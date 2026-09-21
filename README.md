@@ -38,6 +38,9 @@
 | TPS 运行环境面板 | 「装备属性配置」栏新增两块：**TPS 运行环境**（workspace 路径、公共 conftest 版本、SQLite driver 配置统计、可解析驱动规格表 + 「初始化/校验」「同步 driver 配置」按钮）与 **TPS 运行目录**（按 TPS 包列出 workspace 下的运行目录、用例通过数与占用空间、清理旧运行目录） |
 | 界面结构 | 左侧垂直导航栏（品牌区 + 当前测试台名称/编号 + 测试执行/装备属性配置/装备助手/测试记录/测试台导航五个标签，**测试台导航固定在最下**，窄屏自动变顶部横向导航）；右侧为内容区。工位信息只保留产线/工位/物理位置/备注，不采集班次与人员信息 |
 | 界面主题 | 紫色 + 白色背景的工业风主题（工业紫 `#6d28d9` 主色、白色面板、淡紫网格底纹、斜纹分隔条）；所有颜色集中在 `frontend/src/style.css` 的 CSS 变量中，改主题只改这一处 |
+| 元数据管理页 | 左侧导航栏「元数据管理」进入（下挂两个子页面，展开为子导航）：**①装备树管理**（`/metadata/tree`）——维护装备树三级节点 **产品 → 子系统 → 测试台类型**，可新增/重命名/删除产品与子系统（子系统可同时挂在多个产品下）、新增测试台类型并填属性（名称/类别/典型 DUT/推荐节拍/描述，新建时可从同子系统内 BOM 最全的类型复制一份），节点统一落盘后端 `tree` 文件夹的 `tree.json`，列表直接显示每个类型的 BOM 设备数与被已注册测试台引用的台数；**②测试台BOM管理**（`/metadata/bom`）——参照「装备属性配置」中测试台 BOM 的口径，按产品→子系统→类型三级级联选定后以**行内编辑表格**生成/维护该类型的一张 BOM（设备名称型号厂商类别用途、接口、程控标记、默认连接参数 IP:端口 / 串口@波特率 / 资源地址、必需与备注），支持增行/复制/上下移/移除/删库与「从设备模板库添加」（按类别+型号+厂商去重），并与测试台属性一并保存到 `tree/bom/<类型编号>.json`；保存后**「新建测试台」注册向导第一步选中该类型即自动带出这份 BOM**，页面并提供「去新建测试台」入口。既有的 7 个预设测试台类型属性与 49 台设备 BOM 在首次启动时自动纳入管理（`testresource/testbench_presets.json` 降级为种子+回退源） |
+| 元数据管理接口 | 后端独立模块 `backend/metadata_registry.py`：`GET /api/metadata/overview|tree|store|presets/{id}|presets/{id}/bom|device-catalog`、`POST /api/metadata/products|subsystems|presets|reseed|presets/{id}/bom/items`、`PUT /api/metadata/presets/{id}/bom`、`DELETE /api/metadata/products/{id}|subsystems/{id}|presets/{id}|presets/{id}/bom/items/{dev}`；带节点编号格式校验、BOM 条目校验（网络/串口/资源地址口径、可编程必填默认连接、设备编号唯一）、删除保护（被引用的类型与有下级节点的产品/子系统不可删）与原子写 |
+| 元数据管理设计要点 | 新增 `backend/tree/` 作为**预设测试台类型与测试台 BOM 的唯一数据源**（`tree.json` 存树与类型属性、`bom/<类型编号>.json` 存 BOM），`testbench_registry` 的 `_load_presets()` / `_preset_tree()` 改为优先读元数据、失败回退预设文件，因此注册向导与测试台导航无需改动即读到新数据；BOM 只描述类型标准组成，已注册测试台各自保存配置副本，互不覆盖 |
 | 装备助手设计要点 | 工具以**卡片注册表**形式提供（后端 `TOOL_CARDS` 定义卡片元信息与可用性，前端按卡片渲染）：新增工具只需在后端加一张卡片 + 一个处理路由，前端结构与导航无需改动 |
 | 规范测试报告 | 报告含规范字段：日期、批次（UUT 属性，`uut_profiles.json` 预置）、测试项目（TPS 名）、项目（单条用例）、设备编号（测试台）、UUT 类型（SN 前 10 位 PN）、操作员工号（f010392）、结果（OK/NOK）、耗时（秒）、详情、报告链接 |
 
@@ -188,6 +191,13 @@ powershell -ExecutionPolicy Bypass -File packaging\build_package.ps1 -Version 1.
 | GET | `/api/tps/{id}/runs` | 历史运行目录（临时副本）列表 + 最近一次结果摘要 |
 | POST | `/api/tps/{id}/runs/cleanup` | 清理旧运行目录（`keep` 保留最近 N 次，当前运行目录始终保护） |
 | POST | `/api/tps/validate` | 校验 TPS v2 清单结构，返回中文错误清单 |
+| GET | `/api/metadata/overview` · `/tree` · `/store` | 元数据总览指标 / 装备树（产品→子系统→类型）/ tree.json 原文 |
+| POST | `/api/metadata/products` · `/subsystems` · `/presets` | 新增或更新产品 / 子系统 / 测试台类型节点（`original_id` 表示改编号；新建类型可 `copy_bom` 复制 BOM） |
+| DELETE | `/api/metadata/products/{id}` · `/subsystems/{id}` · `/presets/{id}` | 删除节点（被已注册测试台引用或有下级节点时拒绝，`?force=true` 强制） |
+| GET/PUT | `/api/metadata/presets/{id}/bom` | 读取 / 整张保存某类型的 BOM（可同时传 `attributes` 保存测试台属性） |
+| POST/DELETE | `/api/metadata/presets/{id}/bom/items[/{device_id}]` | 追加 / 删除 BOM 中的单台设备 |
+| GET | `/api/metadata/device-catalog` | 设备模板库（全部 BOM 按类别+型号+厂商去重汇总） |
+| POST | `/api/metadata/reseed?mode=merge\|reset` | 从预设文件补齐 / 全量重建 tree 数据 |
 | GET | `/api/health` | 健康检查 |
 
 ## License 授权方案
@@ -350,6 +360,7 @@ D:\ATE
 │   ├── testbench_registry.py # 测试台注册与自检模块（预设类型/BOM/注册表/连通性自检/设备属性 PATCH）
 │   ├── testbench_lifecycle.py # 测试台装备运维模块（待注册/已注册导出、初始化/终止/自检报告、报告区）
 │   ├── instrument_tools.py   # 装备助手模块（工具卡片 + 示波器 SCPI 控制 + 仿真信号源）
+│   ├── metadata_registry.py  # 元数据管理模块（装备树 产品→子系统→类型 + 测试台 BOM，落盘 backend/tree/）
 │   ├── ate_db.py            # 注册库 → SQLite 投影（设备 driver 配置，TPS 运行时读取源）
 │   ├── drivers/             # 仪器驱动层（传输层 / 通用 SCPI / 示波器 / 万用表 / 电源 / 负载 / 信号源 / 运动控制 + 工厂）
 │   ├── tps_runtime/         # TPS 运行环境模块（workspace 临时副本 / 公共 conftest / 清单校验 / 运行路由）
@@ -363,9 +374,13 @@ D:\ATE
 │   ├── run_backend.bat      # 后端启动脚本（优先使用 .venv）
 │   ├── .venv/               # Python 虚拟环境（Python 3.13.7）
 │   ├── testresource/        # TPS 定义（demo_tps.json 旧格式 + <TPS 包>/tps.json 新格式 + ops/ 环境脚本）
-│   │   ├── testbench_presets.json  # 预设测试台类型 + 标准 BOM 清单
+│   │   ├── testbench_presets.json  # 预置测试台类型 + 标准 BOM（已降级为种子/回退源，正式数据在 backend/tree/）
 │   │   ├── testbenches.json        # 已注册测试台（自动生成）
 │   │   └── spm_rh_dyn/             # 示例 TPS v2 包（testconfig / device_config / cmd_suit + testcase/）
+│   ├── tree/                # 元数据管理数据源（「元数据管理」页面维护：装备树 + 测试台 BOM）
+│   │   ├── tree.json        #   产品 / 子系统 / 测试台类型 三级节点与类型属性
+│   │   ├── bom/<类型编号>.json #  每个测试台类型的 BOM 清单（设备默认连接参数）
+│   │   └── README.md        #   目录职责、JSON 字段口径与手工编辑规则
 │   ├── ate.db               # SQLite 测试记录库（自动生成）
 │   ├── test_cases/
 │   │   └── test_demo.py      # Demo pytest 用例
@@ -381,13 +396,14 @@ D:\ATE
 │       ├── views/
 │       │   ├── LoginView.vue    # 登录/注册（License 导入）页
 │       │   ├── ExecuteView.vue  # 执行页（装备树/步骤/报告/记录）
-│       │   ├── EquipmentView.vue      # 测试装备清单页
 │       │   ├── RecordsView.vue        # 历史测试记录页
 │       │   ├── EquipmentView.vue       # 装备属性配置页（BOM 设备属性 + 右键改址）
 │       │   ├── AssistantView.vue       # 装备助手页（工具卡片 + 数字示波器面板 + 仿真信号源控制）
 │       │   ├── TestbenchNavView.vue   # 测试台导航页（已注册测试台独立标签 + 产品/子系统归属）
-│       │   └── TestbenchRegisterView.vue # 新增测试台三步注册向导（产品→子系统→类型 级联选型）
-│       ├── App.vue          # 左侧垂直导航外壳（品牌 + 当前测试台 + 4 个导航标签）
+│       │   ├── TestbenchRegisterView.vue # 新增测试台三步注册向导（产品→子系统→类型 级联选型）
+│       │   ├── MetadataTreeView.vue     # 元数据管理·装备树管理（产品/子系统/类型 三级节点维护）
+│       │   └── MetadataBomView.vue      # 元数据管理·测试台BOM管理（级联选型 + 行内编辑 BOM + 测试台属性）
+│       ├── App.vue          # 左侧垂直导航外壳（品牌 + 当前测试台 + 6 个导航标签：测试执行 / 装备属性配置 / 装备助手 / 测试记录 / 元数据管理 / 测试台导航）
 │       └── style.css        # 主题变量（紫色 + 白底工业风，改配色只改这里）
 ├── start_all.bat            # 一键启动脚本
 ├── docker-compose.yml       # Docker 编排（backend + frontend）
@@ -403,6 +419,8 @@ D:\ATE
 ├── docs/ate-system-topology-devices.html # 系统网络拓扑图·带设备图片版（第二~五层附典型设备图片，AI 拟真图；图例在右上角）
 ├── docs/device-registration-template.html # 设备注册模版说明（字段参考 / 接口校验 / 驱动自动匹配 / 常见错误）
 ├── docs/ate-device-template.jsonc # 设备注册模版本体（JSONC，逐字段备注；去注释即合法 JSON）
+├── docs/metadata-management.html # 元数据管理说明（装备树管理 + 测试台BOM管理：数据流 / 接口 / 校验 / 验证记录）
+├── docs/metadata-management.md   # 同内容 Markdown 版（便于评审与入库）
 ├── docs/driver-sdk-guide.html # 仪器驱动库开发模板与使用说明（契约 / 家族 / 型号包差异面 / 19 项一致性检查）
 ├── docs/scope-contract-api.html # 示波器契约层接口设计（每个接口的签名 / 参数 / 返回结构 / 单位 / 错误码）
 ├── docs/scope-generic-interface-design.html # 示波器通用接口设计（依据泰克编程手册重新总结：七段命令族 / 数据通路 / 29 项测量 / v1.3 新增能力）

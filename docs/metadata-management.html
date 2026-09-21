@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATE Runner — 元数据管理（装备树管理 / 测试台BOM管理）</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --accent-2-rgb: 139, 92, 246;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft);
+    color: var(--text); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* hero */
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; letter-spacing: .3px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .hero .meta { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .metric b { display: block; font-size: 22px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+
+  section { margin-top: 36px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14.5px; margin: 22px 0 8px; color: var(--accent2); }
+  p { margin: 8px 0; }
+  .lead { color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tbl { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; margin: 12px 0; }
+  ul { padding-left: 20px; } li { margin: 5px 0; }
+
+  .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); } .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21, 128, 61, .4); background: rgba(21, 128, 61, .1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180, 83, 9, .4); background: rgba(180, 83, 9, .1); }
+  .badge.accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .4); background: rgba(var(--accent-rgb), .1); }
+
+  /* 入口结构 */
+  .nav-tree { border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; background: var(--panel); font-size: 13px; }
+  .nav-tree .nav-row { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; }
+  .nav-tree .nav-row.new { background: rgba(var(--accent-rgb), .06); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding-left: 10px; margin: 3px 0; }
+  .nav-tree .nav-sub { padding-left: 34px; color: var(--muted); }
+  .nav-code { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+
+  /* 数据流 */
+  .flow { display: grid; gap: 10px; margin-top: 12px; }
+  .flow-box { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--panel); }
+  .flow-box .t { font-weight: 700; font-size: 13.5px; }
+  .flow-box .d { color: var(--muted); font-size: 12.5px; }
+  .flow-arrow { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 12px; }
+  .flow-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 720px) { .flow-split { grid-template-columns: 1fr; } }
+
+  /* 两栏卡片 */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .card ul { margin: 0; }
+
+  /* 步骤 */
+  .steps { border-left: 2px solid var(--border); margin: 8px 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .step { position: relative; }
+  .step::before { content: ''; position: absolute; left: -27px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15); }
+  .step b { display: block; font-size: 14px; }
+  .step span { color: var(--muted); font-size: 13px; }
+
+  .note { border-left: 3px solid var(--accent2); background: rgba(var(--accent-2-rgb), .06); padding: 10px 14px; font-size: 13px; margin: 12px 0; }
+  .note.warn { border-left-color: var(--warn); background: rgba(180, 83, 9, .07); }
+  footer { margin-top: 46px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="stripe"></div>
+    <h1>元数据管理 · 装备树管理 / 测试台BOM管理</h1>
+    <p>把原先只读的「预设测试台类型 + BOM」变成界面可维护的数据，统一落盘到后端的 <code>tree</code> 文件夹，并作为「新建测试台」注册向导的选型与 BOM 数据源。</p>
+    <div class="meta">
+      <span class="badge accent">新增一级导航入口</span>
+      <span class="badge">下挂 2 个子页面</span>
+      <span class="badge">后端模块 metadata_registry.py</span>
+      <span class="badge">数据目录 backend/tree/</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>2</b><span>产品节点（装备树第一级）</span></div>
+      <div class="metric"><b>3</b><span>子系统节点（第二级）</span></div>
+      <div class="metric"><b>7</b><span>测试台类型（第三级）</span></div>
+      <div class="metric"><b>49</b><span>纳管 BOM 设备（可编程 43）</span></div>
+      <div class="metric"><b>17</b><span>元数据接口</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>一、入口与页面结构</h2>
+    <p class="lead">「元数据管理」是左侧导航的一级入口，点击后展开两个子页面；窄屏下自动收敛为顶部横向导航。</p>
+    <div class="nav-tree">
+      <div class="nav-row"><span>测试执行</span><span class="nav-code">RUN</span></div>
+      <div class="nav-row"><span>装备属性配置</span><span class="nav-code">EQU</span><span class="muted">设备连接 · 右键改址</span></div>
+      <div class="nav-row"><span>装备助手</span><span class="nav-code">AST</span></div>
+      <div class="nav-row"><span>测试记录</span><span class="nav-code">REC</span></div>
+      <div class="nav-row new"><strong>元数据管理</strong><span class="nav-code">MDA</span><span class="muted">装备树 · 测试台BOM</span></div>
+      <div class="nav-row nav-sub">└ 装备树管理 · <code>/metadata/tree</code> · 新增产品 / 子系统 / 测试台类型节点</div>
+      <div class="nav-row nav-sub">└ 测试台BOM管理 · <code>/metadata/bom</code> · 编辑生成某类型的 BOM 与属性</div>
+      <div class="nav-row"><span>测试台导航（固定最下）</span><span class="nav-code">TBN</span></div>
+    </div>
+
+    <h3>两个子页面各自解决什么</h3>
+    <div class="cards">
+      <div class="card">
+        <h4>装备树管理</h4>
+        <div class="sub">/metadata/tree</div>
+        <ul>
+          <li>新增 / 编辑 / 删除 <strong>产品 → 子系统 → 测试台类型</strong> 三级节点</li>
+          <li>子系统可同时挂在多个产品下（如 SPM 属于 1000-A / 2000-B）</li>
+          <li>新增类型时可从同子系统内 BOM 最全的类型复制一份，避免空白 BOM</li>
+          <li>节点写入 <code>tree/tree.json</code>；列表显示每个类型的 BOM 设备数与被引用台数</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>测试台BOM管理</h4>
+        <div class="sub">/metadata/bom</div>
+        <ul>
+          <li>参照「装备属性配置」中测试台 BOM 的口径：设备元信息 + 默认连接参数</li>
+          <li>三级级联选定类型后，以<strong>行内编辑表格</strong>维护整张 BOM（增行 / 复制 / 排序 / 移除 / 删库）</li>
+          <li>一并维护<strong>测试台属性</strong>：名称 / 类别 / 典型 DUT / 推荐节拍 / 描述</li>
+          <li>「从设备模板库添加」可引用已有型号；保存写入 <code>tree/bom/&lt;类型编号&gt;.json</code></li>
+          <li>页面直接标出该 BOM 供「新建测试台」使用，并可一键跳到注册向导</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>二、数据流：谁读谁写</h2>
+    <div class="flow">
+      <div class="flow-box">
+        <div class="t">元数据管理页面（前端）</div>
+        <div class="d">装备树管理 / 测试台BOM管理 → 全部写操作走 <code>/api/metadata/*</code></div>
+      </div>
+      <div class="flow-arrow">▼ 保存（原子写：先写 .tmp 再替换）</div>
+      <div class="flow-box">
+        <div class="t">metadata_registry.py — 唯一数据源</div>
+        <div class="d">backend/tree/tree.json（树与类型属性） + backend/tree/bom/&lt;类型编号&gt;.json（BOM 清单）</div>
+      </div>
+      <div class="flow-arrow">▼ load_presets() / load_meta()</div>
+      <div class="flow-split">
+        <div class="flow-box">
+          <div class="t">testbench_registry（后端）</div>
+          <div class="d"><code>/api/testbench/tree</code> 级联选型 · <code>/api/testbench/presets</code> 类型与 BOM · <code>/api/testbench/overview</code> 指标</div>
+        </div>
+        <div class="flow-box">
+          <div class="t">测试台注册向导（前端）</div>
+          <div class="d">第一步选中类型 → 自动获取该类型 BOM；第二步按默认值预填设备配置；第三步注册并自检</div>
+        </div>
+      </div>
+      <div class="flow-arrow">▼ 注册落库</div>
+      <div class="flow-box">
+        <div class="t">testresource/testbenches.json + backend/ate.db</div>
+        <div class="d">已注册测试台各自保存一份设备配置副本；注册库投影到 SQLite，TPS 运行时由公共 conftest 读取 driver 配置</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>边界很清楚：</strong>BOM 只描述「该类型标准装备组成」。新建测试台时用它生成设备清单初值；现场在「装备属性配置」里改址只写该台测试台自己的记录，<strong>不回写 BOM</strong>；反过来改 BOM 也不会自动改写已注册测试台，但之后新建的测试台会立刻读到新版本。
+    </div>
+    <div class="note warn">
+      原预设文件 <code>testresource/testbench_presets.json</code> 降级为<strong>种子 + 回退源</strong>：仅在 <code>tree/</code> 首次建立时导入一次；若 <code>tree/</code> 读取异常，注册流程自动回退到该文件，不因元数据异常而中断。
+    </div>
+  </section>
+
+  <section>
+    <h2>三、存储格式</h2>
+    <h3>backend/tree/tree.json</h3>
+<pre>{
+  "products":   [ { "id": "1000-A", "name": "1000-A 机载电子系统", "note": "…" } ],
+  "subsystems": [ { "id": "SPM", "name": "SPM 电源模块", "products": ["1000-A", "2000-B"] } ],
+  "preset_types": [
+    { "id": "PB-PWR-01", "name": "电源模块标准测试台", "category": "电源类",
+      "description": "面向 DC-DC / LDO 电源模块的通用电性能测试台…",
+      "typical_dut": "DC-DC 模块、LDO 板、PD 适配器板", "recommended_cycle": "38 s / 件",
+      "product": "1000-A", "subsystem": "SPM", "bom_count": 8 }
+  ]
+}</pre>
+    <p class="muted">产品 / 子系统的显示名只在 <code>products</code> / <code>subsystems</code> 里维护一次，类型节点只存归属编号，避免两处改名不一致。</p>
+
+    <h3>backend/tree/bom/&lt;类型编号&gt;.json</h3>
+<pre>{
+  "preset_id": "PB-PWR-01",
+  "count": 8,
+  "items": [
+    { "id": "tek-mso54", "name": "数字示波器", "model": "Tektronix MSO54", "vendor": "Tektronix",
+      "category": "示波器", "role": "上电时序 / 纹波测量", "programmable": true, "interface": "LAN",
+      "protocol": "VXI-11 (SCPI)", "default_host": "192.168.10.21", "default_port": 4000,
+      "default_address": "TCPIP0::192.168.10.21::inst0::INSTR", "required": true, "note": "…" }
+  ]
+}</pre>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>接口口径</th><th>默认参数填写</th><th>可编程时的必填</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">LAN / ETHERNET / TCP / IP</td><td><code>default_host</code> + <code>default_port</code></td><td>IP + 端口</td></tr>
+          <tr><td class="mono">SERIAL / RS232 / RS485 / UART / COM</td><td><code>default_serial_port</code> + <code>default_baudrate</code></td><td>串口号（波特率可选）</td></tr>
+          <tr><td class="mono">USB / GPIB / NONE</td><td><code>default_address</code> 资源地址</td><td>不支持自动探测，自检记 skip，需人工确认</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>四、接口清单</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/overview</td><td>指标块（产品 / 子系统 / 类型 / BOM 设备数）+ 存储路径 + 更新时间</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/tree</td><td>装备树（产品 → 子系统 → 类型，含 BOM 摘要与引用次数）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/store</td><td>tree.json 原始内容（排障 / 导出）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/metadata/reseed?mode=merge|reset</td><td>从预设文件补齐 / 全量重建</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/metadata/products</td><td>新增或更新产品节点（<code>original_id</code> 表示改编号）</td></tr>
+          <tr><td class="mono">DELETE</td><td class="mono">/api/metadata/products/{id}</td><td>删除产品（有下级节点时拒绝；<code>?force=true</code> 强制）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/metadata/subsystems</td><td>新增或更新子系统节点（<code>products</code> 多选归属）</td></tr>
+          <tr><td class="mono">DELETE</td><td class="mono">/api/metadata/subsystems/{id}</td><td>删除子系统（下仍有类型时拒绝）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/metadata/presets</td><td>新增或更新测试台类型（属性；新建可 <code>copy_bom</code> / <code>copy_bom_from</code> 复制 BOM）</td></tr>
+          <tr><td class="mono">DELETE</td><td class="mono">/api/metadata/presets/{id}</td><td>删除类型（被已注册测试台引用时拒绝；<code>?force=true</code> 强制）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/presets/{id}</td><td>类型详情（属性 + BOM + 被引用台数）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/presets/{id}/bom</td><td>读取 BOM 清单与属性</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">/api/metadata/presets/{id}/bom</td><td>整张 BOM 保存（可选 <code>attributes</code> 一并保存测试台属性）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/metadata/presets/{id}/bom/items</td><td>追加一台设备（<code>before_id</code> 可指定插入位置）</td></tr>
+          <tr><td class="mono">DELETE</td><td class="mono">/api/metadata/presets/{id}/bom/items/{device_id}</td><td>删除一台设备</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/metadata/device-catalog</td><td>设备模板库（所有已纳管 BOM 按类别 + 型号 + 厂商去重）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>五、校验与保护</h2>
+    <div class="cards">
+      <div class="card">
+        <h4>节点编号</h4>
+        <ul>
+          <li>字母 / 数字开头，仅允许 <code>字母 数字 . _ -</code>（如 <code>PB-PWR-02</code>、<code>DSP</code>、<code>3000-C</code>）</li>
+          <li>类型必须挂在「该产品下已声明」的子系统分支上，跨分支挂载会被拦下并提示</li>
+          <li>编号唯一；改编号会同步迁移 BOM 文件与子系统内引用</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>BOM 条目</h4>
+        <ul>
+          <li>设备名称 / 型号必填；同一张 BOM 内设备编号唯一</li>
+          <li>网络设备：IP 或主机名格式 + 端口 1–65535；可编程设备必须有默认 IP + 端口</li>
+          <li>串口设备：<code>COMx</code> / <code>/dev/tty*</code> + 波特率 300–921600；可编程设备必须有串口号</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>删除保护</h4>
+        <ul>
+          <li>被已注册 / 草稿测试台引用的类型不可删除，提示引用台数</li>
+          <li>产品还有子系统或类型、子系统下还有类型时不可删除</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>写入安全</h4>
+        <ul>
+          <li>全部保存走「先写 <code>.tmp</code> 再 <code>os.replace</code>」的原子写</li>
+          <li>进程内互斥锁串行化写操作；手工编辑 JSON 也无需重启（每次请求重新读取）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>六、验证记录</h2>
+    <p class="lead">2026-09-21 实机跑通：后端 <code>backend/.venv</code> + uvicorn 冒烟测试，前端 <code>npm run build</code>，后端同端口托管新包。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>验证项</th><th>结果</th><th>证据</th></tr></thead>
+        <tbody>
+          <tr><td>首次启动自动纳入既有预设</td><td><span class="badge ok">通过</span></td><td>tree.json + 7 份 BOM 生成：2 产品 / 3 子系统 / 7 类型 / 49 台设备（可编程 43）</td></tr>
+          <tr><td>新增产品 → 子系统 → 类型（复制 BOM）</td><td><span class="badge ok">通过</span></td><td>新类型自动继承 8 台设备 BOM</td></tr>
+          <tr><td>整张 BOM 保存 + 测试台属性保存</td><td><span class="badge ok">通过</span></td><td>2 台设备落盘，属性（名称 / 描述 / 典型 DUT / 节拍）同步更新</td></tr>
+          <tr><td>追加 / 删除单台设备</td><td><span class="badge ok">通过</span></td><td>编号自增，计数同步</td></tr>
+          <tr><td>校验拦截</td><td><span class="badge ok">通过</span></td><td>缺型号返回「型号不能为空」，未落盘</td></tr>
+          <tr><td>注册向导读取新 BOM</td><td><span class="badge ok">通过</span></td><td><code>/api/testbench/tree</code> 出现新分支；<code>/api/testbench/presets/TST-TYPE-01</code> 返回新 BOM 与新属性</td></tr>
+          <tr><td>删除保护</td><td><span class="badge ok">通过</span></td><td>被 1 台已注册测试台引用的类型拒绝删除；有下级节点的产品拒绝删除</td></tr>
+          <tr><td>前端构建</td><td><span class="badge ok">通过</span></td><td>vite 5.4.21，47 modules transformed，无告警级错误</td></tr>
+          <tr><td>冒烟数据回滚</td><td><span class="badge ok">通过</span></td><td>测试节点与 BOM 文件已清除，tree/ 仅剩 7 份正式 BOM</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>七、现场使用步骤</h2>
+    <div class="steps">
+      <div class="step"><b>① 建树</b><span>元数据管理 → 装备树管理：「＋ 新增产品」建产品；在产品行点「＋子系统」建子系统（可勾多个所属产品）。</span></div>
+      <div class="step"><b>② 建类型</b><span>在子系统行点「＋类型」，填名称 / 类别 / 典型 DUT / 推荐节拍 / 描述；勾选「从同子系统内 BOM 最全的类型自动复制」，避免空白 BOM。</span></div>
+      <div class="step"><b>③ 编 BOM</b><span>切到测试台BOM管理，三级级联选中该类型 → 核对属性 → 「＋ 新增设备行」或「从设备模板库添加」→ 填默认连接参数 → 「校验」→「保存 BOM 与属性」。</span></div>
+      <div class="step"><b>④ 用 BOM</b><span>测试台导航 → 新增测试台：第一步选中该类型即带出这份 BOM，第二步按默认值预填后按现场改址，第三步注册并自检。</span></div>
+      <div class="step"><b>⑤ 回退</b><span>需要恢复出厂元数据时，装备树管理页点「全量重建」（以预设文件为准，手工新增节点会丢失）。</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>八、已知边界</h2>
+    <ul>
+      <li><strong>不影响已注册测试台</strong>：改 BOM / 改属性不会同步到已注册测试台的配置副本；统一改址请到「装备属性配置」逐台修改（有格式校验与变更留痕）。</li>
+      <li><strong>类型编号重命名</strong>会迁移 BOM 文件并更新子系统内引用，但已注册测试台记录里的 <code>preset_id</code> 不会自动改写，需重新注册或手工改配。</li>
+      <li>BOM 表格为行内编辑、字段较宽，窄屏需横向滚动（表格设 <code>min-width</code>，避免卡片互相挤压）。</li>
+      <li>预设文件不再被写入，仅作种子与回退源；若团队以该文件为发布物，请「全量重建」后再导出 <code>tree/</code>。</li>
+    </ul>
+  </section>
+
+  <footer>
+    涉及文件：<span class="mono">backend/metadata_registry.py</span>（新增）·
+    <span class="mono">backend/tree/</span>（新增数据目录）·
+    <span class="mono">backend/testbench_registry.py</span>（预设读取改为优先元数据）·
+    <span class="mono">backend/main.py</span>（注册路由）·
+    <span class="mono">frontend/src/views/MetadataTreeView.vue</span>、<span class="mono">MetadataBomView.vue</span>（新增页面）·
+    <span class="mono">frontend/src/{api.js,router/index.js,App.vue}</span>（接口、路由、导航）
+  </footer>
+
+</div>
+</body>
+</html>

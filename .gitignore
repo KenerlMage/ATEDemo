@@ -36,3 +36,29 @@ backend/logs/
 .thumbs/
 Thumbs.db
 desktop.ini
+
+# ---- python 缓存 / 测试产物 ----
+**/.mypy_cache/
+**/.ruff_cache/
+**/*.egg-info/
+**/htmlcov/
+**/.coverage
+**/.ipynb_checkpoints/
+workspace/**/run_result.json.bak
+
+# ---- SQLite 瞬时文件 ----
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
+
+# ---- 临时 / 编辑器残留 ----
+**/*.tmp
+**/*.bak
+**/~$*
+**/*.swp
+**/.DS_Store
+
+# ---- 打包构建残留（正式产物默认输出到仓库外的 ..\ATE_DIST）----
+/ATE_DIST/
+**/payload/
+**/*_work/

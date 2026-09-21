@@ -36,6 +36,7 @@ D:\ATE
 ├── backend/                     # FastAPI 后端
 │   ├── main.py                  # 服务入口：全部 API 路由与核心逻辑
 │   ├── testbench_registry.py    # 测试台注册与自检模块（独立挂载 /api/testbenches*）
+│   ├── metadata_registry.py     # 元数据管理模块（装备树 + 测试台 BOM 唯一数据源，挂载 /api/metadata*）
 │   ├── license_utils.py         # License 校验模块（公钥验签/机器码）
 │   ├── license.dat              # 导入生效后的本地授权文件（自动生成）
 │   ├── tools/                   # License 签发工具（仅签发方持有，不随产品分发）
@@ -45,11 +46,15 @@ D:\ATE
 │   ├── testresource/            # TPS 定义目录
 │   │   ├── demo_tps.json        #   Demo TPS（8 步：init→6 用例→teardown）
 │   │   ├── equipment_demo.xml   #   测试装备清单 XML（title / SPMTS 编号 / 硬件列表）
-│   │   ├── testbench_presets.json # 预设测试台类型 + 标准 BOM（只读）
+│   │   ├── testbench_presets.json # 预置测试台类型 + 标准 BOM（种子/回退源，正式数据在 backend/tree/）
 │   │   ├── testbenches.json     #   已注册测试台（配置 + 自检结果，自动生成）
 │   │   └── ops/                 #   环境初始化/终止脚本
 │   │       ├── init_env.py
 │   │       └── teardown_env.py
+│   ├── tree/                    # 元数据管理数据源（「元数据管理」页维护）
+│   │   ├── tree.json            #   产品 / 子系统 / 测试台类型 三级节点与类型属性
+│   │   ├── bom/<类型编号>.json  #   每个类型的标准 BOM（设备默认连接参数）
+│   │   └── README.md            #   目录职责、JSON 字段口径与手工编辑规则
 │   ├── test_cases/              # pytest 用例目录（客户可自由增删）
 │   │   └── test_demo.py         #   6 条 Demo 用例（含参数化）
 │   ├── logs/                    # 运行产物（自动生成）
@@ -78,7 +83,9 @@ D:\ATE
 │           ├── AssistantView.vue        # 装备助手（工具卡片 + 数字示波器面板）
 │           ├── RecordsView.vue          # 历史测试记录查询
 │           ├── TestbenchNavView.vue     # 测试台导航（独立标签 + 自检清单）
-│           └── TestbenchRegisterView.vue # 新增测试台三步注册向导
+│           ├── TestbenchRegisterView.vue # 新增测试台三步注册向导
+│           ├── MetadataTreeView.vue     # 元数据管理·装备树管理（产品/子系统/类型 三级节点）
+│           └── MetadataBomView.vue      # 元数据管理·测试台BOM管理（行内编辑 BOM + 测试台属性）
 ├── start_all.bat                # 一键启动（bat 纯 ASCII + CRLF）
 ├── docker-compose.yml           # backend + frontend(nginx) 双容器
 ├── docs/
@@ -170,6 +177,15 @@ D:\ATE
 - **v1 兼容**：旧单文件 TPS（`demo_tps.json`，`steps` 列表）继续按原逻辑执行（`test` 步骤跑 `testcase_id`，init/teardown 跑脚本），**不建 workspace 副本**；`main.py` 的 `_load_tps_files` / `_read_tps` / `_run_tps_step` 改为委派 `tps_runtime`，v2 分支存在 `step["v2"]` 标记时走临时副本。
 - **报告与追溯**：任务执行前写好运行环境日志头（Workspace / Bench / Mode），HTML 报告新增「运行环境 (workspace)」卡片（临时副本目录 / 公共 conftest 路径 / 清单三字段计数）；运行目录里的 `run_result.json` 落汇总、逐用例阈值明细与每台设备解析出的 driver 规格。
 
+### 3.10 元数据管理（metadata_registry.py + tree/）
+
+- **唯一数据源**：`backend/tree/tree.json` 存装备树（`products` / `subsystems` / `preset_types` 三级节点与类型属性），`backend/tree/bom/<类型编号>.json` 存该类型的标准 BOM；数据目录可用环境变量 `ATE_TREE_DIR` 覆盖，`tree/` 下另有 `README.md` 说明字段口径。
+- **种子导入**：首启 `ensure_store(mode="merge")` 从 `testresource/testbench_presets.json` 导入既有预设类型与 BOM（存量资产纳入管理）；`POST /api/metadata/reseed?mode=reset` 可按预设文件全量重建。
+- **读取收口**：`testbench_registry._load_presets()` / `_preset_tree()` 优先调 `metadata_registry.load_presets()` / `load_meta()`，失败才回退预设文件——因此**注册向导与测试台导航零改动即读到新数据**。
+- **写入安全**：保存走「先写 `.tmp` 再 `os.replace`」原子写 + `threading.RLock` 串行化；每次请求重新读盘，手工编辑 JSON 无需重启。
+- **校验与保护**：节点编号正则（字母/数字开头，允许 `._-`）、类型必须挂在「该产品下已声明的子系统」；BOM 名称/型号必填、设备编号唯一、网络设备 IP + 端口（1-65535）、串口 `COMx` + 波特率（300-921600）、可编程设备必须有默认连接；删除保护：被已注册测试台引用的类型、有下级节点的产品/子系统拒删（支持 `force=true`）。
+- **边界**：BOM 只描述「类型标准组成」，不回写已注册测试台的配置副本；现场改址也不反向回写 BOM。
+
 ## 4. 前端模块设计
 
 | 模块 | 职责 |
@@ -177,15 +193,16 @@ D:\ATE
 | `api.js` | 统一 `request()`（JSON 封装 + 错误抛出），导出全部接口函数 |
 | `router` | `/login`、`/`（守卫：无 token 跳登录） |
 | `style.css` | 主题变量：`--accent` / `--accent-rgb` / `--bg` / `--panel` / `--border` / `--ok` / `--warn` / `--err`（紫色 + 白底工业风，改配色只改此处） |
-| `App.vue` | **左侧垂直导航外壳**：品牌区 + 当前测试台（title/SPMTS 编号）+ 4 个导航标签（测试执行/测试装备/测试记录/**测试台导航置底**）+ 用户与退出；≤900px 自动转顶部横向导航。导航项在 `NAV` 数组中配置 |
+| `App.vue` | **左侧垂直导航外壳**：品牌区 + 当前测试台（title/SPMTS 编号）+ 6 个导航入口（测试执行 / 装备属性配置 / 装备助手 / 测试记录 / **元数据管理（展开为「装备树管理」「测试台BOM管理」两个子项）** / **测试台导航置底**）+ 用户与退出；≤900px 自动转顶部横向导航。导航项在 `NAV` 数组中配置，父项带 `children` 时渲染 `.side-sub` 子入口 |
 | `LoginView.vue` | 三态：检查中 → 未授权（注册页：导入 .lic 文件）→ 已授权（登录表单） |
 | `ExecuteView.vue` | 主界面四区：左列（装备树 + 测试记录查询）、右列（环境卡 / 步骤列表 / 报告） |
 | `EquipmentView.vue` | **装备运维页（三栏控件）**：顶部栏切换 **装备属性配置**（设备清单来自各测试台注册 BOM（`GET /api/testbench/devices`），按测试台分组 + 筛选/搜索；可编程设备**右键菜单**（修改属性/恢复 BOM 默认值/复制资源地址/变更历史）+ 属性弹窗按接口类型渲染字段；非可编程设备只读；底部四个面板：待注册测试台导出、**已注册测试台导出（勾选 / 全选 + 导出选中 / 导出全部已注册）**、**TPS 运行环境**（workspace 路径 / 公共 conftest 版本 / SQLite driver 配置统计 / 驱动规格表 + 初始化·同步按钮）与 **TPS 运行目录**（按 TPS 包列运行目录与结果徽标、清理旧目录））→ **测试台装备自检**（目标测试台 + 运行模式 + 初始化/终止/自检三按钮 + 报告弹窗）→ **装备报告中心**（报告目录信息 + 历史报告表 + 打开本地资源管理器）；切换同步地址栏 `#/equipment?tab=selfcheck|reports`，刷新后停留在同一栏 |
 | `AssistantView.vue` | **装备助手页**：工具卡片网格（单击/双击选中 → 「运行工具」启动）；数字示波器面板（绑定设备/连接与识别/运行·停止·单次/自动设置/时基/通道/Canvas 波形/测量卡片/SCPI 日志），支持离线模拟 |
 | `RecordsView.vue` | 历史测试记录查询（日期/项目/批次/UUT 组合筛选） |
 | `TestbenchNavView.vue` | 测试台导航页：指标块 + 已注册测试台**独立标签** + 详情（产品/子系统、工位信息、设备表、自检清单、重新自检/编辑/删除） |
-| `TestbenchRegisterView.vue` | 新增测试台三步注册向导（三级级联选型 + BOM 表 + 工位表单 + 设备配置卡 + 验证方式选择 + 自检清单），支持 `?id=` 编辑模式 |
-| `style.css` | 全局主题：紫色 + 白底工业风（淡紫网格底纹 + 斜纹分隔条） |
+| `TestbenchRegisterView.vue` | 新增测试台三步注册向导（三级级联选型 + BOM 表 + 工位表单 + 设备配置卡 + 验证方式选择 + 自检清单），支持 `?id=` 编辑模式；级联选项与 BOM 来自元数据模块（`/api/testbench/tree`、`/api/testbench/presets/{id}`） |
+| `MetadataTreeView.vue` | **元数据管理·装备树管理**（`/metadata/tree`）：指标块 + 存储位置条（tree 文件夹 / tree.json / bom 目录 / 更新时间 + 「从预设文件补齐」「全量重建」）+ 三级节点树（新增/编辑/删除，产品含所属子系统、子系统可多选归属产品、类型含属性与「复制 BOM」）+ 与 BOM 页互跳 |
+| `MetadataBomView.vue` | **元数据管理·测试台BOM管理**（`/metadata/bom`，支持 `?preset=` 直达）：产品→子系统→类型三级级联 + 测试台属性区 + BOM 行内编辑大表（增行/复制/上移下移/移除/删库、接口切换默认参数口径、校验）+ 设备模板库弹窗 + 「供新建测试台使用」信息卡与跳转注册向导 |
 
 ExecuteView 关键交互：
 
@@ -238,6 +255,13 @@ ExecuteView 关键交互：
 | PATCH | `/api/testbenches/{id}/devices/{device_id}` | 修改可编程设备连接属性（或 `reset_defaults` 恢复默认值） |
 | GET | `/api/tools` · `/api/tools/oscilloscope/bindings` | 装备助手工具卡片清单 / 可绑定示波器设备 |
 | POST | `/api/tools/oscilloscope/connect` · `/action` · `GET /state` | 示波器会话建立 / SCPI 操作 / 会话状态 |
+| GET | `/api/metadata/overview` · `/tree` · `/store` | 元数据指标（产品/子系统/分支/类型/BOM 设备数）+ 装备树（产品→子系统→类型）+ tree.json 原文 |
+| POST | `/api/metadata/products` · `/subsystems` · `/presets` | 新增或更新三级节点（`original_id` 改编号；新建类型可 `copy_bom` / `copy_bom_from` 复制 BOM） |
+| DELETE | `/api/metadata/products/{id}` · `/subsystems/{id}` · `/presets/{id}` | 删除节点（被引用或有下级时拒绝，`?force=true` 强制） |
+| GET / PUT | `/api/metadata/presets/{id}/bom` | 读取 / 整张保存某类型的 BOM（可带 `attributes` 同保存测试台属性） |
+| POST / DELETE | `/api/metadata/presets/{id}/bom/items[/{device_id}]` | 追加（可 `before_id` 指定位置）/ 删除 BOM 单台设备 |
+| GET | `/api/metadata/device-catalog` | 设备模板库（全部 BOM 按类别 + 型号 + 厂商去重） |
+| POST | `/api/metadata/reseed?mode=merge\|reset` | 从预设文件补齐 / 全量重建 tree 数据 |
 | GET | `/api/health` | 健康检查 |
 | *旧接口* | `/api/execute`、`/api/tasks`、`/api/tasks/{id}` | 早期单用例执行接口，保留兼容 |
 
@@ -287,7 +311,7 @@ docker compose up -d --build
 
 ### 7.3 Windows 工控机（无 Docker）
 
-- PyInstaller 免安装打包（后端 exe + 前端 dist 静态托管）——方案已规划，尚未实施。
+- 免安装打包**已实施**：`packaging/build_package.ps1` 产出 `ATE_Setup-<版本>.exe`（优先 Inno Setup，无则用系统自带 `csc.exe` 编自包含安装器）与 `ATERunner-portable-<版本>.zip`；整包 = `app/`（后端源码）+ `web/`（前端 dist）+ `runtime/`（嵌入式 Python，离线），PyInstaller 仅用于编 `ATE_Launcher.exe` 启动器（未装则回退 `start-ate.bat`）。
 - License 支持按客户机器码绑定，适配离线交付。
 
 ## 8. 数据模型
@@ -357,6 +381,18 @@ workspace/                        # TPS 运行环境（安装运行目录下，�
                                   #   ate_env.json / conftest.py / run_result.json / run_log.txt）
 ```
 
+### 8.4 元数据文件（backend/tree/）
+
+```
+tree.json                 # products[] / subsystems[] / preset_types[]：三级节点与类型属性
+                          #   （名称 / 类别 / 典型 DUT / 推荐节拍 / 描述 / 归属产品与子系统 / bom_count）
+bom/<类型编号>.json        # preset_id / count / items[]：设备名称·型号·厂商·类别·用途、接口与协议、程控标记、
+                          #   default_host / default_port / default_serial_port / default_baudrate /
+                          #   default_address / required / note
+```
+
+写入均为「先写 .tmp 再 `os.replace`」原子替换；`testresource/testbench_presets.json` 降级为种子与回退源（仅在 `tree/` 首次建立时导入）。
+
 ## 9. 关键设计决策与约束
 
 | 决策 | 理由 |
@@ -367,6 +403,7 @@ workspace/                        # TPS 运行环境（安装运行目录下，�
 | SQLite 零依赖 | 工控机免装数据库，单文件随目录迁移 |
 | 报告/日志/记录三方留存 | 满足质量追溯；报告自包含可独立分发 |
 | Ed25519 离线验签 | 工控机可能无外网；非对称签名防伪造、可绑定设备 |
+| 元数据单一数据源 | 预设测试台类型与 BOM 收口到 `backend/tree/`，`testbench_registry` 优先读它并保底回退预设文件；注册向导/测试台导航零改动即生效，现场也能手工改 JSON（每次请求重读，无需重启） |
 | 远端 TPS 在线优先+本地回退 | 产线断网不中断测试，默认 TPS 始终可用 |
 | AI 代理走后端 | 规避浏览器 CORS；Key 不落服务器（仅浏览器 localStorage） |
 | bat 脚本纯 ASCII + CRLF | cmd 按 GBK 解析 UTF-8 中文会变乱码令牌（历史踩坑教训） |
