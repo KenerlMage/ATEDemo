@@ -6,6 +6,8 @@ import AssistantView from '../views/AssistantView.vue'
 import RecordsView from '../views/RecordsView.vue'
 import TestbenchNavView from '../views/TestbenchNavView.vue'
 import TestbenchRegisterView from '../views/TestbenchRegisterView.vue'
+import MetadataTreeView from '../views/MetadataTreeView.vue'
+import MetadataBomView from '../views/MetadataBomView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -22,7 +24,13 @@ const router = createRouter({
     // 测试台导航页: 已注册测试台以独立标签展示 + 其他页面导航入口
     { path: '/testbenches', name: 'testbenches', component: TestbenchNavView, meta: { requiresAuth: true } },
     // 新增测试台注册页 (三步: 选类型+BOM/工位 -> 设备配置 -> 注册并验证)
-    { path: '/testbenches/register', name: 'testbench-register', component: TestbenchRegisterView, meta: { requiresAuth: true } }
+    { path: '/testbenches/register', name: 'testbench-register', component: TestbenchRegisterView, meta: { requiresAuth: true } },
+    // 元数据管理 (下挂两个子页面: 装备树管理 / 测试台BOM管理)
+    { path: '/metadata', redirect: '/metadata/tree' },
+    //  子页面一: 装备树管理 (新增/维护 产品 -> 子系统 -> 测试台类型 节点, 落盘后端 tree 文件夹)
+    { path: '/metadata/tree', name: 'metadata-tree', component: MetadataTreeView, meta: { requiresAuth: true } },
+    //  子页面二: 测试台BOM管理 (编辑生成某测试台类型的 BOM + 属性, 供新建测试台使用)
+    { path: '/metadata/bom', name: 'metadata-bom', component: MetadataBomView, meta: { requiresAuth: true } }
   ]
 })
 

@@ -55,6 +55,19 @@ const NAV = [
     match: (p) => p.startsWith('/records')
   },
   {
+    to: '/metadata/tree',
+    icon: '◈',
+    name: '元数据管理',
+    desc: '装备树 · 测试台BOM',
+    code: 'MDA',
+    match: (p) => p.startsWith('/metadata'),
+    // 下挂两个子页面: 装备树管理 / 测试台BOM管理
+    children: [
+      { to: '/metadata/tree', name: '装备树管理', short: '装备树', code: 'TREE', match: (p) => p === '/metadata/tree' || p === '/metadata' },
+      { to: '/metadata/bom', name: '测试台BOM管理', short: '测试台BOM', code: 'BOM', match: (p) => p.startsWith('/metadata/bom') }
+    ]
+  },
+  {
     to: '/testbenches',
     icon: '▦',
     name: '测试台导航',
@@ -121,20 +134,34 @@ function logout() {
 
         <!-- 垂直导航 -->
         <nav class="side-nav">
-          <router-link
-            v-for="item in NAV"
-            :key="item.to"
-            :to="item.to"
-            class="side-item"
-            :class="{ active: item.match(route.path), 'is-last': item.last }"
-          >
-            <span class="side-icon">{{ item.icon }}</span>
-            <span class="side-body">
-              <span class="side-name">{{ item.name }}</span>
-              <span class="side-desc">{{ item.desc }}</span>
-            </span>
-            <span class="side-code">{{ item.code }}</span>
-          </router-link>
+          <template v-for="item in NAV" :key="item.to">
+            <router-link
+              :to="item.to"
+              class="side-item"
+              :class="{ active: item.match(route.path), 'is-last': item.last }"
+            >
+              <span class="side-icon">{{ item.icon }}</span>
+              <span class="side-body">
+                <span class="side-name">{{ item.name }}</span>
+                <span class="side-desc">{{ item.desc }}</span>
+              </span>
+              <span class="side-code">{{ item.code }}</span>
+            </router-link>
+            <!-- 有子页面的导航项 (元数据管理): 选中时展开两个子页面入口 -->
+            <div v-if="item.children && item.match(route.path)" class="side-sub">
+              <router-link
+                v-for="child in item.children"
+                :key="child.to"
+                :to="child.to"
+                class="side-sub-item"
+                :class="{ active: child.match(route.path) }"
+              >
+                <span class="sub-dot"></span>
+                <span class="sub-name">{{ child.short || child.name }}</span>
+                <span class="sub-code">{{ child.code }}</span>
+              </router-link>
+            </div>
+          </template>
         </nav>
 
         <!-- 底部：用户 + 退出 -->
@@ -281,6 +308,38 @@ function logout() {
   background: linear-gradient(90deg, var(--border-strong), transparent);
 }
 
+/* 子页面入口（元数据管理 → 装备树管理 / 测试台BOM管理） */
+.side-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px 12px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(var(--accent-rgb), 0.25);
+}
+.side-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  border: 1px solid transparent;
+}
+.side-sub-item:hover { color: var(--accent); background: var(--panel-2); border-color: var(--border); }
+.side-sub-item.active {
+  color: var(--accent);
+  font-weight: 700;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.12), rgba(var(--accent-rgb), 0.02));
+  border-color: rgba(var(--accent-rgb), 0.28);
+}
+.sub-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); flex: 0 0 auto; }
+.side-sub-item.active .sub-dot { background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6); }
+.sub-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub-code { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.5px; color: var(--muted); }
+
 /* 底部 */
 .side-foot {
   display: flex;
@@ -330,6 +389,9 @@ function logout() {
   .brand-name { font-size: 15px; }
   .brand-mark { width: 30px; height: 30px; flex: 0 0 30px; font-size: 15px; }
   .side-nav { flex-direction: row; gap: 4px; overflow: visible; }
+  .side-sub { flex-direction: row; margin: 0 0 0 4px; padding-left: 6px; }
+  .side-sub-item { padding: 6px 8px; }
+  .sub-code { display: none; }
   .side-item { padding: 7px 10px; gap: 6px; white-space: nowrap; }
   .side-item.is-last { margin-top: 0; }
   .side-item.is-last::before { display: none; }

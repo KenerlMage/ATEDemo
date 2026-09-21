@@ -151,6 +151,42 @@ export const api = {
     request(`/api/tps/${encodeURIComponent(tpsId)}/runs/cleanup`, { method: 'POST', body: JSON.stringify({ keep }) }),
   // TPS v2 清单校验
   validateTps: (manifest) => request('/api/tps/validate', { method: 'POST', body: JSON.stringify({ manifest }) }),
+  // ---- 元数据管理 (装备树管理 + 测试台BOM管理; 数据落在后端 tree 文件夹) ----
+  // 指标块 / 存储路径 / 纳管统计
+  getMetadataOverview: () => request('/api/metadata/overview'),
+  // 装备树: 产品 -> 子系统 -> 测试台类型 (含 BOM 摘要与引用次数)
+  getMetadataTree: () => request('/api/metadata/tree'),
+  // tree.json 原始内容 (排障 / 导出)
+  getMetadataStore: () => request('/api/metadata/store'),
+  // 从 testresource/testbench_presets.json 重新导入 (merge=补齐缺失 / reset=全量重建)
+  reseedMetadata: (mode = 'merge') =>
+    request(`/api/metadata/reseed?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: JSON.stringify({}) }),
+  // 产品节点 (original_id 传旧编号表示改编号)
+  saveMetadataProduct: (payload) => request('/api/metadata/products', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  deleteMetadataProduct: (id, force = false) =>
+    request(`/api/metadata/products/${encodeURIComponent(id)}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  // 子系统节点
+  saveMetadataSubsystem: (payload) => request('/api/metadata/subsystems', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  deleteMetadataSubsystem: (id, force = false) =>
+    request(`/api/metadata/subsystems/${encodeURIComponent(id)}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  // 测试台类型节点 (含属性: 名称/类别/典型DUT/推荐节拍/描述; 新建时可复制已有 BOM)
+  saveMetadataPreset: (payload) => request('/api/metadata/presets', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  deleteMetadataPreset: (id, force = false) =>
+    request(`/api/metadata/presets/${encodeURIComponent(id)}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  getMetadataPreset: (id) => request(`/api/metadata/presets/${encodeURIComponent(id)}`),
+  // 测试台 BOM (整张读写 + 单条增删)
+  getMetadataBom: (id) => request(`/api/metadata/presets/${encodeURIComponent(id)}/bom`),
+  saveMetadataBom: (id, payload) =>
+    request(`/api/metadata/presets/${encodeURIComponent(id)}/bom`, { method: 'PUT', body: JSON.stringify(payload || {}) }),
+  addMetadataBomItem: (id, item) =>
+    request(`/api/metadata/presets/${encodeURIComponent(id)}/bom/items`, { method: 'POST', body: JSON.stringify({ item }) }),
+  deleteMetadataBomItem: (id, deviceId) =>
+    request(`/api/metadata/presets/${encodeURIComponent(id)}/bom/items/${encodeURIComponent(deviceId)}`, {
+      method: 'DELETE'
+    }),
+  // 可复用设备模板库 (从所有已纳管 BOM 去重汇总)
+  getMetadataDeviceCatalog: () => request('/api/metadata/device-catalog'),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }
