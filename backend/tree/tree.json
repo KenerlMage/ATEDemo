@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "managed_by": "元数据管理 · 装备树管理 / 测试台BOM管理",
+  "created_at": "2026-09-21 23:15:39",
+  "updated_at": "2026-09-21 23:16:08",
+  "seed_source": "testresource\\testbench_presets.json",
+  "products": [
+    {
+      "id": "1000-A",
+      "name": "1000-A 机载电子系统",
+      "note": "第一代机载电子系统, 含 SPM/WA/SD 三个子系统"
+    },
+    {
+      "id": "2000-B",
+      "name": "2000-B 车载电子系统",
+      "note": "第二代车载电子系统, 含 SPM/SD 两个子系统"
+    }
+  ],
+  "subsystems": [
+    {
+      "id": "SPM",
+      "name": "SPM 电源模块",
+      "products": [
+        "1000-A",
+        "2000-B"
+      ],
+      "note": ""
+    },
+    {
+      "id": "WA",
+      "name": "WA 无线组件",
+      "products": [
+        "1000-A"
+      ],
+      "note": ""
+    },
+    {
+      "id": "SD",
+      "name": "SD 伺服驱动",
+      "products": [
+        "1000-A",
+        "2000-B"
+      ],
+      "note": ""
+    }
+  ],
+  "preset_types": [
+    {
+      "id": "PB-PWR-01",
+      "name": "电源模块标准测试台",
+      "category": "电源类",
+      "description": "面向 DC-DC / LDO 电源模块的通用电性能测试台，覆盖上电时序、纹波、效率、限流与保护点测试。",
+      "typical_dut": "DC-DC 模块、LDO 板、PD 适配器板",
+      "recommended_cycle": "38 s / 件",
+      "product": "1000-A",
+      "subsystem": "SPM",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 8
+    },
+    {
+      "id": "RF-TX-01",
+      "name": "射频收发模块测试台",
+      "category": "射频类",
+      "description": "面向 Sub-6GHz 收发模块的射频指标测试台，覆盖发射功率、EVM、频偏、接收灵敏度与谐波抑制测试。",
+      "typical_dut": "RF 收发模组、WiFi/BLE 模组、天线前端模块",
+      "recommended_cycle": "72 s / 件",
+      "product": "1000-A",
+      "subsystem": "WA",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 7
+    },
+    {
+      "id": "MOT-DRV-01",
+      "name": "电机驱动控制器测试台",
+      "category": "功率驱动类",
+      "description": "面向电机驱动控制器的功率级测试台，覆盖母线电流、相电流波形、温升、堵转保护与通信协议测试。",
+      "typical_dut": "BLDC/PMSM 驱动器、伺服控制器、电动工具控制板",
+      "recommended_cycle": "95 s / 件",
+      "product": "1000-A",
+      "subsystem": "SD",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 8
+    },
+    {
+      "id": "SPM-AGING-01",
+      "name": "电源模块高温老化测试台",
+      "category": "电源类",
+      "description": "面向电源模块的老化筛选工位：多路带载老化 + 温度巡检，长时间无人值守运行。",
+      "typical_dut": "DC-DC 模块、LDO 板（批量老化筛选）",
+      "recommended_cycle": "4 h / 批（16 件）",
+      "product": "1000-A",
+      "subsystem": "SPM",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 6
+    },
+    {
+      "id": "SPM-HV-01",
+      "name": "高压电源模块测试台",
+      "category": "电源类",
+      "description": "面向 800V 平台高压电源模块的绝缘、耐压与效率测试台。",
+      "typical_dut": "车载高压 DC-DC、OBC 功率板",
+      "recommended_cycle": "96 s / 件",
+      "product": "2000-B",
+      "subsystem": "SPM",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 6
+    },
+    {
+      "id": "SD-MOT-02",
+      "name": "双通道伺服驱动测试台",
+      "category": "功率驱动类",
+      "description": "同时测试两路伺服驱动板：功率级、编码器反馈与总线通信全项验证。",
+      "typical_dut": "双通道伺服驱动器、电机控制板",
+      "recommended_cycle": "110 s / 件",
+      "product": "2000-B",
+      "subsystem": "SD",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 7
+    },
+    {
+      "id": "SPM-RH-DYN-01",
+      "name": "SPM 读头动态测试台",
+      "category": "读头类",
+      "description": "面向 SPM 子系统磁读头的动态性能测试台，覆盖读头静态工作点、回放信号波形、供电与带载动态响应、转速扫描下的输出一致性。",
+      "typical_dut": "SPM 磁读头组件（GMR / TMR 读头）",
+      "recommended_cycle": "45 s / 件",
+      "product": "1000-A",
+      "subsystem": "SPM",
+      "updated_at": "2026-09-21 23:15:39",
+      "bom_count": 7
+    }
+  ]
+}

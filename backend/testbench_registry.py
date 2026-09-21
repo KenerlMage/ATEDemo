@@ -171,6 +171,20 @@ class DeviceConfigPatch(BaseModel):
 
 
 def _load_presets() -> list[dict]:
+    """预设测试台类型清单 (含 BOM)。
+
+    数据源优先级:
+      1) 元数据管理 (backend/tree 文件夹, 由「元数据管理 → 装备树管理 / 测试台BOM管理」维护)
+      2) 回退到只读预设文件 backend/testresource/testbench_presets.json
+    """
+    try:
+        import metadata_registry  # 延迟导入, 避免模块加载顺序耦合
+
+        managed = metadata_registry.load_presets()
+        if managed:
+            return managed
+    except Exception:
+        pass
     data = _read_json(_PRESET_FILE, {"presets": []})
     presets = data.get("presets") if isinstance(data, dict) else data
     return [p for p in (presets or []) if isinstance(p, dict)]
@@ -203,9 +217,19 @@ def _preset_tree() -> list[dict]:
 
     以预设类型自身的 product / subsystem 字段为唯一数据源, 避免手工维护两处结构。
     """
-    data = _read_json(_PRESET_FILE, {})
-    meta_products = data.get("products") or [] if isinstance(data, dict) else []
-    meta_subsystems = data.get("subsystems") or [] if isinstance(data, dict) else []
+    meta_products: list = []
+    meta_subsystems: list = []
+    # 产品 / 子系统元数据同样优先取元数据管理 tree 文件夹的版本
+    try:
+        import metadata_registry  # 延迟导入
+
+        meta_products, meta_subsystems = metadata_registry.load_meta()
+    except Exception:
+        meta_products, meta_subsystems = [], []
+    if not meta_products and not meta_subsystems:
+        data = _read_json(_PRESET_FILE, {})
+        meta_products = data.get("products") or [] if isinstance(data, dict) else []
+        meta_subsystems = data.get("subsystems") or [] if isinstance(data, dict) else []
     pname = {str(m.get("id")): str(m.get("name") or m.get("id")) for m in meta_products if isinstance(m, dict)}
     sname = {str(m.get("id")): str(m.get("name") or m.get("id")) for m in meta_subsystems if isinstance(m, dict)}
 

@@ -1314,6 +1314,22 @@ import testbench_registry  # noqa: E402  (末尾导入, 避免与上方定义顺
 testbench_registry.register_routes(app, TPS_DIR)
 
 
+# ==================== 元数据管理 (装备树 + 测试台 BOM, 独立模块) ====================
+# 装备树节点 (产品 / 子系统 / 测试台类型) 与测试台 BOM 的集中管理,
+# 数据落在后端 tree 文件夹 (backend/tree/tree.json + backend/tree/bom/*.json);
+# 首次启动自动把既有预设 (testresource/testbench_presets.json) 纳入管理,
+# 并由 testbench_registry 作为预设测试台类型的数据源, 供「新建测试台」注册流程读取。
+# 接口: GET    /api/metadata/overview | /api/metadata/tree | /api/metadata/store
+#       GET    /api/metadata/presets/{id} | /api/metadata/presets/{id}/bom | /api/metadata/device-catalog
+#       POST   /api/metadata/products | /api/metadata/subsystems | /api/metadata/presets | /api/metadata/reseed
+#       PUT    /api/metadata/presets/{id}/bom
+#       POST   /api/metadata/presets/{id}/bom/items
+#       DELETE /api/metadata/products/{id} | /subsystems/{id} | /presets/{id} | /presets/{id}/bom/items/{dev}
+import metadata_registry  # noqa: E402
+
+metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
+
+
 # ==================== 装备助手 (仪器控制工具, 独立模块) ====================
 # 工具卡片 / 示波器连接与 SCPI 操作 (泰克 MSO54 方案, 支持离线模拟)
 import instrument_tools  # noqa: E402
