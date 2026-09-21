@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>ATE Runner 仪器驱动库 · 新设备家族接入指南</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Driver SDK · New Device Family</div>
+<h1>ATE Runner 仪器驱动库 · 新设备家族接入指南</h1>
+<p class='sub'>以后接万用表、电源、信号源、运动机构（以及没见过的设备）时，通用驱动怎么设计：先判断属于已有家族还是新家族，再按九步设计家族契约，附万用表完整示例与反模式清单。</p>
+<div class='meta'><span><b>决策</b>已有家族 vs 新家族</span><span><b>流程</b>两种情形 · 九步设计</span><span><b>示例</b>数字万用表 DMM</span><span><b>清单</b>上架前 11 项</span><span><b>库位置</b>D:/ATE/sdk</span></div></header>
+<div class='doc'><aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>1. 先做判断（决策树）</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>2. 情形 A：已有家族新增型号（最常见）</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>3. 情形 B：新家族设计九步</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>4. 需要改动的文件清单（新家族）</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>5. 五差异面模板（照抄这张表去填）</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>6. 上架清单（合并前逐条勾）</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>7. 反模式（踩过的与最容易踩的）</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>8. 版本演进规则</span></a></li>
+</ol></aside><main>
+<p class='lede'><blockquote>
+适用版本：<code>ate_drivers</code> 1.2.0 · 契约 <strong>1.2</strong> · 门禁 19 项
+本文回答一个具体问题：<strong>以后要接万用表、电源、信号源、继电器、运动控制、以及完全没见过的设备，通用驱动该怎么设计？</strong>
+结论先给：<strong>别为新设备写新的一整套，先判断它属于「已有家族的新型号」还是「新家族」——前者只填五个差异面，后者才需要在家族层加一份契约。</strong>
+</blockquote></p>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>1. 先做判断（决策树）</h2></div>
+<pre><code>新设备要接进来
+ ├─ 1. 它属于已有家族吗？（能完成同一类语义动作）
+ │     · 示波器 → 采波形 + 测量  → 属于 scope 家族
+ │     · 万用表 → 读一个量       → 属于 dmm 家族（能力位已预留，契约未落地）
+ │     · 电源   → 设输出 + 回读   → 属于 psu 家族（同上）
+ │     · 信号源 → 设波形 + 开关   → 属于 awg 家族（同上）
+ │     · 运动机构/气缸/转台 → 移动 + 读位置 → 属于 motion 家族（同上）
+ │     · 无源件（夹具、线缆、衰减器）→ passive 家族（无动作）
+ │     ▼ 是（同一家族）
+ │        → 走【情形 A】只写型号驱动包：填五个差异面 + 过 19 项门禁（半天到一天）
+ │     ▼ 不是，且家族能力表里没有
+ │        → 走【情形 B】先设计家族契约，再写型号包（2~5 天，含门禁与文档）
+ └─ 2. 它是「一整台仪器」还是「一条链路」？
+       · 一整台可编程仪器 → 家族 + 厂商包（本指南场景）
+       · 只是一条通信链路（串口/网口转发）→ 用 transport 层，不要造家族
+</code></pre>
+<p>判断依据只有一条：<strong>上层希望用什么「动作」跟它说话</strong>。动作相同 → 同家族；动作不同 → 新家族。</p>
+</section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>2. 情形 A：已有家族新增型号（最常见）</h2></div>
+<p>五步，不许跳：</p>
+<table>
+<thead>
+<tr>
+<th>步</th>
+<th>做什么</th>
+<th>产出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>生成骨架</td>
+<td><code>python -m ate_drivers.kit.cli new &lt;key&gt; --model &lt;型号&gt; --interface LAN,SERIAL</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>填五个差异面</td>
+<td><code>COMMANDS</code> / <code>PREAMBLE_FIELDS</code> / 量纲缩放 / 枚举映射 / <code>_sim_signal()</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>声明派发、链路与后端</td>
+<td>类属性 <code>MODELS</code> / <code>INTERFACES</code> / <code>BACKENDS</code> / <code>vendor</code>，与 <code>driver.json</code> 一致</td>
+</tr>
+<tr>
+<td>4</td>
+<td>跑门禁</td>
+<td><code>cli check &lt;包&gt;</code> → 19/19</td>
+</tr>
+<tr>
+<td>5</td>
+<td>补测试与文档</td>
+<td>同一种用例在两家上结构一致、命令流不同</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键</strong>：不要 <code>override</code> 家族的动作方法。若你觉得非改不可，说明家族契约缺能力——那就走情形 B 的流程去<strong>扩家族</strong>，而不是在厂商包里打补丁。</p>
+</section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>3. 情形 B：新家族设计九步</h2></div>
+<p>以「数字万用表 DMM」为例逐步走。每步都写明<strong>产出物</strong>与<strong>验证方式</strong>。</p>
+<h3 id="1_1">第 1 步：家族命名与动作词汇表</h3>
+<ul>
+<li>家族名用<strong>短英文小写</strong>：<code>dmm</code>、<code>psu</code>、<code>awg</code>、<code>motion</code>（不要 <code>digital_multimeter_iso</code>）；</li>
+<li>动作命名规则：<code>&lt;家族&gt;.&lt;动词&gt;</code>，动词用<strong>业务语义</strong>不用户命令（<code>measure</code> 而不是 <code>read_reg</code>）；</li>
+<li>列出<strong>必需动作</strong>与<strong>可选动作</strong>：必需 = 没有它这一类设备就没意义（万用表的 <code>dmm.measure</code>）；可选 = 部分型号才有（万用表的 <code>dmm.range</code>）。</li>
+</ul>
+<p>产出物：动作清单表（本文第 5 节的表就是模板）。</p>
+<h3 id="2-capabilitiespy">第 2 步：登记能力（改 <code>capabilities.py</code>）</h3>
+<p>三个地方都要改，漏一个门禁 C03 就会挂：</p>
+<pre><code class="language-python"># ate_drivers/capabilities.py
+
+CORE_CAPABILITIES = (&quot;identify&quot;, &quot;reset&quot;, &quot;state&quot;)        # 所有家族共享，不动
+
+FAMILY_CAPABILITIES = {
+    &quot;scope&quot;:  [...],                                       # 已有
+    &quot;dmm&quot;:    (&quot;dmm.measure&quot;,),                            # ① 家族可选动作（已有占位，按需扩）
+    ...
+}
+
+REQUIRED_BY_FAMILY = {
+    &quot;scope&quot;:  [&quot;scope.acquire_waveform&quot;, &quot;scope.measure&quot;],
+    &quot;dmm&quot;:    [&quot;dmm.measure&quot;],                             # ② 家族必需动作
+    ...
+}
+
+# ③ 已知能力总表（frozenset）——由上面两张表汇总，务必同步
+KNOWN_CAPABILITIES = frozenset(
+    list(CORE_CAPABILITIES) + [c for caps in FAMILY_CAPABILITIES.values() for c in caps]
+)
+</code></pre>
+<blockquote>
+<p>现状：<code>dmm</code> / <code>psu</code> / <code>awg</code> / <code>motion</code> / <code>passive</code> / <code>generic</code> 六个家族名<strong>已在能力表里占位</strong>（例如 <code>dmm: ["dmm.measure"]</code>、<code>psu: ["psu.set_output", "psu.measure"]</code>、<code>awg: ["awg.set_waveform", "awg.output"]</code>、<code>motion: ["motion.move", "motion.read_position"]</code>），但<strong>家族实现尚未落地</strong>。所以接万用表的现实路径是：能力位已存在 → 直接按第 3~9 步写 <code>family/dmm.py</code>，不需要改能力表（要加新动作才改）。</p>
+</blockquote>
+<p>产出物：<code>capabilities.py</code> 的 diff。验证：<code>python -c "from ate_drivers import capabilities as c; print(c.KNOWN_CAPABILITIES)"</code> 能看到新动作。</p>
+<h3 id="3">第 3 步：定义数据模型</h3>
+<p>家族要定义三层数据：<strong>输入参数</strong>（用户给什么）、<strong>状态</strong>（设备现在什么样）、<strong>返回值</strong>（上层拿到什么）。</p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>要求</th>
+<th>例子（DMM）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入参数</td>
+<td>名字表达物理量；单位写进 docstring；能给默认值就给</td>
+<td><code>measure(kind="VDC", range_v=None, nplc=1.0)</code></td>
+</tr>
+<tr>
+<td>状态</td>
+<td>可序列化，能进报告</td>
+<td><code>{function: "VDC", range_v: 10.0, nplc: 1.0}</code></td>
+</tr>
+<tr>
+<td>返回值</td>
+<td><strong>每项测量自带 value + unit + quality + source</strong></td>
+<td><code>{"VDC": {"value": 5.0012, "unit": "V", "quality": "good", "source": "real"}}</code></td>
+</tr>
+</tbody>
+</table>
+<p>铁律：<strong>任何暴露给上层的量都必须是物理单位</strong>（V / A / Ω / Hz / s），不是 ADC 计数、不是档位编号。</p>
+<h3 id="4">第 4 步：定义命令表契约（家族层的关键设计）</h3>
+<p>家族层<strong>不写</strong>具体命令，但要规定<strong>需要哪些命令插槽</strong>——这是「厂商包只填差异面」能成立的前提。</p>
+<pre><code class="language-python"># family/dmm.py 里定义插槽（示波器家族的写法可作对照）
+REQUIRED_COMMANDS = (
+    &quot;idn&quot;,              # 身份查询
+    &quot;reset&quot;,            # 复位
+    &quot;func_set&quot;,         # 设功能：{func}
+    &quot;range_set&quot;,        # 设量程：{range}
+    &quot;rate_set&quot;,         # 设速率/积分时间：{nplc}
+    &quot;read&quot;,             # 取值
+    &quot;error_query&quot;,      # 错误队列
+)
+
+COMMANDS = {            # 家族默认表（通用 SCPI 写法，型号包按需覆盖）
+    &quot;idn&quot;: &quot;*IDN?&quot;,
+    &quot;reset&quot;: &quot;*RST;*CLS;*OPC?&quot;,
+    &quot;func_set&quot;: &quot;:FUNC {func}&quot;,
+    &quot;range_set&quot;: &quot;:RANG {range:g}&quot;,
+    &quot;rate_set&quot;: &quot;:RATE {nplc:g}&quot;,
+    &quot;read&quot;: &quot;:READ?&quot;,
+    &quot;error_query&quot;: &quot;:SYST:ERR?&quot;,
+}
+</code></pre>
+<p>插槽设计规则：</p>
+<ol>
+<li><strong>一个业务动作对应一到多个插槽</strong>，插槽粒度要细到「不同厂家只差这一条」；</li>
+<li>占位符用 <code>{name}</code> / <code>{name:g}</code> / <code>{state}</code>，<strong>不要在家族层写死分隔符</strong>（有的仪器用 <code>;</code> 拼多命令，有的不支持）；</li>
+<li>需要「按通道/按型号改写命令片段」时用钩子（示波器的 <code>channel_token(channel)</code> 就是这种钩子），不要在家族层拼 <code>CH1</code>；</li>
+<li>插槽一旦发布<strong>只增不改</strong>；型号包必须覆盖全部 <code>REQUIRED_COMMANDS</code>，<code>missing_commands()</code> 为空。</li>
+</ol>
+<p>产出物：家族命令表。验证：门禁 C05。</p>
+<h3 id="5">第 5 步：定义仿真基线</h3>
+<p>仿真不是「随便给个数」，而是<strong>一个物理上说得通的模型</strong>：同样的输入必须给同样的输出（C12）。</p>
+<table>
+<thead>
+<tr>
+<th>家族</th>
+<th>仿真模型建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DMM</td>
+<td>目标值 + 固定噪声种子 + 与档位相关的量化台阶</td>
+</tr>
+<tr>
+<td>PSU</td>
+<td>设定值 + 负载响应（可用一阶延迟）+ 回读噪声</td>
+</tr>
+<tr>
+<td>AWG</td>
+<td>波形方程（正弦/方波/任意点表），幅度与偏置按设定</td>
+</tr>
+<tr>
+<td>Motion</td>
+<td>位置积分模型 + 行程限位</td>
+</tr>
+</tbody>
+</table>
+<p>型号包可以在家族基线上叠加<strong>本机特性</strong>（示例：泰克 MSO5 在家族正弦上叠加 8 bit 垂直量化）。</p>
+<h3 id="6">第 6 步：定义错误与边界</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>码</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>参数越界（量程/频率 ≤ 0、格数 &lt; 2）</td>
+<td><code>E_PARAM</code></td>
+<td>报错 + 已登记取值清单</td>
+</tr>
+<tr>
+<td>枚举未登记（功能写 <code>VAC</code> 而驱动只登记 <code>VDC/VAC</code>）</td>
+<td><code>E_PARAM</code></td>
+<td><strong>不静默替换</strong></td>
+</tr>
+<tr>
+<td>缺连接参数</td>
+<td><code>E_CONFIG</code></td>
+<td>不重试</td>
+</tr>
+<tr>
+<td>应答解析不了</td>
+<td><code>E_PROTOCOL</code></td>
+<td>保留原始应答到 <code>detail</code></td>
+</tr>
+<tr>
+<td>型号未登记</td>
+<td><code>E_NOT_FOUND</code></td>
+<td>列出可用型号</td>
+</tr>
+</tbody>
+</table>
+<p>家族层负责<strong>统一的校验与错误分类</strong>，厂商包只负责「翻译方言」。</p>
+<h3 id="7-familydmmpy">第 7 步：家族实现骨架（<code>family/dmm.py</code>）</h3>
+<pre><code class="language-python"># -*- coding: utf-8 -*-
+&quot;&quot;&quot;数字万用表家族契约：动作、单位、校验、仿真基线、命令表插槽&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Optional
+
+from ..base import InstrumentDriver
+from ..errors import DriverError
+
+
+@dataclass
+class Reading:
+    &quot;&quot;&quot;一次测量的读数（物理单位出口）&quot;&quot;&quot;
+    kind: str                      # VDC / VAC / IDC / RES / FREQ ...
+    value: Optional[float]
+    unit: str                      # V / A / Ohm / Hz
+    quality: str = &quot;good&quot;
+
+    def to_dict(self) -&gt; dict:
+        return {&quot;kind&quot;: self.kind, &quot;value&quot;: self.value, &quot;unit&quot;: self.unit,
+                &quot;quality&quot;: self.quality}
+
+
+class DmmDriver(InstrumentDriver):
+    &quot;&quot;&quot;万用表家族：只依赖命令表插槽，不依赖任何品牌方言&quot;&quot;&quot;
+
+    family = &quot;dmm&quot;
+    FUNCTIONS = (&quot;VDC&quot;, &quot;VAC&quot;, &quot;IDC&quot;, &quot;IAC&quot;, &quot;RES&quot;, &quot;FREQ&quot;)
+    UNITS = {&quot;VDC&quot;: &quot;V&quot;, &quot;VAC&quot;: &quot;V&quot;, &quot;IDC&quot;: &quot;A&quot;, &quot;IAC&quot;: &quot;A&quot;, &quot;RES&quot;: &quot;Ohm&quot;, &quot;FREQ&quot;: &quot;Hz&quot;}
+
+    REQUIRED_COMMANDS = (&quot;idn&quot;, &quot;reset&quot;, &quot;func_set&quot;, &quot;range_set&quot;, &quot;rate_set&quot;,
+                         &quot;read&quot;, &quot;error_query&quot;)
+    COMMANDS = {...}               # 见第 4 步
+    SIMULATE_SUPPORTED = True
+
+    # —— 状态 ——
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.function = self.FUNCTIONS[0]
+        self.range_v: Optional[float] = None
+        self.nplc = 1.0
+
+    # —— 动作（方言无关）——
+    def measure(self, kind: Optional[str] = None, **_) -&gt; dict:
+        kind = self._check_kind(kind or self.function)
+        if kind != self.function:
+            self.write(self.cmd(&quot;func_set&quot;, func=kind))
+            self.function = kind
+        self.write(self.cmd(&quot;rate_set&quot;, nplc=self.nplc))
+        raw = self.query(self.cmd(&quot;read&quot;))            # 厂商包负责把 raw 变成读数
+        reading = self._parse_reading(kind, raw)      # 默认实现 + 厂商可覆盖
+        return {&quot;kind&quot;: reading.kind, &quot;value&quot;: reading.value,
+                &quot;unit&quot;: reading.unit, &quot;quality&quot;: reading.quality}
+
+    def state(self) -&gt; dict:
+        return {&quot;function&quot;: self.function, &quot;range_v&quot;: self.range_v, &quot;nplc&quot;: self.nplc,
+                &quot;unit&quot;: self.UNITS.get(self.function, &quot;&quot;)}
+
+    # —— 校验与仿真 ——
+    def _check_kind(self, kind: str) -&gt; str:
+        if kind not in self.FUNCTIONS:
+            raise DriverError(&quot;未登记的功能&quot;, device_id=self.device_id,
+                              detail=&quot;可选: &quot; + &quot;, &quot;.join(self.FUNCTIONS), code=&quot;E_PARAM&quot;)
+        return kind
+
+    def _parse_reading(self, kind: str, raw: str) -&gt; Reading:
+        try:
+            return Reading(kind, float(str(raw).strip()), self.UNITS[kind], &quot;good&quot;)
+        except ValueError:
+            raise DriverError(&quot;读数无法解析&quot;, device_id=self.device_id,
+                              detail=repr(raw), code=&quot;E_PROTOCOL&quot;)
+
+    def simulate_command(self, command: str) -&gt; str:
+        if command.strip().endswith(&quot;?&quot;):
+            return &quot;5.0000&quot;
+        return &quot;&quot;
+</code></pre>
+<h3 id="8-vendorsfluke_8808a">第 8 步：厂商型号包骨架（<code>vendors/fluke_8808a/</code>）</h3>
+<pre><code class="language-python"># vendors/fluke_8808a/driver.py
+from ate_drivers import DmmDriver          # 家族层导出后可用
+
+
+class Fluke8808AScope(DmmDriver):
+    driver_key = &quot;fluke-8808a&quot;
+    family = &quot;dmm&quot;
+    vendor = &quot;Fluke&quot;
+    label = &quot;数字万用表 · Fluke 8808A&quot;
+    driver_version = &quot;1.0.0&quot;
+    INTERFACES = (&quot;SERIAL&quot;,)               # 该型号只有串口
+    BACKENDS = (&quot;native&quot;, &quot;visa&quot;)          # 两套栈都支持（原生 pyserial / PyVISA）
+    MODELS = (&quot;8808A&quot;,)
+    sim_idn = &quot;FLUKE,8808A,SIM0001,1.0&quot;
+
+    # 只填差异面①：命令表
+    COMMANDS = dict(DmmDriver.COMMANDS, **{
+        &quot;func_set&quot;: &quot;:FUNC {func}&quot;,
+        &quot;range_set&quot;: &quot;:RANG {range:g}&quot;,
+        &quot;read&quot;: &quot;:VAL1?&quot;,
+    })
+
+    # 差异面②③：应答解析与量纲（这里读数已直接是伏特/安培/欧姆）
+    def _parse_reading(self, kind, raw):
+        return super()._parse_reading(kind, raw)
+
+    # 差异面⑤：仿真模型（在家族基线上叠加本机 5.5 位量化）
+    def _sim_signal(self, *a, **k):
+        ...
+</code></pre>
+<pre><code class="language-json">// vendors/fluke_8808a/driver.json
+{
+  &quot;schema&quot;: &quot;ate.driver.manifest.v1&quot;,
+  &quot;key&quot;: &quot;fluke-8808a&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;family&quot;: &quot;dmm&quot;,
+  &quot;api&quot;: &quot;1.2&quot;,
+  &quot;label&quot;: &quot;数字万用表 · Fluke 8808A&quot;,
+  &quot;vendor&quot;: &quot;Fluke&quot;,
+  &quot;entry&quot;: &quot;ate_drivers.vendors.fluke_8808a.driver:Fluke8808AScope&quot;,
+  &quot;interfaces&quot;: [&quot;SERIAL&quot;],
+  &quot;models&quot;: [&quot;8808A&quot;],
+  &quot;capabilities&quot;: [&quot;identify&quot;, &quot;reset&quot;, &quot;state&quot;, &quot;dmm.measure&quot;],
+  &quot;simulate&quot;: true,
+  &quot;min_platform&quot;: &quot;1.0.0&quot;,
+  &quot;depends&quot;: [],
+  &quot;signature&quot;: &quot;&quot;
+}
+</code></pre>
+<h3 id="9">第 9 步：门面、测试、文档</h3>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>门面</td>
+<td>新家族配一个门面（<code>Dmm</code> + <code>open_dmm()</code>）或复用统一入口 <code>open_instrument(device=...)</code>；门面里<strong>不许出现命令字样</strong>（单测扫源码）</td>
+</tr>
+<tr>
+<td>测试</td>
+<td>家族级用例（仿真 + 假链路各跑一遍）、型号派发用例、门禁用例；同一段用户代码在<strong>两家同家族型号</strong>上结构一致</td>
+</tr>
+<tr>
+<td>文档</td>
+<td>家族动作表 + 单位表 + 差异面模板 + 已登记型号清单，进 <code>sdk/docs/</code></td>
+</tr>
+<tr>
+<td>门禁</td>
+<td>19 项全绿；如新家族有特有规则，追加检查项（C20、C21…），不许删旧项</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>4. 需要改动的文件清单（新家族）</h2></div>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>文件</th>
+<th>改什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>ate_drivers/capabilities.py</code></td>
+<td><code>FAMILY_CAPABILITIES</code> / <code>REQUIRED_BY_FAMILY</code> / <code>KNOWN_CAPABILITIES</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>ate_drivers/family/&lt;家族&gt;.py</code></td>
+<td>新增家族契约（动作、模型、校验、仿真基线、命令插槽）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>ate_drivers/family/__init__.py</code></td>
+<td>导出家族类</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>ate_drivers/api.py</code></td>
+<td>家族门面（可选，若走统一门面则不新增）</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>ate_drivers/__init__.py</code></td>
+<td>导出新家族类与门面函数</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>ate_drivers/vendors/&lt;厂商&gt;_&lt;型号&gt;/</code></td>
+<td>型号驱动包 + <code>driver.json</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>ate_drivers/vendors/__init__.py</code></td>
+<td>追加 <code>DRIVERS</code> 元组（内置登记）</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>ate_drivers/kit/conformance.py</code></td>
+<td>家族特有门禁项（可选）</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>ate_drivers/transport.py</code></td>
+<td>一般<strong>不用改</strong>：链路与后端已收口（<code>native</code> / <code>visa</code>）；新后端才在此登记</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>tests/test_&lt;家族&gt;_family.py</code></td>
+<td>家族级测试</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>sdk/docs/</code> + <code>sdk/README.md</code></td>
+<td>文档与型号清单</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>5. 五差异面模板（照抄这张表去填）</h2></div>
+<table>
+<thead>
+<tr>
+<th>差异面</th>
+<th>载体</th>
+<th>怎么填</th>
+<th>常见坑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 命令表</td>
+<td><code>COMMANDS</code></td>
+<td>覆盖家族默认表中与本机不同的键；键名<strong>不许改</strong></td>
+<td>手册里的方括号 <code>&lt;...&gt;</code>/<code>[...]</code> 是文档写法，不是命令正文</td>
+</tr>
+<tr>
+<td>② 应答解析</td>
+<td><code>_parse_*</code> / <code>PREAMBLE_FIELDS</code></td>
+<td>按<strong>字段名</strong>取值，不靠位置猜</td>
+<td>品牌间分隔符不同（<code>,</code> vs <code>;</code>）、可选字段会导致字段数变化</td>
+</tr>
+<tr>
+<td>③ 量纲缩放</td>
+<td>解析函数内</td>
+<td>出口必须是物理单位</td>
+<td>头里没给缩放系数时（如 R&amp;S 走 ASCII 伏特）别硬乘</td>
+</tr>
+<tr>
+<td>④ 枚举映射</td>
+<td>家族枚举 → 本机取值</td>
+<td>不支持的取值报 <code>E_PARAM</code></td>
+<td>别把 <code>GND</code> 静默当 <code>DC</code></td>
+</tr>
+<tr>
+<td>⑤ 仿真模型</td>
+<td><code>_sim_signal()</code> / <code>simulate_command()</code></td>
+<td>在家族基线上叠加本机特性</td>
+<td>用随机数会让回归不稳定（C12 会挂）</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>6. 上架清单（合并前逐条勾）</h2></div>
+<ul>
+<li>[ ] 能力位已在 <code>capabilities.py</code> 三处同步（C03/C04）；</li>
+<li>[ ] 命令表覆盖全部 <code>REQUIRED_COMMANDS</code>（<code>missing_commands()</code> 为空，C05）；</li>
+<li>[ ] 仿真覆盖全部声明能力且可复现（C06/C12）；</li>
+<li>[ ] 测量项都带单位（C08）；</li>
+<li>[ ] 所有失败路径有明确错误码（C09）；</li>
+<li>[ ] 未引入第三方硬依赖（C15）；</li>
+<li>[ ] <code>MODELS</code> / <code>INTERFACES</code> / <code>BACKENDS</code> 与 <code>driver.json</code> 一致（C17/C18/C19）；</li>
+<li>[ ] <code>cli check</code> 19/19、<code>pytest</code> 全绿；</li>
+<li>[ ] 门面源码无命令字样；</li>
+<li>[ ] 两家同家族型号跑同一段用例，返回结构一致、命令流不同；</li>
+<li>[ ] 文档更新（家族动作表 + 单位表 + 型号清单）。</li>
+</ul>
+</section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>7. 反模式（踩过的与最容易踩的）</h2></div>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果</th>
+<th>正确做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>把家族逻辑写进厂商包</td>
+<td>第二个品牌又要复制一遍</td>
+<td>家族层加能力，厂商包只填差异</td>
+</tr>
+<tr>
+<td>2</td>
+<td>在门面里拼命令</td>
+<td>品牌方言泄漏给上层，解耦失效</td>
+<td>命令关进厂商包，门面只给业务方法</td>
+</tr>
+<tr>
+<td>3</td>
+<td>用 <code>vendor</code>/<code>category</code> 打分兜底选型</td>
+<td>型号写错时「猜一个最像的」，故障难查</td>
+<td>型号精确派发，未登记就报错</td>
+</tr>
+<tr>
+<td>4</td>
+<td>用 <code>ALIASES</code> 登记型号别名</td>
+<td>覆盖家族动作别名表 → 该驱动所有动作崩</td>
+<td>型号别名用 <code>MODEL_ALIASES</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>顶层 <code>import serial</code> / <code>import pyvisa</code></td>
+<td>门禁 C15 直接挂；离线机装不上</td>
+<td>函数体内惰性导入 + <code>set_serial_factory()</code> / <code>set_visa_factory()</code> 注入</td>
+</tr>
+<tr>
+<td>6</td>
+<td>两种链路参数都填却不报错</td>
+<td>接错线被当成仿真/走错链路</td>
+<td>报「连接方式不明确」，强制写明 <code>interface</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>把「格数」「ADC 计数」返回给上层</td>
+<td>上层被迫懂仪器档位</td>
+<td>出口物理单位，缩放关在厂商包</td>
+</tr>
+<tr>
+<td>8</td>
+<td>枚举不支持时静默替换</td>
+<td>物理量含义被悄悄改掉</td>
+<td>报 <code>E_PARAM</code> 并列出已登记取值</td>
+</tr>
+<tr>
+<td>9</td>
+<td>改动作语义而不加新动作</td>
+<td>TPS 用例集体失效</td>
+<td>只增不改，旧动作进 <code>DEPRECATIONS</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>8. 版本演进规则</h2></div>
+<table>
+<thead>
+<tr>
+<th>变更</th>
+<th>版本动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新增型号（同家族）</td>
+<td>只改 <code>MODELS</code> + <code>driver.json</code> → 驱动版本 +0.0.1</td>
+</tr>
+<tr>
+<td>新增可选动作</td>
+<td>加能力位 + 家族默认实现 + 文档；驱动版本 +0.1.0</td>
+</tr>
+<tr>
+<td>新增必填动作</td>
+<td>属破坏性变更：先加可选，过渡期后再提升为必需；契约版本 +0.1</td>
+</tr>
+<tr>
+<td>修改动作语义</td>
+<td><strong>禁止直接改</strong>：加新动作，旧的写进 <code>DEPRECATIONS</code>（C16 会验）</td>
+</tr>
+<tr>
+<td>平台不兼容</td>
+<td>用 <code>min_platform</code> 声明，加载阶段报 <code>E_CONTRACT</code></td>
+</tr>
+</tbody>
+</table></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 仪器驱动库文档 · 契约 ate.driver.api 1.2</span><span>库位置 D:/ATE/sdk · 上架门禁 19 项一致性检查 · 传输后端 native / visa</span></div>
+</div></body></html>

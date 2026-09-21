@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ATE Runner 测试装备清单 (Demo)
+     约定: serial = "SPMTS" + 恰好 12 位数字; consumable="true" 的易损件必须携带 lifespan_days 与 installed_at -->
+<testbench title="Demo 测试台" serial="SPMTS000000000123">
+  <equipment name="数字万用表" model="Fluke 8846A" vendor="Fluke" consumable="false" status="normal"/>
+  <equipment name="数字示波器" model="Keysight DSOX3054T" vendor="Keysight" consumable="false" status="normal"/>
+  <equipment name="直流电源" model="ITECH IT6332A" vendor="ITECH" consumable="false" status="normal"/>
+  <equipment name="信号发生器" model="RIGOL DG1022Z" vendor="RIGOL" consumable="false" status="normal"/>
+  <equipment name="电子负载" model="ITECH IT8512A+" vendor="ITECH" consumable="false" status="normal"/>
+  <equipment name="测试探针组套" model="PROBE-KIT-100" vendor="ATE-InHouse" consumable="true"
+             lifespan_days="180" installed_at="2026-03-15" status="normal"/>
+</testbench>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATE Runner — 界面结构 · 测试台注册（紫白工业风）</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --accent-2-rgb: 139, 92, 246;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft);
+    color: var(--text); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 14px; line-height: 1.65;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 24px 80px; }
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; box-shadow: 0 10px 30px rgba(var(--accent-rgb), .06); }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .metric b { display: block; font-size: 22px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14.5px; margin: 20px 0 8px; color: var(--accent2); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13px; }
+  .timeline { border-left: 2px solid var(--border); margin: 6px 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .step { position: relative; }
+  .step::before { content: ''; position: absolute; left: -27px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15); }
+  .step b { display: block; font-size: 14px; }
+  .step span { color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21, 128, 61, .4); background: rgba(21, 128, 61, .1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180, 83, 9, .4); background: rgba(180, 83, 9, .1); }
+  .badge.err { color: var(--err); border-color: rgba(220, 38, 38, .4); background: rgba(220, 38, 38, .1); }
+  /* 布局示意图 */
+  .layout { display: grid; grid-template-columns: 200px 1fr; gap: 10px; margin-top: 6px; }
+  .mock-side { border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(180deg, #fbfaff, #fff); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .mock-mark { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .mock-mark i { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #8b5cf6, #5b21b6); display: inline-block; }
+  .mock-chip { font-size: 10.5px; color: var(--accent); background: rgba(var(--accent-rgb), .08); border: 1px solid rgba(var(--accent-rgb), .22); border-left: 3px solid var(--accent); border-radius: 7px; padding: 5px 7px; }
+  .mock-item { font-size: 12px; padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; color: var(--muted); }
+  .mock-item.on { color: var(--accent); background: rgba(var(--accent-rgb), .1); border-color: rgba(var(--accent-rgb), .28); border-left: 3px solid var(--accent); font-weight: 700; }
+  .mock-item.last { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  .mock-main { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .mock-bar { height: 10px; border-radius: 5px; background: var(--panel2); border: 1px solid var(--border); }
+  .mock-bar.w70 { width: 70%; } .mock-bar.w45 { width: 45%; }
+  .mock-note { font-size: 11.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="stripe"></div>
+    <h1>界面结构 · 测试台注册（紫白工业风）</h1>
+    <p>左侧垂直导航外壳 + 装备树三级级联选型 + 紫白工业风主题；已注册测试台独立标签查看自检清单。</p>
+    <div class="metrics">
+      <div class="metric"><b>1</b><span>左侧垂直导航（5 标签）</span></div>
+      <div class="metric"><b>3</b><span>级联层级：产品/子系统/类型</span></div>
+      <div class="metric"><b>2</b><span>产品（1000-A / 2000-B）</span></div>
+      <div class="metric"><b>7</b><span>预设测试台类型</span></div>
+      <div class="metric"><b>49</b><span>BOM 设备条目</span></div>
+      <div class="metric"><b>10</b><span>测试台相关接口</span></div>
+      <div class="metric"><b>1</b><span>默认已注册测试台</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>1. 界面结构（本轮改动）</h2>
+    <div class="layout">
+      <div class="mock-side">
+        <div class="mock-mark"><i></i>ATE RUNNER</div>
+        <div class="mock-chip">当前测试台<br>电源模块测试台 #1<br>SPMTS000000000123</div>
+        <div class="mock-item">▶ 测试执行</div>
+        <div class="mock-item on">⚙ 测试装备</div>
+        <div class="mock-item">▤ 测试记录</div>
+        <div class="mock-item last">▦ 测试台导航</div>
+      </div>
+      <div class="mock-main">
+        <div class="mock-bar w45"></div>
+        <div class="mock-bar"></div>
+        <div class="mock-bar w70"></div>
+        <div class="mock-bar"></div>
+        <div class="mock-note">右侧内容区：原页眉标签全部移入左侧垂直导航；「测试台导航」固定在最下方，并用分隔线强调。窄屏（≤900px）自动切换为顶部横向导航。</div>
+      </div>
+    </div>
+
+    <table style="margin-top:14px">
+      <tr><th>改动点</th><th>改动内容</th><th>位置</th></tr>
+      <tr><td>导航位置</td><td>页眉横向标签 → 左侧垂直导航栏，顺序为 测试执行 / 测试装备 / 测试记录 / <b>测试台导航（置底）</b>；品牌区与当前测试台信息随之下移到侧栏顶部</td><td><code>src/App.vue</code></td></tr>
+      <tr><td>工位信息</td><td>删除「班次 / 责任人 / 操作员工号」三项，只保留产线、工位、物理位置、备注</td><td><code>TestbenchRegisterView.vue</code> · <code>TestbenchNavView.vue</code></td></tr>
+      <tr><td>选型方式</td><td>预设类型卡片墙 → 产品 → 子系统 → 测试台类型 三级级联下拉</td><td><code>TestbenchRegisterView.vue</code></td></tr>
+      <tr><td>主题</td><td>深色青色 → 紫色 + 白色背景工业风（淡紫网格底纹、斜纹分隔条、直角感边框）</td><td><code>src/style.css</code> + 各页面变量引用</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. 三级级联选型（按装备树结构）</h2>
+    <p>第一级为产品名称，第二级为子系统，第三级为预设测试台类型；未选上级时下级禁用，选中类型后自动获取标准 BOM。数据源 <code>GET /api/testbench/tree</code>，由每个预设类型的 <code>product</code> / <code>subsystem</code> 字段聚合，单一数据源。</p>
+    <table>
+      <tr><th>产品（第一级）</th><th>子系统（第二级）</th><th>预设测试台类型（第三级）</th><th>BOM</th></tr>
+      <tr><td rowspan="5"><code>1000-A</code><br>1000-A 机载电子系统</td><td>SPM 电源模块</td><td>PB-PWR-01 电源模块标准测试台<br>SPM-AGING-01 电源模块高温老化测试台<br><b>SPM-RH-DYN-01 SPM 读头动态测试台（默认已注册）</b></td><td>8 / 6 / <b>7 台</b></td></tr>
+      <tr><td>WA 无线组件</td><td>RF-TX-01 射频收发模块测试台</td><td>7 台</td></tr>
+      <tr><td>SD 伺服驱动</td><td>MOT-DRV-01 电机驱动控制器测试台</td><td>8 台</td></tr>
+      <tr><td colspan="2" class="mock-note">—— 产品 1000-A 共 3 个子系统 / 5 个测试台类型 ——</td><td>—</td></tr>
+      <tr><td rowspan="3"><code>2000-B</code><br>2000-B 车载电子系统</td><td>SPM 电源模块</td><td>SPM-HV-01 高压电源模块测试台</td><td>6 台</td></tr>
+      <tr><td>SD 伺服驱动</td><td>SD-MOT-02 双通道伺服驱动测试台</td><td>7 台</td></tr>
+      <tr><td colspan="2" class="mock-note">—— 产品 2000-B 共 2 个子系统 / 2 个测试台类型 ——</td><td>—</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 默认测试台（开箱即已注册）</h2>
+    <p>后端启动时自动登记一台预置测试台，打开「测试台导航」页就能看到设备与自检清单，无需先走注册流程。种子逻辑幂等，且<b>删除后不自动复活</b>；需要时在导航页点「↺ 恢复默认测试台」（或调 <code>POST /api/testbenches/restore-defaults</code>）重建。</p>
+    <table>
+      <tr><th>项</th><th>值</th></tr>
+      <tr><td>名称 / 编号</td><td><b>SPM读头动态测试台</b> · <code>SPMTS202609120001</code></td></tr>
+      <tr><td>预设类型 / 归属</td><td><code>SPM-RH-DYN-01</code> · 1000-A 机载电子系统 / SPM 电源模块</td></tr>
+      <tr><td>产线 / 工位</td><td>SPM 总装线 · 读头动态测试工位 · 一号厂房 A 区 3 号工位</td></tr>
+      <tr><td>设备构成</td><td>7 台（6 台可编程）：<b>Fluke 8846A 数字万用表</b> 192.168.10.42:3490 · 泰克 MSO54 示波器 192.168.10.41:4000 · ITECH IT6332A 可编程电源 192.168.10.43:30000 · ITECH IT8512A+ 电子负载 192.168.10.44:30000 · Keysight 33500B 信号源 192.168.10.45:5025 · 读头转速控制盒 COM6@115200 · 读头装夹夹具（非可编程）</td></tr>
+      <tr><td>自检</td><td>启动时自动跑一次离线模拟自检（13 项全通过，<code>overall=pass</code>），不探测真实网络</td></tr>
+      <tr><td>删除后行为</td><td>注册库用 <code>seeded_defaults</code> 记录已种过的预设，删除后不会自己长回来，避免“删不掉”的错觉</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. 三步注册流程</h2>
+    <div class="timeline">
+      <div class="step">
+        <b>第一步 · 级联选型与工位</b>
+        <span>产品 → 子系统 → 测试台类型三级下拉，选中即获取该类型标准 BOM 清单；填写测试台名称、SPMTS 编号、产线、工位、物理位置、备注。此步可存草稿。</span>
+      </div>
+      <div class="step">
+        <b>第二步 · 可编程设备配置</b>
+        <span>网口设备填 IP / 端口 / 协议 / VISA 资源串 / 通道；串口设备填串口号 + 波特率；USB / GPIB 填资源地址。实时显示「已配置 x/y 台」，支持回填 BOM 默认值，前端先拦地址冲突。</span>
+      </div>
+      <div class="step">
+        <b>第三步 · 注册并验证</b>
+        <span>选择验证方式后提交注册，逐台探测设备连通性并输出自检清单；结果落库并保留最近 10 次历史。</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. 自检清单</h2>
+    <table>
+      <tr><th>类别</th><th>检查项</th><th>判定</th></tr>
+      <tr><td>配置类</td><td>测试台编号格式（SPMTS + 12 位数字）</td><td>不匹配即失败</td></tr>
+      <tr><td>配置类</td><td>测试台名称已填写</td><td>为空即失败</td></tr>
+      <tr><td>配置类</td><td>产线 / 工位信息完整</td><td>缺任一项即失败</td></tr>
+      <tr><td>配置类</td><td>可编程设备配置完整</td><td>网口缺 IP:端口、串口缺串口号、USB/GPIB 缺资源地址即失败</td></tr>
+      <tr><td>配置类</td><td>设备地址无冲突</td><td>同一 IP:端口 被多台设备占用即失败</td></tr>
+      <tr><td>配置类</td><td>必备设备均已配置</td><td>required 且程控设备未配置即失败</td></tr>
+      <tr><td>设备类</td><td>每台设备 1 项连通性检查</td><td>网口 TCP 连通 / 串口打开成功 / USB·GPIB·无接口则跳过并提示人工确认</td></tr>
+    </table>
+    <p>整体结论：任一项失败 → <span class="badge err">fail</span>；无失败但有跳过 → <span class="badge warn">warn</span>；全部通过 → <span class="badge ok">pass</span>。验证方式分「真实探测（real）」与「离线模拟（simulate，清单标注模拟）」，工位无仪器时也能演练全流程。</p>
+  </section>
+
+  <section>
+    <h2>6. 接口</h2>
+    <table>
+      <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+      <tr><td>GET</td><td><code>/api/testbench/tree</code></td><td>三级级联树：产品 → 子系统 → 预设测试台类型（级联下拉数据源）</td></tr>
+      <tr><td>GET</td><td><code>/api/testbench/presets</code> · <code>/api/testbench/presets/{id}</code></td><td>预设类型列表 / 含完整 BOM 的详情</td></tr>
+      <tr><td>GET</td><td><code>/api/testbench/overview</code></td><td>指标汇总（含产品数 / 子系统数）</td></tr>
+      <tr><td>GET</td><td><code>/api/testbenches</code> · <code>/api/testbenches/{id}</code></td><td>已注册测试台列表（带产品 / 子系统归属）/ 详情</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches</code></td><td>创建或更新（三步共用；<code>status=registered</code> 为正式注册）</td></tr>
+      <tr><td>DELETE</td><td><code>/api/testbenches/{id}</code></td><td>删除测试台</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/{id}/verify</code></td><td>连通性自检（<code>{"mode":"real"|"simulate"}</code>）</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/restore-defaults</code></td><td>重建默认测试台（幂等；已存在则返回“无需重建”）</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>7. 数据模型</h2>
+<pre>testbench_presets.json（预设类型 + BOM，只读）
+├── products[]    { id: "1000-A", name: "1000-A 机载电子系统" }
+├── subsystems[]  { id: "SPM", name: "SPM 电源模块", products: ["1000-A","2000-B"] }
+└── presets[]     { id, name, category,
+                    product: "1000-A", subsystem: "SPM",
+                    description, typical_dut, recommended_cycle,
+                    bom[] { id, name, model, vendor, category, role, programmable,
+                            interface, default_host, default_port, default_serial_port,
+                            default_baudrate, default_address, protocol, required, note } }
+
+testbenches.json（注册表，JSON 单文件 + 原子写）
+├── id / preset_id / preset_name / title / serial / status(draft|registered)
+├── station       { line, station, location, remark }        ← 已去掉班次/责任人/工号
+├── devices[]     { id, name, model, vendor, interface, host, port,
+│                   serial_port, baudrate, address, channel, programmable, configured }
+├── verification  { overall, mode, checked_at, summary, checklist[], conclusion }
+└── verify_history[]  最近 10 次自检摘要
+   （接口返回时补 product / product_name / subsystem / subsystem_name → 该测试台服务的装备树分支）</pre>
+  </section>
+
+  <section>
+    <h2>8. 主题变量（改配色指南）</h2>
+    <table>
+      <tr><th>变量</th><th>当前值</th><th>用途</th></tr>
+      <tr><td><code>--accent</code> / <code>--accent-rgb</code></td><td>#6d28d9 / 109, 40, 217</td><td>主色（工业紫）：选中态、强调文字、半透明底色</td></tr>
+      <tr><td><code>--accent-2</code> / <code>--accent-2-rgb</code></td><td>#8b5cf6 / 139, 92, 246</td><td>辅助色：次级标签、接口徽标</td></tr>
+      <tr><td><code>--bg</code> / <code>--bg-soft</code></td><td>#ffffff / #faf9ff</td><td>页面背景（白底 + 淡紫网格底纹）</td></tr>
+      <tr><td><code>--panel</code> / <code>--panel-2</code></td><td>#ffffff / #f5f2fd</td><td>卡片与表头底色</td></tr>
+      <tr><td><code>--border</code> / <code>--border-strong</code></td><td>#e4def6 / #cec3ec</td><td>描边</td></tr>
+      <tr><td><code>--ok</code> / <code>--warn</code> / <code>--err</code></td><td>#15803d / #b45309 / #dc2626</td><td>通过 / 待确认 / 失败（白底上的深色，保证对比度）</td></tr>
+    </table>
+    <p>各页面 scoped 样式统一使用 <code>rgba(var(--accent-rgb), 0.12)</code> 这类写法，因此改主题只需修改 <code>frontend/src/style.css</code> 的 <code>:root</code> 一处。导航项（名称 / 副标题 / 图标 / 顺序）在 <code>frontend/src/App.vue</code> 的 <code>NAV</code> 数组中配置。</p>
+  </section>
+
+  <section>
+    <h2>9. 验证记录</h2>
+    <ul>
+      <li><code>npm run build</code>：41 modules transformed，构建通过（模板与脚本编译无误）。</li>
+      <li>接口联调：级联树返回 2 个产品 / 5 个「产品-子系统」/ <b>7 个预设类型</b>；三步注册、真实与模拟自检、编号与工位校验、列表与概览、删除清理全部符合预期。</li>
+      <li>默认测试台（本轮）：启动即已注册 <b>SPM读头动态测试台</b>（7 台设备含 Fluke 8846A 万用表，6 台可编程，自检 <b>13/13 pass</b>）；级联树出现 <code>1000-A &gt; SPM &gt; SPM-RH-DYN-01</code>；<code>overview</code> 返回预设 7 / 已注册 1 / 设备 7 / 可编程 6；恢复接口幂等，删除后重建名称与编号一致且自检仍 pass。全套断言 <b>28/28 通过</b>。</li>
+      <li>自检修正：「可编程设备配置完整」对 USB / GPIB 设备改以「是否登记资源地址」判定，模拟自检由 10/12 提升至 <b>12/12 全通过</b>。</li>
+      <li>回归：<code>/api/health</code>、<code>/api/testcases</code>、<code>/api/tree</code>、<code>/api/equipment</code>、<code>/api/records</code>、<code>/api/tps</code>、<code>/api/license/status</code> 均正常。</li>
+      <li>未做：浏览器端可视化巡检（本机无可用浏览器自动化节点），建议按下述命令启动后人工确认紫白主题与左侧导航在 1366 / 1920 宽度下的表现。</li>
+    </ul>
+    <pre>后端：cd D:\ATE\backend  →  .venv\Scripts\python.exe -m uvicorn main:app --port 8000
+前端：cd D:\ATE\frontend →  npm run dev  →  打开 http://127.0.0.1:5173 → 登录 → 左侧「测试台导航」
+（默认测试台已就位；要新增自己的测试台走「＋ 新增测试台」）</pre>
+  </section>
+
+</div>
+</body>
+</html>

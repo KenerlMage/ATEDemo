@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATE Runner - TPS 运行环境(workspace / 公共 conftest / driver 配置)</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6; --border-strong: #cec3ec;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --accent-2-rgb: 139, 92, 246;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); font-size: 14px; line-height: 1.65;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; box-shadow: 0 10px 30px rgba(var(--accent-rgb), .06); }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 12px; margin-top: 22px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .metric b { display: block; font-size: 21px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14.5px; margin: 20px 0 8px; color: var(--accent2); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 8px; font-size: 14.5px; }
+  .card p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .timeline { border-left: 2px solid var(--border); margin: 6px 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 15px; }
+  .step { position: relative; }
+  .step::before { content: ''; position: absolute; left: -27px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15); }
+  .step b { display: block; font-size: 14px; }
+  .step span { color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21, 128, 61, .4); background: rgba(21, 128, 61, .1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180, 83, 9, .4); background: rgba(180, 83, 9, .1); }
+  .badge.acc { color: var(--accent); border-color: rgba(var(--accent-rgb), .35); background: rgba(var(--accent-rgb), .1); }
+  .mock { display: grid; grid-template-columns: 196px 1fr; gap: 12px; }
+  .mock-side { border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(180deg, #fbfaff, #fff); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .mi { font-size: 12px; padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; color: var(--muted); }
+  .mi.on { color: var(--accent); background: rgba(var(--accent-rgb), .1); border-color: rgba(var(--accent-rgb), .28); border-left: 3px solid var(--accent); font-weight: 700; }
+  .mock-main { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .mrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+  .mcard { border: 1px solid var(--border); border-radius: 9px; padding: 8px 9px; background: var(--panel2); font-size: 11.5px; color: var(--muted); }
+  .mcard b { display: block; color: var(--text); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="stripe"></div>
+    <h1>TPS 运行环境 · workspace / 公共 conftest / driver 配置</h1>
+    <p>TPS 不再直接跑在 <code>testresource/</code> 里：运行时复制一份临时副本到安装目录下的 <code>workspace/&lt;TPS 名称&gt;/run_&lt;任务号&gt;/</code>，装备信息、测试阈值与设备 driver 全部由程序提供的公共 <code>conftest.py</code> 注入，而 driver 配置由测试台注册结果投影到 SQLite 供运行时读取。</p>
+    <div class="metrics">
+      <div class="metric"><b>3</b><span>TPS 主要字段(testconfig / device_config / cmd_suit)</span></div>
+      <div class="metric"><b>13</b><span>新增后端接口</span></div>
+      <div class="metric"><b>8</b><span>驱动规格(工厂可解析)</span></div>
+      <div class="metric"><b>5</b><span>运行目录保留份数(默认)</span></div>
+      <div class="metric"><b>7</b><span>顺序步骤(1 初始化 + 5 用例 + 1 终止)</span></div>
+      <div class="metric"><b>2</b><span>运行模式(仿真 / 真机)</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>1. 一图看懂：一次 TPS 运行发生了什么</h2>
+    <div class="timeline">
+      <div class="step">
+        <b>① 读清单</b>
+        <span><code>tps_runtime.read_tps()</code> 读 <code>testresource/spm_rh_dyn/tps.json</code>（v2 目录包）或单文件 JSON（v1 旧格式兼容），校验三个主要字段。</span>
+      </div>
+      <div class="step">
+        <b>② 建运行环境</b>
+        <span><code>stage()</code> 确保 <code>workspace/</code> 与公共 <code>conftest.py</code> 就绪（不存在则创建/部署）→ 把整个 TPS <strong>复制一份临时副本</strong>到 <code>workspace/SPM读头动态测试/run_df0d1b653f88/</code> → 生成执行入口 <code>test_tps_generated.py</code> 与运行环境文件 <code>ate_env.json</code>。</span>
+      </div>
+      <div class="step">
+        <b>③ 配测试台</b>
+        <span>按清单里的 <code>bench.preset_id</code> 自动匹配已注册测试台（也可用 <code>bench_id</code> 指定），把测试台标题/编号、运行模式写进 <code>ate_env.json</code>；没有测试台时如实提示，不阻塞仿真运行。</span>
+      </div>
+      <div class="step">
+        <b>④ 逐步骤执行</b>
+        <span>每个步骤在临时副本目录里跑 <code>pytest &lt;节点&gt; -v</code>（cwd = 运行目录）。公共 conftest 提供 <code>ate_ctx</code> 等夹具：从 SQLite 取装备与 driver、从清单取阈值。</span>
+      </div>
+      <div class="step">
+        <b>⑤ 判定与落盘</b>
+        <span>用例返回值经清单 <code>checks</code> 映射到 <code>testconfig</code> 阈值自动判定，越限即失败；结果写入 <code>run_result.json</code>（汇总 / 逐用例 / 阈值明细 / 每台设备解析出的 driver），HTML 报告新增「运行环境 (workspace)」卡片。</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. workspace 目录结构（不存在由程序自动创建）</h2>
+<pre>D:\ATE\workspace\                     # ATE 安装运行目录下的 workspace（可用 ATE_WORKSPACE 覆盖）
+├── conftest.py                       # 公共 conftest（程序提供，升级带版本标记 ATECONFTEST_VERSION）
+└── SPM读头动态测试\                   # 以 TPS 名称命名的目录
+    └── run_df0d1b653f88\              # 运行时临时副本（run_&lt;task_id&gt;）
+        ├── tps.json                  #   TPS 清单副本
+        ├── testcase\                 #   用例实现副本（原样复制，源 TPS 不被写脏）
+        ├── test_tps_generated.py     #   由 cmd_suit 生成的执行入口（setup / case / teardown）
+        ├── ate_env.json              #   本次运行环境（任务 / UUT / 测试台 / 模式 / 后端路径 / 库路径）
+        ├── conftest.py               #   公共 conftest 副本（读同目录 ate_env.json）
+        ├── run_result.json           #   运行结果（汇总 / 逐用例阈值 / 设备 driver 规格）
+        └── run_log.txt               #   pytest 输出全文</pre>
+    <table>
+      <thead><tr><th>能力</th><th>实现</th></tr></thead>
+      <tbody>
+        <tr><td>自动创建</td><td><code>workspace_root()</code> 取 <code>&lt;ATE&gt;/workspace</code>；<code>ensure_workspace()</code> 缺失即建；后端启动挂载与 <code>/api/runtime/workspace/init</code> 都会确保就绪</td></tr>
+        <tr><td>临时副本</td><td><code>stage()</code> 用 <code>copytree</code> 复制整份 TPS，并把本次运行上下文写成 <code>ate_env.json</code>；源 TPS 全程只读</td></tr>
+        <tr><td>保留策略</td><td>默认保留最近 <strong>5</strong> 份运行目录（<code>keep_runs</code>），<strong>当前运行目录始终保护</strong>；界面「TPS 运行目录」栏可一键清理</td></tr>
+        <tr><td>公共 conftest 升级</td><td>版本一致 → <span class="badge">kept</span>；版本变化 → 自动备份旧文件后覆盖，并同步到新运行目录</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 公共 conftest.py 注入什么</h2>
+    <div class="grid2">
+      <div class="card">
+        <h4>装备信息 <span class="badge acc">ate_bench / ate_devices</span></h4>
+        <p>从 SQLite 的 <code>bench_registry</code> / <code>device_registry</code> 读出本次测试台与设备（IP·端口·串口·波特率·资源地址 + 解析出的 driver 规格）。</p>
+        <ul>
+          <li>TPS 里不写死任何地址</li>
+          <li>现场改址只需改注册库 / 装备属性配置页</li>
+          <li>无测试台时给出明确提示（可继续仿真）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>测试阈值 <span class="badge acc">ate_thresholds · ctx.check()</span></h4>
+        <p>本次 TPS 的 <code>testconfig</code> 子字典整体注入；用例只需回传测量值，上下限判定与中文提示由 conftest 完成。</p>
+        <ul>
+          <li>越限抛 <code>LimitError</code>，带阈值明细</li>
+          <li>改阈值只改清单，不动用例代码</li>
+          <li>结果里保留 实测值 / 下限 / 上限 / 单位</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>设备 driver <span class="badge acc">driver(别名) / command(别名, 动作)</span></h4>
+        <p>按 <code>device_config</code> 别名 → 注册库设备 → 工厂解析出具体 driver（示波器 / 万用表 / 电源 / 电子负载 / 信号源 / 运动控制 / 夹具），统一返回 <code>{ok, value, detail}</code>。</p>
+        <ul>
+          <li>仿真与真机共用同一驱动，只在传输层分叉</li>
+          <li>未识别设备走通用 SCPI 或被动设备规格</li>
+          <li>用例结束统一释放连接</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>结果记录 <span class="badge acc">ate_runner</span></h4>
+        <p>pytest 钩子在会话结束/用例失败时兜底写盘，异常中断也不会丢结果。</p>
+        <ul>
+          <li>逐用例写 <code>run_result.json</code>（续写同一任务）</li>
+          <li>失败用例带阈值明细与测量值</li>
+          <li>记录每台设备的 driver 规格，便于归因</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. TPS 三个主要字段</h2>
+    <table>
+      <thead><tr><th>字段</th><th>作用</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>testconfig</code></td>
+          <td>测试用例的阈值设置（测试套中单个用例的阈值上下限子字典）</td>
+          <td><code>{"TC_VDD": {"label": "读头上电电压", "min": 3.135, "max": 3.465, "unit": "V"}}</code></td>
+        </tr>
+        <tr>
+          <td><code>device_config</code></td>
+          <td>测试用例使用的设备信息子字典（别名 → 注册库设备 / 角色）</td>
+          <td><code>{"scope": {"device_id": "rh-scope"}, "dmm": {"role": "万用表"}}</code></td>
+        </tr>
+        <tr>
+          <td><code>cmd_suit</code></td>
+          <td>测试套排列子字典，其中每一个测试用例对应 <code>testcase/</code> 中提供的一个实现</td>
+          <td><code>[{"no": 1, "id": "TC001", "name": "读头上电电压", "case": "testcase.power::power_on_voltage", "checks": {"VDD": "TC_VDD"}}]</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>展开成执行步骤</h3>
+<pre>setup(SETUP01) → cmd_suit(TC001 TC002 TC003 TC004 TC005) → teardown(TD01)
+= 7 个顺序 pytest 节点：test_tps_generated.py::test_setup[SETUP01] / ::test_case[TC001] … / ::test_teardown[TD01]</pre>
+    <div class="grid2">
+      <div class="card">
+        <h4>用例签名</h4>
+        <p><code>def 用例(ctx, **params) -&gt; None | float | dict</code></p>
+        <ul>
+          <li>返回 <code>float</code>：按清单 <code>checks</code> 第一个键判定</li>
+          <li>返回 <code>dict</code>：<code>{检查项: 值}</code> 逐项映射到 <code>testconfig</code></li>
+          <li>返回 <code>None</code>：只做动作（初始化/终止类）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>清单校验（中文错误清单）</h4>
+        <ul>
+          <li>阈值上下限非数字 / 下限大于上限</li>
+          <li><code>cmd_suit</code> 引用了未定义的阈值</li>
+          <li><code>case</code> 不是 <code>模块::函数</code> 形式、id 重复</li>
+          <li>与旧 <code>steps</code> 字段混用</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. 设备 driver 配置为什么放 SQLite</h2>
+    <div class="grid2">
+      <div class="card">
+        <h4>注册即入库</h4>
+        <p>第三步注册完成（或设备属性 PATCH 改址）后，<code>_save_registry()</code> 把注册库全量投影到 SQLite；注册库 JSON 仍是<strong>唯一事实源</strong>。</p>
+      </div>
+      <div class="card">
+        <h4>运行时只读 SQLite</h4>
+        <p>公共 conftest 从 SQLite 取设备，而不是让每个 TPS 自己写 IP/端口；现场改址 TPS 代码零改动。</p>
+      </div>
+      <div class="card">
+        <h4>可随时重建</h4>
+        <p>SQLite 只是投影：删库后 <code>POST /api/runtime/db/sync</code>（或重启后端）即从 JSON 重建，不影响授权与注册数据。</p>
+      </div>
+      <div class="card">
+        <h4>驱动工厂</h4>
+        <p><code>drivers/factory.py</code> 的 <code>DRIVER_SPECS</code> 按厂商/型号/类别/接口打分选驱动，先具体（泰克 MSO5 示波器）后兜底（通用 SCPI），未识别设备走被动设备规格。</p>
+      </div>
+    </div>
+<pre>backend\ate.db（表）
+├── bench_registry   (bench_id PK, preset_id, title, serial, product, subsystem, status,
+│                     station_json, verify_overall, verify_mode, device_count,
+│                     programmable_count, synced_at)
+├── device_registry  (bench_id + device_id PK, name, model, vendor, category, role,
+│                     programmable, interface, host, port, protocol, serial_port, baudrate,
+│                     address, channel, driver, timeout, config_json, synced_at)
+└── bench_sync_log   (id PK, synced_at, source, bench_count, device_count, note)</pre>
+    <table>
+      <thead><tr><th>驱动规格 key</th><th>设备类别</th><th>典型动作</th></tr></thead>
+      <tbody>
+        <tr><td><code>tektronix-mso5</code></td><td>数字示波器（泰克 MSO5 方案）</td><td>identify / autoset / waveform / measure / timebase / channel</td></tr>
+        <tr><td><code>generic-dmm</code></td><td>数字万用表</td><td>measure_dc_voltage / current / resistance / frequency / ac_voltage</td></tr>
+        <tr><td><code>generic-psu</code></td><td>可编程直流电源</td><td>set_voltage / set_current / output / measure_voltage / measure_current</td></tr>
+        <tr><td><code>generic-eload</code></td><td>可编程电子负载</td><td>set_mode / set_level / input / measure_voltage / measure_current</td></tr>
+        <tr><td><code>generic-awg</code></td><td>信号发生器</td><td>set_waveform / set_frequency / set_amplitude / output</td></tr>
+        <tr><td><code>serial-motion</code></td><td>运动控制盒（串口）</td><td>handshake / set_speed / read_speed / home / stop</td></tr>
+        <tr><td><code>passive-device</code></td><td>夹具 / 探针（非程控）</td><td>info（只登记信息，不参与结论）</td></tr>
+        <tr><td><code>generic-scpi</code></td><td>其他 SCPI 仪器（兜底）</td><td>write / query / idn</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>6. 接口一览（新增 13 个）</h2>
+    <table>
+      <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/runtime/workspace</code></td><td>运行环境总览（workspace 路径 / 公共 conftest 是否存在与版本 / 运行目录列表）</td></tr>
+        <tr><td>POST</td><td><code>/api/runtime/workspace/init</code></td><td>初始化 workspace 并部署/更新公共 conftest（<code>force</code> 覆盖前自动备份）</td></tr>
+        <tr><td>GET</td><td><code>/api/runtime/drivers</code></td><td>驱动规格清单（key / 名称 / 设备类别 / 可用动作）</td></tr>
+        <tr><td>GET</td><td><code>/api/runtime/db</code></td><td>SQLite 投影统计（测试台数 / 设备数 / 库路径 / 最近同步时间）</td></tr>
+        <tr><td>POST</td><td><code>/api/runtime/db/sync</code></td><td>手动把注册库重新投影到 SQLite</td></tr>
+        <tr><td>GET</td><td><code>/api/runtime/schema</code></td><td>TPS v2 结构说明（三字段含义）</td></tr>
+        <tr><td>GET</td><td><code>/api/tps/{id}/manifest</code></td><td>读取 TPS 清单（v2 自动归一化，返回三字段与展开后的步骤）</td></tr>
+        <tr><td>POST</td><td><code>/api/tps/{id}/stage</code></td><td>准备运行环境（生成 workspace 临时副本：执行入口 + ate_env.json + conftest）</td></tr>
+        <tr><td>POST</td><td><code>/api/tps/{id}/collect</code></td><td>收集用例（pytest --collect-only，只读，不生成运行记录）</td></tr>
+        <tr><td>GET</td><td><code>/api/tps/{id}/runs</code></td><td>历史运行目录列表 + 最近一次结果摘要</td></tr>
+        <tr><td>POST</td><td><code>/api/tps/{id}/runs/cleanup</code></td><td>清理旧运行目录（<code>keep</code> 保留最近 N 份，当前运行目录保护）</td></tr>
+        <tr><td>POST</td><td><code>/api/tps/validate</code></td><td>校验 TPS v2 清单，返回中文错误清单</td></tr>
+        <tr><td>POST</td><td><code>/api/tps/{id}/run</code></td><td>执行 TPS（新增 <code>bench_id</code> / <code>mode</code>；v2 包先在 workspace 生成临时副本再逐步执行）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>7. 界面入口（装备属性配置页 · 装备栏位新增两块）</h2>
+    <div class="mock">
+      <div class="mock-side">
+        <div class="mi">测试执行</div>
+        <div class="mi on">装备属性配置</div>
+        <div class="mi">装备助手</div>
+        <div class="mi">测试记录</div>
+        <div class="mi">测试台导航</div>
+      </div>
+      <div class="mock-main">
+        <div class="mrow">
+          <div class="mcard"><b>待注册测试台</b>1 台草稿 · 导出 JSON</div>
+          <div class="mcard"><b>TPS 运行环境</b>workspace 路径 · conftest v2 · SQLite 7 台设备 · 8 驱动规格</div>
+          <div class="mcard"><b>TPS 运行目录</b>run_xxxx · 7/7 通过 · 1.2 MB · 清理旧目录</div>
+        </div>
+        <div class="mcard"><b>设备卡片区</b>按测试台分组，可编程设备右键改址（IP / 端口 / 串口 / 波特率 / 资源地址）</div>
+      </div>
+    </div>
+    <ul>
+      <li><strong>TPS 运行环境</strong>：workspace 目录、公共 conftest 版本（界面版本 vs 模板版本不一致时徽标转黄）、SQLite driver 配置统计、可解析驱动规格表、「初始化 / 校验 workspace」与「同步 driver 配置」按钮。</li>
+      <li><strong>TPS 运行目录</strong>：选择 TPS 程序包 → 列出 workspace 下该 TPS 的运行目录（名称 / 用例通过数徽标 / 时间 / 占用空间）+ 最近一次结果摘要 + 「清理旧运行目录」（保留最近 3 份）。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>8. 验证记录</h2>
+    <ul>
+      <li><span class="badge ok">通过</span> 后端端到端联调 <code>test_tps_runtime.py</code>：<strong>62 passed, 0 failed</strong>（workspace 自动创建与命名 / 公共 conftest 部署幂等 / SQLite 投影 1 台 7 设备 / 8 条驱动规格 / v2 清单三字段 / 7 条用例收集 / stage 临时副本内容 / 完整运行 7 步全通过 / run_result.json 汇总与阈值明细 / 报告含「运行环境 (workspace)」/ 运行目录排序与清理 / v2 校验与导入 / v1 TPS 8 步回归）</li>
+      <li><span class="badge ok">通过</span> 回归：<code>test_tools.py</code> 全通过（52 断言）、<code>test_sim.py</code> 52 passed、<code>test_lifecycle.py</code> 47 passed、<code>test_default_bench.py</code> 28 passed、<code>test_tree.py</code> OK、<code>test_api.py</code> 退出码 0</li>
+      <li><span class="badge ok">通过</span> 前端：<code>npm run build</code> 成功（43 modules；CSS 73.13 kB / JS 208.55 kB），产物含「TPS 运行环境」「TPS 运行目录」「初始化 / 校验 workspace」「/api/runtime/db/sync」与 <code>.drv-table</code> / <code>.tag.ok</code> 样式</li>
+      <li><span class="badge warn">未覆盖</span> 浏览器端可视化巡检（本机无可用浏览器自动化节点）：以「构建 + 接口端到端 + 模板结构校验」为准；重跑 <code>start_all.bat</code> 后可在「装备属性配置」页直接查看两块新面板</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>9. 后续可扩展方向</h2>
+    <ul>
+      <li>运行目录里增加「本次运行实际下发的 SCPI 报文清单」导出，便于与 TPS 基线做回归比对。</li>
+      <li>driver 规格表支持在界面上查看/覆盖某台设备的驱动选择（当前由工厂按字段自动解析）。</li>
+      <li>workspace 增加跨工位共享的「基线运行结果」对比视图（同 TPS 不同 UUT 的阈值漂移趋势）。</li>
+      <li>公共 conftest 发布为独立升级包（版本号 + 变更说明），工控机离线升级。</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

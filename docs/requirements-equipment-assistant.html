@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>需求文档 · 装备属性配置 与 装备助手</title>
+<style>
+  :root{
+    --accent:#6d28d9; --accent-rgb:109,40,217; --ink:#1e1b31; --muted:#5b5570;
+    --line:#e6e2f5; --bg:#f7f6fb; --panel:#ffffff; --code-bg:#f4f2fb;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.75 "Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px 70px}
+  header{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%);color:#fff;
+    padding:38px 0 30px;margin-bottom:26px;box-shadow:0 10px 30px rgba(76,29,149,.22)}
+  header .wrap{padding-bottom:0}
+  header h1{margin:0 0 8px;font-size:29px;letter-spacing:.4px}
+  header p{margin:0;opacity:.9;font-size:14.5px}
+  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);
+    border-radius:999px;padding:4px 12px;font-size:12.5px}
+  section,body>div.wrap>h2,body>div.wrap>p,body>div.wrap>table,body>div.wrap>ul,body>div.wrap>ol{position:relative}
+  h2{font-size:20px;margin:26px 0 12px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:16.5px;margin:20px 0 10px;color:#4c1d95}
+  h4{font-size:15px;margin:16px 0 8px}
+  p{margin:10px 0}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px dashed rgba(var(--accent-rgb),.5)}
+  code{font-family:var(--mono);font-size:13px;background:var(--code-bg);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#4c1d95}
+  pre{background:#241f3a;color:#eae6ff;border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.6}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:12.8px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  th{background:#f1eefb;text-align:left;font-weight:600;color:#3b2f63}
+  th,td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fbfaff}
+  ul,ol{padding-left:22px;margin:10px 0}
+  li{margin:5px 0}
+  blockquote{margin:12px 0;padding:10px 16px;background:#f6f2ff;border-left:4px solid var(--accent);
+    border-radius:0 8px 8px 0;color:#3f3a58}
+  hr{border:none;border-top:1px dashed var(--line);margin:26px 0}
+  strong{color:#3b2f63}
+  footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:26px}
+  @media(max-width:720px){header h1{font-size:23px}table{font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <p>2026-09-13 ｜ 前端 /equipment · /assistant ＋ 后端 testbench_registry / instrument_tools / testbench_lifecycle</p>
+    <div class="badges">
+      <span class="badge">设备清单唯一来源：测试台注册 BOM</span>
+      <span class="badge">只改连接参数，BOM 元信息只读</span>
+      <span class="badge">导出 · 自检 · 报告 同页三栏</span>
+      <span class="badge">示波器打通 SCPI</span>
+      <span class="badge">仿真一等公民</span>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+<h1>需求文档 · 装备属性配置 与 装备助手</h1>
+<p><strong>日期</strong>：2026-09-13　<strong>模块</strong>：前端 <code>/equipment</code>（装备属性配置）、<code>/assistant</code>（装备助手）+ 后端 <code>testbench_registry</code> / <code>instrument_tools</code> / <code>testbench_lifecycle</code></p>
+<p><strong>一句话背景</strong>：测试台注册完成后，现场需要能就地查看并修改设备连接参数、对测试台做装备级运维，并能在没有硬件的情况下用同一套界面把仪器"跑起来"验证流程。</p>
+<hr />
+<h2>一、核心需求（先说重点）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>核心需求</th>
+<th>关键约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td><strong>设备清单只有一个来源</strong>：装备属性配置页的设备来自各测试台注册时该类型 BOM 清单</td>
+<td>不二次维护、不另存一份</td>
+</tr>
+<tr>
+<td>C2</td>
+<td><strong>只允许改连接参数</strong>：可编程设备可改 IP/端口/串口/资源地址并写回注册库</td>
+<td>型号·厂商·类别·用途属 BOM 元信息，只读</td>
+</tr>
+<tr>
+<td>C3</td>
+<td><strong>一个页面承载三类现场动作</strong>：测试台导出（待注册 + 已注册）、装备自检、报告中心</td>
+<td>同路由内三栏切换，不新增两个侧栏菜单项</td>
+</tr>
+<tr>
+<td>C4</td>
+<td><strong>装备助手 = 工具卡片 + 会话式仪器控制</strong>，首期打通数字示波器（泰克 MSO54，SCPI over socket）</td>
+<td>工具以卡片注册，后续仪器按同一形态扩展</td>
+</tr>
+<tr>
+<td>C5</td>
+<td><strong>仿真是一等公民</strong>：无硬件也能完成演示与自检，且与实测严格区分</td>
+<td>仿真数据标 <code>simulate</code>、测量标「模拟」，不冒充实测</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>二、装备属性配置（<code>/equipment</code>）</h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>说明 / 验收点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>由原「测试装备」页改造为「装备属性配置」</td>
+<td>回答"这台测试台装了哪些设备、连接参数是什么、能不能改"</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>设备清单按测试台分组，支持关键词搜索与「仅看可编程 / 未配置」筛选</td>
+<td>数据源：<code>GET /api/testbench/devices</code>（各测试台 BOM 设备拍平，含资源串）</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>可编程设备右键 → 修改设备属性</td>
+<td>网口：IP/主机名·端口·协议·备注；串口：口号·波特率；USB/GPIB：资源地址·通道号</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>属性弹窗<strong>按接口类型渲染</strong>，元信息只读</td>
+<td>型号/厂商/类别/用途不在提交范围内</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>保存前双重校验 + 变更留痕</td>
+<td>格式校验（端口 1–65535、<code>COM3</code> 样式、波特率 300–1000000 等）+ 同测试台内 <code>IP:端口</code> 不允许被两台设备占用（前后端同一套规则）；字段级前后值保留最近 10 条，可查「变更历史」</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>右键附带「恢复 BOM 默认值」「复制资源地址」</td>
+<td>默认值来自预设 BOM</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>非可编程设备（夹具、探针组等）只读</td>
+<td>右键给出明确提示，不参与校验</td>
+</tr>
+<tr>
+<td>R8</td>
+<td><strong>测试台导出</strong>：待注册（草稿）与<strong>已注册</strong>都可导出</td>
+<td>勾选多台 → 「导出选中」，或「导出全部已注册」；导出内容自描述作用范围（<code>pending/registered/selected/all</code>）与状态构成（已注册 x 台 / 草稿 y 台）</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>导出记录统一进报告区</td>
+<td>类型标签统一「测试台导出」，历史记录读取时重映射，无需迁移数据</td>
+</tr>
+<tr>
+<td>R10</td>
+<td><strong>三栏切换</strong>：装备属性配置 / 测试台装备自检 / 装备报告中心</td>
+<td>同一路由内 <code>v-show</code> 切换，栏位与地址栏 hash 深链同步</td>
+</tr>
+<tr>
+<td>R11</td>
+<td>装备级运维：初始化 / 终止 / 自检</td>
+<td>自检结果（含每项清单）在界面直接显示报告；非程控设备只做信息项、不参与结论判定</td>
+</tr>
+<tr>
+<td>R12</td>
+<td>报告区</td>
+<td>「打开本地资源管理器」定位报告目录 + 历史硬件自检报告 / 导出清单，按类型过滤</td>
+</tr>
+<tr>
+<td>R13</td>
+<td>默认测试台可见可用</td>
+<td>新环境下装备页应直接看到「SPM 读头动态测试台」及其 BOM 设备</td>
+</tr>
+<tr>
+<td>R14</td>
+<td>TPS 运行环境面板（同页承载）</td>
+<td>显示 workspace 路径、公共 <code>conftest</code> 版本、SQLite 投影统计与驱动规格表，提供初始化 / 同步按钮；「TPS 运行目录」列出运行副本与结果徽标并可清理</td>
+</tr>
+</tbody>
+</table>
+<h2>三、装备助手（<code>/assistant</code>）</h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>说明 / 验收点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>以<strong>卡片</strong>形式提供控制设备的小工具</td>
+<td>卡片含名称、协议、能力清单、可用性；单击/双击选中 → 「运行工具」启动</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>工具注册可扩展</td>
+<td>首期：数字示波器（泰克 MSO54 方案）；万用表 / 可编程电源 / 电子负载预留卡片</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>设备绑定来自注册库</td>
+<td>下拉列出已注册测试台中的网口设备（示波器优先），显示 <code>IP:端口</code> 与所属测试台；不另维护清单</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>示波器基本操作</td>
+<td>连接并识别（<code>*IDN?</code> + 回读时基与通道状态）、运行/停止/单次、自动设置、时基 ×2 ÷2 与常用档位、通道 ON/OFF 与量程 / 耦合（DC·AC·GND）</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>波形读取与呈现</td>
+<td>取波形后 Canvas 绘制 10×8 工业风网格，按通道量程标注刻度</td>
+</tr>
+<tr>
+<td>A6</td>
+<td>测量项带来源标签</td>
+<td>峰峰值、幅值、频率、周期、平均值、有效值、上升/下降时间，每项标注 实测 / 模拟 / 无效</td>
+</tr>
+<tr>
+<td>A7</td>
+<td>命令日志</td>
+<td>面板底部实时显示 SCPI 发送 / 应答 / 提示，便于现场排查与复现</td>
+</tr>
+<tr>
+<td>A8</td>
+<td><strong>仿真模式</strong>：无硬件也能看波形</td>
+<td>「一键仿真」<strong>不选设备也能进</strong>（后端用内置仿真信号源）；仿真与真实仪器并存、切换明确</td>
+</tr>
+<tr>
+<td>A9</td>
+<td><strong>可调仿真信号源</strong></td>
+<td>波形 6 种（正弦/方波/三角/锯齿/直流/噪声）；频率 10 Hz–1 MHz（16 档）；幅度 Vpp 0.1–10 V（自动 1-2-5 档 V/div，手动改过后不再自动）；偏置 ±5 V；噪声 0–0.5；屏内周期 1/2/5/10（换算时基并显示 µs/div）</td>
+</tr>
+<tr>
+<td>A10</td>
+<td>仿真算法自洽</td>
+<td>时基与频率配套（屏内恰好 N 个周期）；频率测量用带迟滞的过中点检测（噪声不造假穿越）；幅度取 Top/Base 直方图均值差、与偏置无关；切回真实仪器后仿真参数不影响实测</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>四、非功能与设计约束</h2>
+<ul>
+<li><strong>单一事实源</strong>：注册库（JSON）为唯一事实源，SQLite 只做投影；装备页读注册库，不新建存储。</li>
+<li><strong>改哪里</strong>：默认 IP/端口 → <code>testresource/testbench_presets.json</code>；校验规则 → <code>testbench_registry.py</code>；工具卡片 / 示波器 → <code>instrument_tools.py</code>；导出与报告 → <code>testbench_lifecycle.py</code>。</li>
+<li><strong>导航</strong>：装备助手为左侧导航项，「测试台导航」固定在最下方；窄屏（≤900px）转顶部横向导航。</li>
+<li><strong>界面风格</strong>：延续紫色 + 白底工业风，配色只改 <code>style.css</code> 的 <code>:root</code> 变量。</li>
+<li><strong>验证方式</strong>：以构建 + 接口端到端断言为准（无 GUI 自动化节点时不做浏览器渲染巡检）。</li>
+</ul>
+<h2>五、验收标准（简表）</h2>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>验收点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据源一致</td>
+<td>注册一台 8 设备测试台 → 装备页接口返回 8 台设备</td>
+</tr>
+<tr>
+<td>属性写回</td>
+<td>改 IP/端口后注册库更新，冲突被前后端同时拦截，变更历史可查</td>
+</tr>
+<tr>
+<td>导出范围</td>
+<td><code>scope</code> 为 <code>pending/registered/selected/all</code> 且 <code>by_status</code> 计数正确，弹窗显示状态构成</td>
+</tr>
+<tr>
+<td>三栏深链</td>
+<td>三个栏位切换后地址栏 hash 正确，刷新后停在原栏位</td>
+</tr>
+<tr>
+<td>装备自检</td>
+<td>结论与清单在界面可见，报告可在资源管理器中定位</td>
+</tr>
+<tr>
+<td>仿真</td>
+<td>6 种波形均可显示；设定频率/幅度/偏置与测量值一致；<code>source=simulate</code>、测量标「模拟」</td>
+</tr>
+<tr>
+<td>回归</td>
+<td>示波器仿真 52 条断言、装备运维 47 条、导出 40 条、默认测试台 28 条全绿</td>
+</tr>
+</tbody>
+</table>
+<h2>六、本期范围外（明确不做）</h2>
+<ul>
+<li>不为装备数据单独建一套存储（避免双份事实源）。</li>
+<li>不允许修改型号 / 厂商 / 类别等 BOM 元信息。</li>
+<li>不为「装备自检」「报告中心」各新增一个侧栏菜单页（统一为同路由三栏）。</li>
+<li>仿真数据不得进入实测报告或作为实测结论。</li>
+</ul>
+  <footer>ATE Runner · 需求文档 · 装备属性配置 与 装备助手</footer>
+</div>
+</body>
+</html>

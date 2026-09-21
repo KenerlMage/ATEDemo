@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="auto-designer-preview-device" content="slide" />
+<title>ATE Runner 需求说明</title>
+<style>
+  /* ╔════════════════════════════════════════════════════════════════════╗
+     ║ ZONE A · TOKENS                                                     ║
+     ║ 底子取自 html-ppt-zhangzara-monochrome（白纸黑字、无装饰、hairline）║
+     ║ 两处按用户指定覆盖：① 单一正红强调 ② 微软雅黑                       ║
+     ║ 只改本区即可整体换皮，其余区域不写裸 hex。                          ║
+     ╚════════════════════════════════════════════════════════════════════╝ */
+  :root {
+    --bg: #fbfaf8;
+    --surface: #f2f0ea;
+    --ink: #141414;
+    --ink-2: #46463f;
+    --muted: #8b8b84;
+    --rule: #d9d6cd;
+    --rule-strong: #141414;
+    --accent: #c8102e;
+    --accent-deep: #8c0b1f;
+
+    --f-sans: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Noto Sans SC", sans-serif;
+
+    --sz-cover: 104px;
+    --sz-h1: 72px;
+    --sz-h2: 42px;
+    --sz-lead: 34px;
+    --sz-body: 30px;
+    --sz-list: 30px;
+    --sz-num: 188px;
+    --sz-meta: 24px;
+
+    --pad-x: 72px;
+    --pad-y: 56px;
+    --gap-xs: 12px;
+    --gap-sm: 20px;
+    --gap-md: 34px;
+    --gap-lg: 52px;
+
+    --dur: 0.45s;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ╔════════════════════════════════════════════════════════════════════╗
+     ║ ZONE B · ENGINE — 布局引擎 / 切页 / 动画 / 导航，不必修改           ║
+     ╚════════════════════════════════════════════════════════════════════╝ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #35342f;
+    font-family: var(--f-sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage-wrap { position: absolute; inset: 0; }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    transform: scale(var(--deck-scale, 1));
+    transform-origin: top left;
+    background: var(--bg);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    padding: var(--pad-y) var(--pad-x);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background: var(--bg);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--dur) var(--ease);
+    overflow: hidden;
+  }
+  .slide.is-active { opacity: 1; visibility: visible; }
+
+  [data-anim] { opacity: 0; }
+  .slide.is-active [data-anim] {
+    animation-duration: var(--dur);
+    animation-timing-function: var(--ease);
+    animation-fill-mode: forwards;
+  }
+  .slide.is-active [data-anim="fade-up"] { animation-name: kUp; }
+  .slide.is-active [data-anim="fade-in"] { animation-name: kIn; }
+  .slide.is-active [data-anim="rule"] { animation-name: kRule; }
+  @keyframes kUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+  @keyframes kIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes kRule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  [data-delay="0"] { animation-delay: 0s; }
+  [data-delay="1"] { animation-delay: 0.06s; }
+  [data-delay="2"] { animation-delay: 0.14s; }
+  [data-delay="3"] { animation-delay: 0.22s; }
+  [data-delay="4"] { animation-delay: 0.30s; }
+  [data-delay="5"] { animation-delay: 0.38s; }
+  [data-delay="6"] { animation-delay: 0.46s; }
+
+  /* 顶部页码章 / 底部页码条 */
+  .chrome {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--gap-sm);
+    padding-bottom: var(--gap-sm);
+    border-bottom: 1px solid var(--rule);
+  }
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-sm);
+    padding-top: var(--gap-sm);
+    border-top: 1px solid var(--rule);
+    font-size: var(--sz-meta);
+    color: var(--muted);
+  }
+  .foot .line { flex: 1; height: 1px; background: var(--rule); }
+  .foot .pg { color: var(--ink-2); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+  /* ╔════════════════════════════════════════════════════════════════════╗
+     ║ ZONE C · SLIDE 组件                                                 ║
+     ╚════════════════════════════════════════════════════════════════════╝ */
+  .eyebrow {
+    font-size: var(--sz-meta);
+    color: var(--accent);
+    letter-spacing: 0.14em;
+  }
+  .eyebrow .sep { color: var(--muted); letter-spacing: 0; margin: 0 0.5em; }
+  .meta { font-size: var(--sz-meta); color: var(--muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+  .body { min-height: 0; padding-top: var(--gap-md); }
+
+  /* 封面 */
+  .slide--cover .body { display: flex; flex-direction: column; justify-content: flex-end; gap: var(--gap-md); }
+  .cover-title {
+    font-size: var(--sz-cover);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .cover-sub {
+    font-size: var(--sz-lead);
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--ink);
+    max-width: 1240px;
+  }
+  .cover-mark {
+    width: 96px;
+    height: 4px;
+    background: var(--accent);
+    transform-origin: left center;
+  }
+
+  /* 章节 / 大数字页 */
+  .slide--section .body {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: var(--gap-lg);
+    align-items: baseline;
+  }
+  .numeral {
+    font-size: var(--sz-num);
+    font-weight: 700;
+    line-height: 0.86;
+    letter-spacing: -0.04em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .h1 {
+    font-size: var(--sz-h1);
+    font-weight: 700;
+    line-height: 1.16;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .sec-title { font-size: var(--sz-h2); font-weight: 700; line-height: 1.3; color: var(--accent); }
+
+  /* 两栏内容页：左=定位与约束，右=特性清单 */
+  .slide--two .body {
+    display: grid;
+    grid-template-columns: 1.02fr 1fr;
+    gap: 72px;
+    align-items: start;
+  }
+  .col-title { font-size: var(--sz-h2); font-weight: 700; line-height: 1.28; color: var(--accent); }
+  .col-rule { width: 72px; height: 3px; background: var(--accent); margin: var(--gap-sm) 0; }
+  .lead { font-size: var(--sz-lead); line-height: 1.62; color: var(--ink); max-width: 30ch; }
+  .kv { margin-top: var(--gap-md); border-top: 1px solid var(--rule); }
+  .kv-row {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: var(--gap-sm);
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--sz-meta);
+    line-height: 1.55;
+  }
+  .kv-row dt { color: var(--muted); letter-spacing: 0.08em; }
+  .kv-row dd { color: var(--ink-2); }
+
+  .feat { display: flex; flex-direction: column; }
+  .feat-item {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    gap: var(--gap-sm);
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .feat-item:last-child { border-bottom: 1px solid var(--rule); }
+  .feat-no {
+    font-size: var(--sz-body);
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+  .feat-tx { font-size: var(--sz-list); line-height: 1.56; color: var(--ink); }
+  .feat-tx b { color: var(--accent-deep); font-weight: 700; }
+  .feat-tx span { color: var(--ink-2); }
+
+  /* 流程链页 */
+  .chain { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); }
+  .chain-cell {
+    background: var(--bg);
+    padding: 30px 28px 34px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+  }
+  .chain-no { font-size: var(--sz-meta); font-weight: 700; color: var(--accent); letter-spacing: 0.1em; font-variant-numeric: tabular-nums; }
+  .chain-t { font-size: var(--sz-h2); font-weight: 700; line-height: 1.3; color: var(--ink); }
+  .chain-d { font-size: 26px; line-height: 1.55; color: var(--ink-2); }
+
+  .aside-note {
+    margin-top: var(--gap-md);
+    border-top: 1px solid var(--rule);
+    padding-top: var(--gap-sm);
+    font-size: 26px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .aside-note b { color: var(--accent); font-weight: 700; }
+
+  /* 清单页 */
+  .slide--list .body { display: grid; grid-template-columns: 1fr; align-content: center; }
+  .rules { display: flex; flex-direction: column; max-width: 1500px; }
+  .rule-item {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: var(--gap-sm);
+    align-items: baseline;
+    padding: 22px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .rule-item:last-child { border-bottom: 1px solid var(--rule); }
+  .rule-no { font-size: var(--sz-body); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .rule-tx { font-size: var(--sz-list); line-height: 1.55; }
+
+  /* 指标页 */
+  .slide--stat .body { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--gap-md); }
+  .stat-big { font-size: 220px; font-weight: 700; line-height: 0.92; letter-spacing: -0.05em; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat-cap { font-size: var(--sz-lead); color: var(--ink-2); max-width: 1100px; line-height: 1.6; }
+  .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--rule); width: 1560px; }
+  .stat-cell { background: var(--bg); padding: 22px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .stat-n { font-size: var(--sz-h2); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat-l { font-size: var(--sz-meta); color: var(--muted); line-height: 1.5; }
+
+  /* 收尾 */
+  .slide--end .body { display: flex; flex-direction: column; justify-content: center; gap: var(--gap-md); }
+  .end-title { font-size: 84px; font-weight: 700; line-height: 1.14; color: var(--accent); letter-spacing: -0.02em; }
+
+  /* 演讲者备注：默认不出现在观众视图 */
+  .notes { display: none; }
+  .notes-panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: #141414;
+    color: #f2f0ea;
+    font-size: 26px;
+    line-height: 1.6;
+    padding: 20px 28px 24px;
+    max-height: 34vh;
+    overflow: auto;
+    display: none;
+  }
+  .notes-panel.is-open { display: block; }
+  .notes-panel .np-label { color: #ff6b7f; font-size: 24px; letter-spacing: 0.14em; display: block; margin-bottom: 8px; }
+
+  .hint {
+    position: fixed;
+    right: 18px;
+    bottom: 14px;
+    font-size: 24px;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.04em;
+  }
+  .dots { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; gap: 10px; }
+  .dot {
+    width: 9px; height: 9px; border: 0; padding: 0; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3); cursor: pointer;
+  }
+  .dot.is-active { background: #ff6b7f; }
+  .dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  @media print {
+    @page { size: 26.667in 15in; margin: 0; }
+    html, body { overflow: visible; background: #fff; }
+    body { transform: none !important; }
+    .stage { transform: none !important; box-shadow: none; width: 1920px; height: auto; }
+    .slide {
+      position: relative; inset: auto; opacity: 1 !important; visibility: visible !important;
+      height: 1080px; break-after: page; page-break-after: always;
+    }
+    .dots, .hint, .notes-panel { display: none !important; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide, [data-anim] { transition: none !important; animation: none !important; opacity: 1 !important; }
+    [data-anim] { transform: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="stage-wrap" data-deck-stage>
+  <main class="stage" data-deck>
+
+    <!-- 01 封面 -->
+    <section class="slide slide--cover is-active" data-slide="1" data-screen-label="封面">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">ATE RUNNER<span class="sep">/</span>需求说明</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">2026-09-13 · 内部评审</span>
+      </div>
+      <div class="body">
+        <span class="cover-mark" data-anim="rule" data-delay="1"></span>
+        <h1 class="cover-title" data-anim="fade-up" data-delay="2">装备测试平台<br />需求说明</h1>
+        <p class="cover-sub" data-anim="fade-up" data-delay="3">
+          装备助手 · 装备驱动 · 装备属性配置 · 测试台注册 · 设备实例统一注入
+        </p>
+      </div>
+      <div class="foot">
+        <span class="pg">01 / 12</span>
+        <span class="line"></span>
+        <span>专注特性与契约，不含控件布局</span>
+      </div>
+      <aside class="notes">这份材料只讲需求本身：五项能力分别要解决什么问题、必须满足哪些条件、边界在哪里。界面长什么样、控件怎么摆不在这里讨论，那些由设计稿承载。我们先过一遍总览，再逐项展开。</aside>
+    </section>
+
+    <!-- 02 目录 -->
+    <section class="slide slide--two" data-slide="2" data-screen-label="需求总览">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">总览<span class="sep">/</span>Scope</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">五项需求</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">本次交付的五项需求</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            从"注册一台测试台"到"用例跑起来"，串成一条完整的可用链路。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>链路</dt><dd>注册 → 属性配置 → 驱动选型 → 运行时注入 → 执行留痕</dd></div>
+            <div class="kv-row"><dt>读者</dt><dd>用例开发者 / 集成工程师 / 现场运维</dd></div>
+            <div class="kv-row"><dt>原则</dt><dd>单一事实源 · 契约稳定 · 无硬件可验证</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx">装备助手需求设计<span> — 设备能力变成可使用、可追溯的工具</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx">装备驱动需求设计<span> — 驱动作为可插拔货架包分发</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx">装备属性配置需求设计<span> — 连接参数的唯一可改入口</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx">导航页注册新测试台<span> — 一次登记，全局复用</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx">运行期 conftest 统一注入设备实例<span> — 用例不关心设备从哪来</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">02 / 12</span>
+        <span class="line"></span>
+        <span>Scope · 五项需求</span>
+      </div>
+      <aside class="notes">五项需求不是并列的功能清单，而是一条链路：先注册测试台，才能配置属性；配置好了，运行时才拿得到正确的设备实例；设备实例背后由驱动实现。散装的仪器控制能力则由装备助手提供。所以后面按这条链路的顺序讲。</aside>
+    </section>
+
+    <!-- 03 · 01 装备助手 -->
+    <section class="slide slide--two" data-slide="3" data-screen-label="装备助手">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">01<span class="sep">/</span>装备助手</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">需求设计</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">设备能干什么，<br />应当可操作、可追溯</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            把仪器能力从"说明书里的命令"变成用例开发者与现场工程师都能直接上手的东西。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>核心定位</dt><dd>工具化 + 会话化 + 可复现</dd></div>
+            <div class="kv-row"><dt>硬要求</dt><dd>无硬件也能演示；仿真不冒充实测</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx"><b>工具卡片注册表</b><span>：一类仪器一张卡，声明协议、能力与可用性；装驱动包即上架，无需改平台代码。</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx"><b>会话式控制</b><span>：连接并识别设备身份，回读时基与通道状态；运行 / 停止 / 单次 / 自动设置。</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx"><b>波形与测量</b><span>：取回波形即可视化；八项测量（峰峰值 / 幅值 / 频率 / 周期 / 均值 / 有效值 / 上升 / 下降）各带来源标签。</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx"><b>仿真是一等公民</b><span>：一键仿真不选设备也能进；六种波形、10 Hz–1 MHz、幅度 / 偏置 / 噪声 / 屏内周期可调。</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx"><b>可追溯</b><span>：命令日志实时显示发送 / 应答 / 提示，现场能复现问题。</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">03 / 12</span>
+        <span class="line"></span>
+        <span>01 · 装备助手</span>
+      </div>
+      <aside class="notes">装备助手要回答的是"这些设备怎么用"。所以第一要求是工具化：能力要以工具形式暴露出来，而不是让人翻命令手册。第二个要求是仿真必须是一等公民——工控机现场经常没有实机，没有仿真就等于没法验收。</aside>
+    </section>
+
+    <!-- 04 · 02 装备驱动 -->
+    <section class="slide slide--two" data-slide="4" data-screen-label="装备驱动">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">02<span class="sep">/</span>装备驱动</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">需求设计</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">驱动是货架商品，<br />不是平台代码的一部分</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            设备型号会持续增加，平台版本不应跟着涨。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>分层</dt><dd>契约层（冻结）/ 通用家族（内置）/ 型号包（货架）/ 私有包（侧载）</dd></div>
+            <div class="kv-row"><dt>来源</dt><dd>官方货架 · 离线目录 · 本地侧载，同一套校验流程</dd></div>
+            <div class="kv-row"><dt>硬要求</dt><dd>签名离线可验；型号包必须自带仿真模型</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx"><b>分层分发</b><span>：接口契约与通用家族随平台内置；型号细节与客户专有实现走包，各归其位。</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx"><b>包规范自描述</b><span>：声明标识、版本、所属契约、兼容平台、能力清单、匹配规则、是否带仿真。</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx"><b>签名与离线</b><span>：包与货架清单均签名，离线可验；内网与 U 盘场景与在线同流程。</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx"><b>版本可治理</b><span>：同一驱动单一生效版本、可回滚；安装前做兼容性预检；稳定 / 预览双通道。</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx"><b>选型逻辑不变</b><span>：包声明并入既有规格匹配与优先级打分，不引入第二套选择机制。</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">04 / 12</span>
+        <span class="line"></span>
+        <span>02 · 装备驱动</span>
+      </div>
+      <aside class="notes">驱动这部分的关键判断是分层，而不是"常用就内置"。判断标准是内容稳定性：接口契约稳定，就内置并冻结；型号细节变化快，就做成包。还要强调一点，货架只能是来源之一，离线工控机必须能通过离线目录装包。</aside>
+    </section>
+
+    <!-- 05 · 03 装备属性配置 -->
+    <section class="slide slide--two" data-slide="5" data-screen-label="装备属性配置">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">03<span class="sep">/</span>装备属性配置</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">需求设计</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">连接参数只有一个<br />可改入口</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            设备从注册结果来，改动只落在连接参数上，且每一次都可核对。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>事实源</dt><dd>测试台注册 BOM，不二次维护</dd></div>
+            <div class="kv-row"><dt>可改范围</dt><dd>仅连接参数；型号 / 厂商 / 类别只读</dd></div>
+            <div class="kv-row"><dt>硬要求</dt><dd>前后端同一套校验；变更留痕可回溯</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx"><b>设备清单单一来源</b><span>：按测试台分组呈现注册 BOM 中的设备，不另建一份装备台账。</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx"><b>只改连接参数</b><span>：网口地址与端口、串口号与波特率、总线资源地址与通道号；元信息只读。</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx"><b>校验与留痕</b><span>：格式校验 + 同台地址冲突拦截（前后端同规则）；字段级留痕，可恢复 BOM 默认值。</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx"><b>一页承载三类动作</b><span>：测试台导出（待注册 + 已注册）、装备自检、报告中心，三栏同路由可深链。</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx"><b>导出范围自描述</b><span>：导出内容标明作用范围与状态构成，报告记录标签统一，历史记录无需迁移。</span></span></div>
+          <div class="feat-item"><span class="feat-no">06</span><span class="feat-tx"><b>运行环境可见</b><span>：workspace 路径、公共 conftest 版本、设备投影统计与驱动规格，集中可见可初始化。</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">05 / 12</span>
+        <span class="line"></span>
+        <span>03 · 装备属性配置</span>
+      </div>
+      <aside class="notes">属性配置页的核心约束是"只改连接参数"。型号、厂商这些属于 BOM 元信息，不允许在这里改，否则事实源就裂了。另一个重点是校验必须在前后端用同一套规则，否则绕过界面就能造假数据。</aside>
+    </section>
+
+    <!-- 06 · 04 测试台注册 -->
+    <section class="slide slide--two" data-slide="6" data-screen-label="测试台注册">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">04<span class="sep">/</span>测试台注册</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">需求设计</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">一次登记，<br />全局复用</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            在导航页注册的那一次，决定了后续所有能力能拿到什么。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>流程</dt><dd>类型选型 → 设备配置 → 注册并验证（三步）</dd></div>
+            <div class="kv-row"><dt>编号</dt><dd>固定前缀 + 12 位数字，与装备清单规则一致</dd></div>
+            <div class="kv-row"><dt>硬要求</dt><dd>地址冲突双重拦截；注册即自检</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx"><b>三步注册</b><span>：先选产品与子系统定位预设类型，标准 BOM 自动下发；再配可编程设备；最后注册并验证。</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx"><b>BOM 由预设下发</b><span>：设备清单不是手填，而是随预设类型带出，减少人为缺漏。</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx"><b>编号唯一</b><span>：固定前缀 + 12 位数字，重复即拦截。</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx"><b>注册即自检</b><span>：连通性与自检清单当场给出结论；无实机时可以走仿真模式完成验证。</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx"><b>开箱即用</b><span>：内置默认测试台；删除后不自动复活，需要时可一键重建。</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">06 / 12</span>
+        <span class="line"></span>
+        <span>04 · 测试台注册</span>
+      </div>
+      <aside class="notes">注册这一步是整个链路的地基。需求上最要紧的是两件事：一是设备清单必须由预设类型带出来，不能手填，否则每个现场都会填出差异；二是注册完必须当场验证连通性，把这个动作前置，别等到跑用例才发现设备不通。</aside>
+    </section>
+
+    <!-- 07 · 05 conftest 注入 -->
+    <section class="slide slide--two" data-slide="7" data-screen-label="设备实例注入">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">05<span class="sep">/</span>设备实例注入</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">需求设计</span>
+      </div>
+      <div class="body">
+        <div>
+          <h2 class="col-title" data-anim="fade-up" data-delay="1">用例不关心设备<br />从哪来、怎么连</h2>
+          <div class="col-rule" data-anim="rule" data-delay="2"></div>
+          <p class="lead" data-anim="fade-up" data-delay="3">
+            统一由平台提供的公共 conftest 在运行时把设备实例交到用例手上。
+          </p>
+          <dl class="kv" data-anim="fade-up" data-delay="4">
+            <div class="kv-row"><dt>运行环境</dt><dd>安装目录下的 workspace，运行副本隔离</dd></div>
+            <div class="kv-row"><dt>用例表达</dt><dd>阈值上下限 / 设备别名 / 测试套顺序</dd></div>
+            <div class="kv-row"><dt>硬要求</dt><dd>设备版本可追溯；仿真与实测结果不混淆</dd></div>
+          </dl>
+        </div>
+        <div class="feat" data-anim="fade-up" data-delay="3">
+          <div class="feat-item"><span class="feat-no">01</span><span class="feat-tx"><b>运行环境固定</b><span>：workspace 不存在自动创建；每次运行复制独立副本，历史运行互不干扰。</span></span></div>
+          <div class="feat-item"><span class="feat-no">02</span><span class="feat-tx"><b>公共 conftest 随平台部署</b><span>：带版本号统一分发与更新，用例导入即得设备夹具。</span></span></div>
+          <div class="feat-item"><span class="feat-no">03</span><span class="feat-tx"><b>三个字段描述用例</b><span>：阈值上下限、设备别名映射、测试套步骤顺序，业务动作以库形式提供。</span></span></div>
+          <div class="feat-item"><span class="feat-no">04</span><span class="feat-tx"><b>实例按别名解析</b><span>：注册结果投影到本地库，夹具按别名解析为驱动实例，选型交给既有匹配机制。</span></span></div>
+          <div class="feat-item"><span class="feat-no">05</span><span class="feat-tx"><b>失败可控可查</b><span>：运行结果、日志与环境快照落盘，报告里能追到设备与驱动版本。</span></span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">07 / 12</span>
+        <span class="line"></span>
+        <span>05 · 设备实例注入</span>
+      </div>
+      <aside class="notes">这一项是给用例开发者减负的。用例里不写地址、不写端口，只写别名；设备从哪来、怎么连、用哪个驱动，全部由运行时的公共 conftest 决定。这样换台测试台或者换台仪器，用例代码基本不用动。</aside>
+    </section>
+
+    <!-- 08 机制 · 运行期链路 -->
+    <section class="slide" data-slide="8" data-screen-label="运行期链路">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">机制<span class="sep">/</span>运行期链路</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">一页看懂</span>
+      </div>
+      <div class="body">
+        <h2 class="col-title" data-anim="fade-up" data-delay="1" style="margin-bottom: 34px;">从注册到执行，数据只沿一条线走</h2>
+        <div class="chain" data-anim="fade-up" data-delay="2">
+          <div class="chain-cell">
+            <span class="chain-no">01</span>
+            <span class="chain-t">注册登记</span>
+            <span class="chain-d">测试台与设备写入注册库，作为唯一事实源。</span>
+          </div>
+          <div class="chain-cell">
+            <span class="chain-no">02</span>
+            <span class="chain-t">本地投影</span>
+            <span class="chain-d">注册结果同步到本地数据库，供运行时读取。</span>
+          </div>
+          <div class="chain-cell">
+            <span class="chain-no">03</span>
+            <span class="chain-t">夹具注入</span>
+            <span class="chain-d">公共 conftest 按别名解析出驱动实例交给用例。</span>
+          </div>
+          <div class="chain-cell">
+            <span class="chain-no">04</span>
+            <span class="chain-t">执行留痕</span>
+            <span class="chain-d">按测试套顺序执行，产出结果文件与报告。</span>
+          </div>
+        </div>
+        <p class="aside-note" data-anim="fade-up" data-delay="4">
+          <b>关键约束：</b>每一段都只读上一段的产物，不反向写入；因此"装备属性配置"改了连接参数，运行期立刻生效，而用例代码、报告格式都不需要跟着改。
+        </p>
+      </div>
+      <div class="foot">
+        <span class="pg">08 / 12</span>
+        <span class="line"></span>
+        <span>机制 · 运行期链路</span>
+      </div>
+      <aside class="notes">这一页把五项需求串起来看。注册是唯一事实源，运行时读的是它的投影，conftest 只是把投影翻译成用例能用的对象。单向流动的好处是很实际的：现场改一个 IP，不需要动用例代码，也不需要改报告模板。</aside>
+    </section>
+
+    <!-- 09 机制 · 驱动解析与仿真回退 -->
+    <section class="slide slide--section" data-slide="9" data-screen-label="驱动解析与仿真回退">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">机制<span class="sep">/</span>设备实例怎么来</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">选型优先级</span>
+      </div>
+      <div class="body">
+        <div class="numeral" data-anim="fade-in" data-delay="1">3</div>
+        <div>
+          <h2 class="sec-title" data-anim="fade-up" data-delay="2">实例解析的三级优先：型号包 → 通用家族 → 兜底</h2>
+          <div class="chain" data-anim="fade-up" data-delay="3" style="margin-top: 40px; grid-template-columns: repeat(3, 1fr);">
+            <div class="chain-cell">
+              <span class="chain-no">优先 1</span>
+              <span class="chain-t">型号专用包</span>
+              <span class="chain-d">命中品牌与型号特征时优先选用，命令与解析按型号定制。</span>
+            </div>
+            <div class="chain-cell">
+              <span class="chain-no">优先 2</span>
+              <span class="chain-t">通用能力家族</span>
+              <span class="chain-d">按类别与角色落入通用实现，覆盖大多数现场设备。</span>
+            </div>
+            <div class="chain-cell">
+              <span class="chain-no">优先 3</span>
+              <span class="chain-t">无通讯兜底</span>
+              <span class="chain-d">夹具、探头等非程控设备作为信息项参与，不参与结论判定。</span>
+            </div>
+          </div>
+          <p class="aside-note" data-anim="fade-up" data-delay="4">
+            <b>实机不可用时：</b>允许显式回退到仿真并标注来源；回退只影响本次会话，不写入实测结论，也不改变驱动选型规则。
+          </p>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">09 / 12</span>
+        <span class="line"></span>
+        <span>机制 · 选型优先级</span>
+      </div>
+      <aside class="notes">设备实例不是拍脑袋选的，是三级优先：先看有没有型号专用包，再看能不能落进通用家族，最后是无通讯的兜底。实机连不上时允许降级到仿真，但必须在结果里标明来源，不能让人误以为是真机实测。</aside>
+    </section>
+
+    <!-- 10 边界 -->
+    <section class="slide slide--list" data-slide="10" data-screen-label="边界与不做">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">边界<span class="sep">/</span>明确不做</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">五条</span>
+      </div>
+      <div class="body">
+        <div class="rules" data-anim="fade-up" data-delay="1">
+          <div class="rule-item"><span class="rule-no">01</span><span class="rule-tx">不为装备数据另建一套存储 —— 避免出现两份事实源。</span></div>
+          <div class="rule-item"><span class="rule-no">02</span><span class="rule-tx">不允许修改型号、厂商、类别等 BOM 元信息 —— 元信息只读。</span></div>
+          <div class="rule-item"><span class="rule-no">03</span><span class="rule-tx">不把驱动源码交给用例开发者修改 —— 用客户私有包替代分支式改动。</span></div>
+          <div class="rule-item"><span class="rule-no">04</span><span class="rule-tx">不让货架成为唯一来源 —— 离线目录与本地侧载必须同等可用。</span></div>
+          <div class="rule-item"><span class="rule-no">05</span><span class="rule-tx">不让仿真数据进入实测结论 —— 来源必须可区分、可追溯。</span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">10 / 12</span>
+        <span class="line"></span>
+        <span>边界 · 明确不做</span>
+      </div>
+      <aside class="notes">边界写清楚，评审时才不会反复。这五条里最容易被忽略的是第三条和第五条：前者防的是每个项目都分叉出一套驱动，后者防的是报告里混进仿真数据。这两条一旦破掉，后面维护成本会失控。</aside>
+    </section>
+
+    <!-- 11 状态 -->
+    <section class="slide slide--stat" data-slide="11" data-screen-label="落地状态">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">状态<span class="sep">/</span>验证覆盖</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">自动化断言口径</span>
+      </div>
+      <div class="body">
+        <div class="stat-big" data-anim="fade-in" data-delay="1">5 / 5</div>
+        <p class="stat-cap" data-anim="fade-up" data-delay="2">
+          五项需求均已实现，并以接口级自动化断言验收；驱动货架为设计方案，按阶段推进。
+        </p>
+        <div class="stat-grid" data-anim="fade-up" data-delay="3">
+          <div class="stat-cell"><span class="stat-n">52</span><span class="stat-l">装备助手仿真断言</span></div>
+          <div class="stat-cell"><span class="stat-n">47</span><span class="stat-l">装备运维断言</span></div>
+          <div class="stat-cell"><span class="stat-n">40</span><span class="stat-l">测试台导出断言</span></div>
+          <div class="stat-cell"><span class="stat-n">62</span><span class="stat-l">运行环境断言</span></div>
+          <div class="stat-cell"><span class="stat-n">28</span><span class="stat-l">默认测试台断言</span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">11 / 12</span>
+        <span class="line"></span>
+        <span>状态 · 验证覆盖</span>
+      </div>
+      <aside class="notes">这五项里已经落地的部分，都用接口级断言验过，数字是各专项脚本的断言条数，不是估算值。驱动货架目前还停在设计方案，需要按阶段一先做零行为变化的注册表重构。</aside>
+    </section>
+
+    <!-- 12 收尾 -->
+    <section class="slide slide--end" data-slide="12" data-screen-label="下一步">
+      <div class="chrome">
+        <span class="eyebrow" data-anim="fade-in" data-delay="0">下一步<span class="sep">/</span>Next</span>
+        <span class="meta" data-anim="fade-in" data-delay="0">2026-09-13</span>
+      </div>
+      <div class="body">
+        <h2 class="end-title" data-anim="fade-up" data-delay="1">请确认三项</h2>
+        <div class="rules" data-anim="fade-up" data-delay="2" style="max-width: none;">
+          <div class="rule-item"><span class="rule-no">01</span><span class="rule-tx">五项需求描述是否与预期一致；是否有遗漏的特性要补进需求文档。</span></div>
+          <div class="rule-item"><span class="rule-no">02</span><span class="rule-tx">驱动货架是否按"分层 + 三种来源"推进，先做零行为变化的注册表合并。</span></div>
+          <div class="rule-item"><span class="rule-no">03</span><span class="rule-tx">已实现部分是否需要重跑启动脚本，让后端加载新模块后现场复核。</span></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="pg">12 / 12</span>
+        <span class="line"></span>
+        <span>下一步 · 待确认</span>
+      </div>
+      <aside class="notes">收尾只需要三个确认：需求描述有没有漏、驱动货架是否按分层方案推进、已实现部分是否要重跑启动脚本做现场复核。这三项确认完，材料就可以作为需求基线归档。</aside>
+    </section>
+
+  </main>
+</div>
+
+<div class="dots" id="dots" role="tablist" aria-label="幻灯片导航"></div>
+<div class="hint">← → 切页 · N 备注 · P 打印</div>
+<div class="notes-panel" id="notes-panel" aria-live="polite"><span class="np-label">SPEAKER NOTES</span><span id="notes-text"></span></div>
+
+<script>
+  (function () {
+    var stage = document.querySelector("[data-deck]");
+    var slides = Array.prototype.slice.call(stage.querySelectorAll(".slide"));
+    var dotsBox = document.getElementById("dots");
+    var notesPanel = document.getElementById("notes-panel");
+    var notesText = document.getElementById("notes-text");
+    var current = -1;
+    var total = slides.length;
+    var locked = false;
+    var STORE = "ate-requirements-deck-slide";
+
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+    slides.forEach(function (s, i) {
+      var b = document.createElement("button");
+      b.className = "dot";
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-label", "第 " + (i + 1) + " 页");
+      b.addEventListener("click", function () { goTo(i); });
+      dotsBox.appendChild(b);
+    });
+    var dots = Array.prototype.slice.call(dotsBox.querySelectorAll(".dot"));
+
+    function fit() {
+      var w = window.innerWidth, h = window.innerHeight;
+      var scale = Math.min(w / 1920, h / 1080) * 0.96;
+      document.documentElement.style.setProperty("--deck-scale", scale);
+      var wrap = document.querySelector(".stage-wrap");
+      if (wrap) {
+        wrap.style.left = Math.max(0, (w - 1920 * scale) / 2) + "px";
+        wrap.style.top = Math.max(0, (h - 1080 * scale) / 2) + "px";
+      }
+    }
+    window.addEventListener("resize", fit);
+
+    function goTo(i) {
+      if (i < 0 || i >= total) return;
+      if (locked && i !== current) return;
+      var prev = current;
+      current = i;
+
+      if (prev >= 0 && prev !== i) slides[prev].classList.remove("is-active");
+
+      slides[i].querySelectorAll("[data-anim]").forEach(function (el) {
+        el.style.animation = "none";
+        void el.offsetHeight;
+        el.style.animation = "";
+      });
+      slides[i].classList.add("is-active");
+
+      dots.forEach(function (d, k) {
+        d.classList.toggle("is-active", k === i);
+        d.setAttribute("aria-selected", k === i ? "true" : "false");
+      });
+      var note = slides[i].querySelector(".notes");
+      notesText.textContent = note ? note.textContent.trim() : "";
+
+      try { localStorage.setItem(STORE, String(i)); } catch (e) {}
+
+      locked = true;
+      setTimeout(function () { locked = false; }, 480);
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); goTo(current + 1); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); goTo(current - 1); }
+      else if (e.key === "Home") { goTo(0); }
+      else if (e.key === "End") { goTo(total - 1); }
+      else if (e.key === "n" || e.key === "N") { notesPanel.classList.toggle("is-open"); }
+      else if (e.key === "p" || e.key === "P") { window.print(); }
+    });
+
+    var tx = 0;
+    document.addEventListener("touchstart", function (e) { tx = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener("touchend", function (e) {
+      var dx = e.changedTouches[0].clientX - tx;
+      if (Math.abs(dx) > 40) goTo(current + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+
+    var wheelLock = false;
+    document.addEventListener("wheel", function (e) {
+      if (wheelLock) return;
+      var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (Math.abs(d) < 4) return;
+      goTo(current + (d > 0 ? 1 : -1));
+      wheelLock = true;
+      setTimeout(function () { wheelLock = false; }, 900);
+    }, { passive: true });
+
+    fit();
+    var start = 0;
+    try { start = parseInt(localStorage.getItem(STORE), 10) || 0; } catch (e) { start = 0; }
+    if (start < 0 || start >= total) start = 0;
+    goTo(start);
+  })();
+</script>
+</body>
+</html>

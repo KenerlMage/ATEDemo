@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ate-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/test_cases:/app/test_cases   # 客户可在此增删测试用例
+      - ./backend/logs:/app/logs               # 登录/执行日志持久化
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: ate-frontend
+    ports:
+      - "8080:80"   # 工控机访问: http://<工控机IP>:8080
+    depends_on:
+      - backend
+    restart: unless-stopped

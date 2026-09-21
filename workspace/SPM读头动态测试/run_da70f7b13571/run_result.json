@@ -1,0 +1,252 @@
+{
+  "task_id": "da70f7b13571",
+  "tps_id": "spm_rh_dyn",
+  "tps_name": "SPM读头动态测试",
+  "uut": "SPMDYN000042",
+  "mode": "simulate",
+  "bench": {
+    "id": "tb_80da1e4e55",
+    "title": "SPM读头动态测试台",
+    "serial": "SPMTS202609120001",
+    "preset_id": "SPM-RH-DYN-01"
+  },
+  "run_dir": "D:\\ATE\\workspace\\SPM读头动态测试\\run_da70f7b13571",
+  "started_at": "2026-09-12 23:19:55",
+  "updated_at": "2026-09-12 23:19:55",
+  "workspace": "D:\\ATE\\workspace",
+  "conftest_version": 2,
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "expected": 5
+  },
+  "cases": [
+    {
+      "id": "SETUP01",
+      "no": 1,
+      "name": "环境初始化",
+      "case": "testcase.env_setup::init_environment",
+      "kind": "init",
+      "status": "passed",
+      "message": "",
+      "duration": 0.006,
+      "measurements": {},
+      "checks": [],
+      "at": "2026-09-12 23:19:53"
+    },
+    {
+      "id": "TC001",
+      "no": 1,
+      "name": "上电电压测试",
+      "case": "testcase.power::power_on_voltage",
+      "kind": "test",
+      "status": "passed",
+      "message": "",
+      "duration": 0.003,
+      "measurements": {
+        "VDD": 3.312608
+      },
+      "checks": [
+        {
+          "key": "TC_VDD",
+          "label": "读头上电电压",
+          "value": 3.312608,
+          "min": 3.135,
+          "max": 3.465,
+          "unit": "V",
+          "ok": true,
+          "message": ""
+        }
+      ],
+      "at": "2026-09-12 23:19:53"
+    },
+    {
+      "id": "TC002",
+      "no": 2,
+      "name": "读头工作电流测试",
+      "case": "testcase.power::read_head_current",
+      "kind": "test",
+      "status": "passed",
+      "message": "",
+      "duration": 0.002,
+      "measurements": {
+        "IDD": 182.225634
+      },
+      "checks": [
+        {
+          "key": "TC_IDD",
+          "label": "读头工作电流",
+          "value": 182.225634,
+          "min": 150,
+          "max": 250,
+          "unit": "mA",
+          "ok": true,
+          "message": ""
+        }
+      ],
+      "at": "2026-09-12 23:19:54"
+    },
+    {
+      "id": "TC003",
+      "no": 3,
+      "name": "转速闭环测试",
+      "case": "testcase.comm::spin_speed",
+      "kind": "test",
+      "status": "passed",
+      "message": "",
+      "duration": 0.055,
+      "measurements": {
+        "RPM": 3587.545,
+        "HS_MS": 0.315
+      },
+      "checks": [
+        {
+          "key": "TC_RPM",
+          "label": "读头转速",
+          "value": 3587.545,
+          "min": 3560,
+          "max": 3640,
+          "unit": "rpm",
+          "ok": true,
+          "message": ""
+        },
+        {
+          "key": "TC_MOTION_HS",
+          "label": "运动控制握手响应",
+          "value": 0.315,
+          "min": 0,
+          "max": 50,
+          "unit": "ms",
+          "ok": true,
+          "message": ""
+        }
+      ],
+      "at": "2026-09-12 23:19:54"
+    },
+    {
+      "id": "TC004",
+      "no": 4,
+      "name": "回放信号幅度与频率测试",
+      "case": "testcase.comm::playback_signal",
+      "kind": "test",
+      "status": "passed",
+      "message": "",
+      "duration": 0.004,
+      "measurements": {
+        "VPP": 2.44667,
+        "FREQ": 1002.005013,
+        "MEAN": 0.000134,
+        "RMS": 0.848366
+      },
+      "checks": [
+        {
+          "key": "TC_SIG_VPP",
+          "label": "回放信号幅度",
+          "value": 2.44667,
+          "min": 2.3,
+          "max": 2.5,
+          "unit": "V",
+          "ok": true,
+          "message": ""
+        },
+        {
+          "key": "TC_SIG_FREQ",
+          "label": "回放信号频率",
+          "value": 1002.005013,
+          "min": 990,
+          "max": 1010,
+          "unit": "Hz",
+          "ok": true,
+          "message": ""
+        }
+      ],
+      "at": "2026-09-12 23:19:54"
+    },
+    {
+      "id": "TC005",
+      "no": 5,
+      "name": "负载端电压测试",
+      "case": "testcase.comm::load_voltage",
+      "kind": "test",
+      "status": "passed",
+      "message": "",
+      "duration": 0.003,
+      "measurements": {
+        "VLOAD": 3.2946
+      },
+      "checks": [
+        {
+          "key": "TC_ELOAD_V",
+          "label": "负载端电压",
+          "value": 3.2946,
+          "min": 3.1,
+          "max": 3.5,
+          "unit": "V",
+          "ok": true,
+          "message": ""
+        }
+      ],
+      "at": "2026-09-12 23:19:55"
+    },
+    {
+      "id": "TD01",
+      "no": 1,
+      "name": "环境终止",
+      "case": "testcase.env_setup::teardown_environment",
+      "kind": "teardown",
+      "status": "passed",
+      "message": "",
+      "duration": 0.003,
+      "measurements": {},
+      "checks": [],
+      "at": "2026-09-12 23:19:55"
+    }
+  ],
+  "devices": {
+    "scope": {
+      "device_id": "rh-scope",
+      "model": "Tektronix MSO54",
+      "driver": "tektronix-mso5",
+      "resource": "TCPIP0::192.168.10.41::4000::SOCKET"
+    },
+    "dmm": {
+      "device_id": "rh-dmm",
+      "model": "Fluke 8846A",
+      "driver": "generic-dmm",
+      "resource": "TCPIP0::192.168.10.42::3490::SOCKET"
+    },
+    "psu": {
+      "device_id": "rh-psu",
+      "model": "ITECH IT6332A",
+      "driver": "generic-psu",
+      "resource": "TCPIP0::192.168.10.43::30000::SOCKET"
+    },
+    "eload": {
+      "device_id": "rh-eload",
+      "model": "ITECH IT8512A+",
+      "driver": "generic-eload",
+      "resource": "TCPIP0::192.168.10.44::30000::SOCKET"
+    },
+    "awg": {
+      "device_id": "rh-awg",
+      "model": "Keysight 33500B",
+      "driver": "generic-awg",
+      "resource": "TCPIP0::192.168.10.45::5025::SOCKET"
+    },
+    "spin": {
+      "device_id": "rh-spin",
+      "model": "SPIN-CTRL-100",
+      "driver": "serial-motion",
+      "resource": "ASRL::COM6::115200::INSTR"
+    },
+    "fixture": {
+      "device_id": "rh-fixture",
+      "model": "RH-PROBE-KIT-50",
+      "driver": "passive-device",
+      "resource": ""
+    }
+  },
+  "driver_errors": {}
+}

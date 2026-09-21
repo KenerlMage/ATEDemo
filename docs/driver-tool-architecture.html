@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATE Runner — 后端 driver / tool 模块拆分设计方案</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6; --border-strong: #cec3ec;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--text); font-size: 14px; line-height: 1.68;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 84px; }
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; box-shadow: 0 10px 30px rgba(var(--accent-rgb), .06); }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 22px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+  .metric b { display: block; font-size: 20px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 15px; margin: 22px 0 8px; color: var(--accent2); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 8px; font-size: 14.5px; }
+  .card p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .card li { margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.62; }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21,128,61,.4); background: rgba(21,128,61,.1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180,83,9,.4); background: rgba(180,83,9,.1); }
+  .badge.acc { color: var(--accent); border-color: rgba(var(--accent-rgb),.35); background: rgba(var(--accent-rgb),.1); }
+  .badge.err { color: var(--err); border-color: rgba(220,38,38,.35); background: rgba(220,38,38,.08); }
+  /* 分层示意 */
+  .layer { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: #fff; }
+  .layer + .arrow { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 13px; padding: 6px 0; }
+  .layer-title { font-weight: 800; font-size: 14.5px; margin-bottom: 4px; }
+  .layer-sub { color: var(--muted); font-size: 12.5px; }
+  .layer.tools { border-left: 4px solid var(--accent); background: linear-gradient(90deg, rgba(var(--accent-rgb),.05), #fff 40%); }
+  .layer.drivers { border-left: 4px solid var(--accent2); }
+  .layer.transport { border-left: 4px solid #a78bfa; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .fbox { border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; background: var(--panel2); }
+  .fbox b { display: block; font-size: 13px; }
+  .fbox span { color: var(--muted); font-size: 12px; }
+  .step-marker { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; margin-right: 8px; font-family: var(--mono); }
+  .mig { display: flex; flex-direction: column; gap: 10px; }
+  .mig-row { display: grid; grid-template-columns: 34px 1fr; align-items: start; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; background: #fff; }
+  .mig-row b { font-size: 13.5px; }
+  .mig-row span { color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="stripe"></div>
+    <h1>后端 driver / tool 模块拆分设计方案</h1>
+    <p>把「装备助手工具」与「可编程设备驱动」拆成两个独立模块：<code>tools/</code> 面向装备助手的工具，<code>drivers/</code> 面向可编程设备的驱动；驱动层用工厂方法按后端注册信息选择具体实现，首期落地示波器一族。</p>
+    <div class="metrics">
+      <div class="metric"><b>2</b><span>新增模块</span></div>
+      <div class="metric"><b>4</b><span>传输实现（含预留）</span></div>
+      <div class="metric"><b>3</b><span>示波器驱动（1 落地 2 预留）</span></div>
+      <div class="metric"><b>4</b><span>工厂匹配优先级</span></div>
+      <div class="metric"><b>5</b><span>迁移步骤</span></div>
+      <div class="metric"><b>0</b><span>前端改动</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>1. 现状问题：三件事揉在一处</h2>
+    <p>现在 <code>backend/instrument_tools.py</code>（774 行）里，<code>ScopeSession</code> 一个类同时承担了传输收发、泰克 SCPI 方言、波形与测量解析、以及工具卡片与路由。<code>_is_scope()</code> 还是靠名称关键字猜设备类型。</p>
+    <table>
+      <tr><th>现状</th><th>问题</th></tr>
+      <tr><td><code>ScopeSession</code> 同时管 socket、SCPI 命令字、波形解析、卡片</td><td>加一台非泰克示波器要改同一个类，容易碰坏已验证逻辑</td></tr>
+      <tr><td>真实 / 模拟两套分支（<code>_waveform_real</code> 与 <code>_waveform_sim</code>、<code>_measure_real</code> 与 <code>_measure_sim</code>）</td><td>两条代码路径各自演化，模拟与实测行为会漂移</td></tr>
+      <tr><td><code>_is_scope()</code> 用关键字猜类型</td><td>判定不权威，注册信息一变就误判</td></tr>
+      <tr><td>路由、会话字典、业务编排同处一个文件</td><td>单元测试必须拉起 FastAPI，无法只测驱动</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. 分层与依赖方向</h2>
+    <p>硬约束是<b>依赖单向</b>，下层不认识上层：驱动层不读注册库、不读 FastAPI，只接收一个设备描述字典，因此可以脱离 Web 单独单测。</p>
+    <div class="layer tools">
+      <div class="layer-title">tools/ — 装备助手工具层</div>
+      <div class="layer-sub">卡片清单 · 会话管理 · 动作编排 · FastAPI 路由。只依赖抽象接口，不认识任何厂商 SCPI 命令。</div>
+    </div>
+    <div class="arrow">▼ 只调用抽象方法</div>
+    <div class="layer drivers">
+      <div class="layer-title">drivers/ — 可编程设备驱动层</div>
+      <div class="layer-sub">DeviceDriver / ScopeDriver 抽象 + 具体实现 + 工厂。只吃设备描述字典，不感知持久化与 Web。</div>
+    </div>
+    <div class="arrow">▼ 只发命令 / 收应答</div>
+    <div class="layer transport">
+      <div class="layer-title">drivers/transport/ — 传输层</div>
+      <div class="layer-sub">Socket / Serial / VISA(预留) / Simulate。唯一与真实仪器打交道的地方，<b>模拟模式只替换这一层</b>。</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. 目录结构</h2>
+<pre>backend/
+├── drivers/
+│   ├── __init__.py            # 对外只导出 get_driver / resolve_driver_class / DriverError 族
+│   ├── base.py                # DeviceDriver 抽象基类（生命周期 + 能力声明 + 命令日志）
+│   ├── models.py              # Waveform / Measurement / ChannelState 数据类（纯标准库）
+│   ├── errors.py              # DriverError 族
+│   ├── factory.py             # DRIVER_SPECS 匹配表 + resolve_driver_class() + get_driver()
+│   ├── transport/
+│   │   ├── base.py            # Transport 协议：write / query / close / describe
+│   │   ├── socket_transport.py# SCPI over raw socket（4000 / 5025 / 30000）
+│   │   ├── serial_transport.py# pyserial（未安装则明确报缺依赖）
+│   │   ├── visa_transport.py  # 预留：pyvisa / VXI-11 真地址
+│   │   └── simulate.py        # SimulateTransport：命令 → 脚本化应答 + 波形样本生成
+│   ├── scopes/
+│   │   ├── base_scope.py      # ScopeDriver 统一契约 + 通用波形/测量计算
+│   │   ├── tektronix_mso5.py  # 泰克 5/6 系 MSO（现 SCPI 方言迁到这里）
+│   │   ├── generic_scpi.py    # 兜底：SCPI 子集
+│   │   ├── keysight_infiniivision.py   # 预留
+│   │   └── rigol_mso5000.py            # 预留
+│   ├── dmm/ psu/ eload/       # 同类扩展位
+│   └── README.md              # 接入新设备的 5 步清单
+├── tools/
+│   ├── base.py                # ToolBase：卡片元信息 + 能力声明 + driver_kind
+│   ├── cards.py               # TOOL_CARDS（现有 4 张，每张声明 driver_kind）
+│   ├── bindings.py            # 读注册库 → 交驱动层判定可绑定项
+│   ├── session.py             # SessionManager：会话键 / RLock / 空闲回收 / 命令日志
+│   ├── oscilloscope_tool.py   # 示波器动作编排 + 参数校验 + 中文错误
+│   └── routes.py              # /api/tools 系列路由（路径与响应结构不变）
+└── instrument_tools.py        # 兼容 shim：一行转发（1 个版本周期后删）</pre>
+  </section>
+
+  <section>
+    <h2>4. 传输层：模拟与真实共用一套驱动</h2>
+    <p>这是整个方案里最关键的一条决定 —— 模拟<b>不</b>另写一套驱动，只在传输层换实现。命令序列、状态机、解析逻辑只有一份，模拟因此能真实地验证驱动逻辑。</p>
+    <table>
+      <tr><th>传输</th><th>触发条件（来自注册信息）</th><th>实现要点</th></tr>
+      <tr><td><code>SocketTransport</code></td><td><code>interface=LAN</code>，协议含 raw socket / SCPI（泰克 4000、多数 5025）</td><td><code>create_connection</code>、行结束符 <code>\n</code>、读超时可覆盖；写命令与查询分离</td></tr>
+      <tr><td><code>SerialTransport</code></td><td><code>interface=SERIAL</code></td><td><code>serial_port</code> + <code>baudrate</code>；缺 pyserial 抛 <code>DependencyMissing</code></td></tr>
+      <tr><td><code>VisaTransport</code> <span class="badge">预留</span></td><td>协议含 VXI-11，或资源地址形如 <code>TCPIP0::…::INSTR</code></td><td>走 pyvisa；缺失则降级为 Socket 并在日志与界面<b>标注实际通道</b></td></tr>
+      <tr><td><code>SimulateTransport</code></td><td><code>mode=simulate</code>，或真实连接失败且允许降级</td><td>命令→应答规则表；未知命令回 <code>0</code>/空不报错；波形样本在传输层生成</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. 驱动层：抽象契约与工厂</h2>
+    <div class="grid">
+      <div class="card">
+        <h4>DeviceDriver（通用）</h4>
+        <ul>
+          <li><code>connect() / close() / identify()</code></li>
+          <li><code>capabilities()</code> → 能力集合</li>
+          <li><code>command_log()</code> → 命令日志</li>
+          <li>类属性 <code>kind</code>（scope/dmm/psu/eload）、<code>family</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>ScopeDriver（示波器契约）</h4>
+        <ul>
+          <li><code>run / stop / single / autoset</code></li>
+          <li><code>get_timebase / set_timebase</code></li>
+          <li><code>get_channels / set_channel(display·scale·offset·coupling)</code></li>
+          <li><code>acquire_waveform(ch, points)</code> → <code>Waveform</code></li>
+          <li><code>measure(ch, types)</code> → <code>Measurement[]</code></li>
+        </ul>
+      </div>
+    </div>
+    <h3>职责划分</h3>
+    <ul>
+      <li><b>通用计算放 <code>base_scope.py</code></b>：<code>measure()</code> 先试仪器原生测量（<code>MEASUrement:ADDMEAS</code> + <code>MEAS&lt;x&gt;:VALUE?</code>），单项失败回退为「用波形自算」Vpp / RMS / 频率 / 周期 / 均值 / 上升时间，并标注来源 <code>instrument</code> 或 <code>derived</code>。</li>
+      <li><b>厂商类只写方言</b>：命令字、波形前导解析（<code>WFMOutpre:*</code> 标定）、通道上限（4/8 通道）。</li>
+      <li><b>零依赖</b>：数据类用标准库 <code>dataclass</code>，不引入 numpy；pyserial / pyvisa 均为可选。</li>
+      <li><b>能力协商</b>：动作超出 <code>capabilities()</code> 时，工具层直接给「该型号不支持」的中文原因，而不是把仪器难懂的 SCPI 错误抛给用户。</li>
+    </ul>
+
+    <h3>工厂选择算法（先具体后兜底）</h3>
+    <div class="flow">
+      <div class="fbox"><b>① 显式覆盖</b><span>注册信息里的 <code>driver</code> 字段，现场特殊机型手工指定，优先级最高</span></div>
+      <div class="fbox"><b>② 型号匹配</b><span><code>vendor + model</code> 拼接后正则匹配，兼容 "Tektronix MSO54" 这类合并写法</span></div>
+      <div class="fbox"><b>③ 类别兜底</b><span><code>category</code> / <code>protocol</code> 关键字命中通用 SCPI 驱动</span></div>
+      <div class="fbox"><b>④ 明确拒绝</b><span>都不中 → <code>DriverNotFound</code>，附"当前支持的型号清单"</span></div>
+    </div>
+
+    <h3>匹配结果示例（用现有 6 个预设的真实 BOM）</h3>
+    <table>
+      <tr><th>注册设备</th><th>判定依据</th><th>选中的驱动</th><th>传输</th></tr>
+      <tr><td><code>tek-mso54</code> Tektronix MSO54 · LAN:4000</td><td>vendor=tektronix + model=mso5</td><td><code>tektronix_mso5.TektronixMSO5Scope</code></td><td>Socket</td></tr>
+      <tr><td>未知品牌 LAN 示波器</td><td>category=示波器</td><td><code>generic_scpi.GenericScpiScope</code></td><td>Socket</td></tr>
+      <tr><td><code>itech-it6332a</code> ITECH IT6332A · LAN:30000</td><td>kind=psu，驱动未实现</td><td>—（提示"电源驱动待接入"）</td><td>—</td></tr>
+      <tr><td><code>fluke-8846a</code> Fluke 8846A · LAN:3490</td><td>kind=dmm，预留</td><td>后续 <code>fluke_8846a_dmm.DmmDriver</code></td><td>Socket</td></tr>
+      <tr><td><code>uart-dut</code> FTDI USB-TTL · SERIAL COM3</td><td>interface=SERIAL</td><td>串口驱动（DUT 通信）</td><td>Serial</td></tr>
+      <tr><td>任意设备 + <code>mode=simulate</code></td><td>模式优先</td><td><b>同一驱动类</b></td><td>Simulate</td></tr>
+    </table>
+    <p>驱动层<b>不持久化配置</b>：注册库 <code>testbenches.json</code> 是唯一事实源，工厂只吃一个字典；因此装备属性配置页改完 IP，下次建会话自然就是新值。</p>
+  </section>
+
+  <section>
+    <h2>6. 工具层</h2>
+    <table>
+      <tr><th>文件</th><th>职责</th></tr>
+      <tr><td><code>base.py</code></td><td><code>ToolBase</code>：id / name / subtitle / desc / protocol / capabilities / available / <code>driver_kind</code></td></tr>
+      <tr><td><code>cards.py</code></td><td>卡片清单数据（数字示波器可用，万用表 / 电源 / 电子负载规划中）；新增工具 = 加一条记录</td></tr>
+      <tr><td><code>bindings.py</code></td><td>读注册库 → 交驱动层判定可绑定项（替代关键字猜测），示波器优先排序</td></tr>
+      <tr><td><code>session.py</code></td><td>会话键 <code>tool_id:bench_id:device_id</code>；每会话一把 <code>RLock</code>；空闲 600s 惰性回收（不起后台线程）；命令日志环形缓冲 200 条</td></tr>
+      <tr><td><code>oscilloscope_tool.py</code></td><td>11 个动作 → 驱动方法；参数校验、单位换算、中文错误；响应结构保持 <code>{success, message, result, log, state}</code></td></tr>
+      <tr><td><code>routes.py</code></td><td><code>register_routes(app, tps_dir)</code>，路径与现有 7 个接口完全一致</td></tr>
+    </table>
+    <h3>接口契约：前端零改动</h3>
+    <table>
+      <tr><th>接口</th><th>变化</th></tr>
+      <tr><td><code>GET /api/tools</code></td><td>不变；卡片新增可选字段 <code>driver_kind</code></td></tr>
+      <tr><td><code>GET /api/tools/oscilloscope/bindings</code></td><td>不变；<code>is_scope</code> 改由驱动层判定（更准）</td></tr>
+      <tr><td><code>POST /api/tools/oscilloscope/connect</code></td><td>新增 <code>driver</code>（驱动类名）与 <code>transport</code>（实际通道类型）</td></tr>
+      <tr><td><code>POST /api/tools/oscilloscope/action</code></td><td>不变；失败时新增 <code>code</code> 便于前端分支</td></tr>
+      <tr><td><code>GET /api/tools/oscilloscope/state</code></td><td>不变；新增 <code>driver</code> / <code>transport</code></td></tr>
+    </table>
+    <p>新增字段全部是<b>追加</b>，老前端忽略即可；业务失败仍维持 HTTP 200 + <code>success:false</code>，前端不用改判断逻辑。</p>
+  </section>
+
+  <section>
+    <h2>7. 并发、超时与错误模型</h2>
+    <div class="grid">
+      <div class="card">
+        <h4>并发</h4>
+        <p>FastAPI 同步路由跑在线程池：驱动实例自身<b>不加锁</b>，由会话管理器对同一设备串行化命令；不同设备天然并行。</p>
+        <h4 style="margin-top:12px">超时</h4>
+        <p>统一在传输层：普通查询 2s（可被请求覆盖）、波形查询 5s、连接 2s。会话空闲 10 分钟自动断开，不长期占仪器 socket。</p>
+      </div>
+      <div class="card">
+        <h4>错误映射</h4>
+        <table>
+          <tr><th>异常</th><th>工具层返回</th></tr>
+          <tr><td><code>DriverNotFound</code></td><td>"未找到 XX 的驱动，当前支持：…"</td></tr>
+          <tr><td><code>DependencyMissing</code></td><td>"缺少 pyserial，请 pip install pyserial"</td></tr>
+          <tr><td><code>NotConnected</code></td><td>"尚未连接设备，请先运行工具并连接"</td></tr>
+          <tr><td><code>Timeout</code></td><td>"仪器无响应（超时 Xs），请检查 IP/端口"</td></tr>
+          <tr><td><code>Unsupported</code></td><td>"该型号不支持自动设置"</td></tr>
+          <tr><td><code>ProtocolError</code></td><td>带回应答片段，便于排查</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>8. 迁移步骤：五步，每步可独立验证</h2>
+    <div class="mig">
+      <div class="mig-row"><span class="step-marker">1</span><div><b>抽传输层</b><span>把 socket 与模拟收发从 <code>ScopeSession</code> 搬进 <code>transport/</code>，只搬运不改行为 → 现有 <code>test_tools.py</code> 应全绿。</span></div></div>
+      <div class="mig-row"><span class="step-marker">2</span><div><b>抽驱动契约 + 泰克驱动</b><span>迁移 SCPI 方言与波形解析；两条 <code>*_real / *_sim</code> 分支合并为「驱动 + SimulateTransport」→ 模拟频率 1.000 MHz 等既有断言保持通过。</span></div></div>
+      <div class="mig-row"><span class="step-marker">3</span><div><b>建工厂与匹配表</b><span><code>DRIVER_SPECS</code> 表驱动单测：合并 model 串、未知型号、显式覆盖三种情形。</span></div></div>
+      <div class="mig-row"><span class="step-marker">4</span><div><b>建工具层</b><span>迁移卡片、会话、路由；<code>instrument_tools.py</code> 转 shim，<code>main.py</code> 改挂 <code>tools.routes</code> → 12 个既有接口回归 + 装备助手端到端。</span></div></div>
+      <div class="mig-row"><span class="step-marker">5</span><div><b>收尾与文档</b><span>预设 JSON 增加可选 <code>driver</code> 字段说明；<code>drivers/README.md</code> 写"接入新设备 5 步"；同步架构文档。</span></div></div>
+    </div>
+    <h3>测试计划</h3>
+    <ul>
+      <li><b>单测</b>（新增 <code>backend/tests/</code>，pytest）：工厂匹配表、波形前导解析（固定样本）、SimulateTransport 命令回放、<code>capabilities()</code> 拒绝路径、同设备命令串行化。</li>
+      <li><b>端到端</b>：沿用现有 <code>test_tools.py</code>（注册测试台 → 绑定 → 模拟全流程 → 真实模式降级）。</li>
+      <li><b>回归</b>：既有 12 个接口（测试执行 / 记录 / 装备属性配置 / 测试台注册）。</li>
+      <li><b>硬指标</b>：拆分前后同一套端到端脚本的断言逐条不变地通过（模拟模式下的测量值、波形点数、日志条数一致）。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>9. 风险与对策</h2>
+    <table>
+      <tr><th>风险</th><th>对策</th></tr>
+      <tr><td>预设里 <code>protocol</code> 写 VXI-11，实现却走 raw socket</td><td>传输层显式映射，并把<b>实际通道类型</b>回传前端与日志，不靠字符串自欺</td></tr>
+      <tr><td><code>model</code> 是合并串（"Tektronix MSO54"）</td><td>匹配时用 <code>vendor + model</code> 拼接后统一小写再正则，不依赖字段拆分</td></tr>
+      <tr><td>pyserial / pyvisa 未必安装</td><td>构造传输时抛 <code>DependencyMissing</code>，工具层转"待补依赖"提示，不阻断自检</td></tr>
+      <tr><td>拆分期间老代码仍被 import</td><td>保留 <code>instrument_tools.py</code> shim 一个版本周期，<code>main.py</code> 一次性改挂</td></tr>
+      <tr><td>模拟与真实再次漂移</td><td>硬约束：模拟只许改传输层；驱动层出现 <code>if simulated:</code> 分支视为设计违规，评审拦截</td></tr>
+      <tr><td>工控机零依赖约束</td><td>驱动与工具层只用标准库（socket / threading / dataclasses），pyserial、pyvisa 均为可选</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>10. 后续扩展</h2>
+    <div class="grid">
+      <div class="card">
+        <h4>接入新仪器 = 一条规则 + 一个类</h4>
+        <p>能力表驱动，新增设备只需在 <code>DRIVER_SPECS</code> 加一条匹配规则并实现驱动类；这与"把仪器说明书喂给 AI 自动生成适配层"的探索方向天然契合。</p>
+      </div>
+      <div class="card">
+        <h4>与测试执行侧打通</h4>
+        <p>驱动注册信息可直接生成 <code>equipment_demo.xml</code>，让装备清单、注册库、驱动三者同源。</p>
+      </div>
+      <div class="card">
+        <h4>从工具到动作编排</h4>
+        <p>示波器工具稳定后，<code>tools/</code> 复用到万用表 / 电源 / 电子负载，并演进为多设备协同的测试动作编排。</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

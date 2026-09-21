@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>ATE Runner 仪器驱动库 · 使用手册</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Driver SDK · User Guide</div>
+<h1>ATE Runner 仪器驱动库 · 使用手册</h1>
+<p class='sub'>写 TPS 用例、做工具卡片、接平台的人看这份：仿真 / 网口 / 串口 / 换后端四种上手方式、门面方法全表、返回结构解读、错误处理、命令行工具、故障排查表。</p>
+<div class='meta'><span><b>上手</b>仿真 / LAN / SERIAL × native / visa</span><span><b>门面方法</b>16 个动作 + 10 个属性</span><span><b>测量项</b>8 项（自带单位）</span><span><b>错误码</b>9 个</span><span><b>库位置</b>D:/ATE/sdk</span></div></header>
+<div class='doc'><aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>1. 环境与安装</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>2. 五分钟上手</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>3. 门面方法一览（Scope）</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>4. 返回结构怎么看</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>5. 错误处理</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>6. 命令行工具</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>7. 写自己的驱动包（三步）</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>8. 故障排查</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>9. 注意事项</span></a></li>
+</ol></aside><main>
+<p class='lede'><blockquote>
+适用版本：<code>ate_drivers</code> 1.2.0 · 契约 <strong>1.2</strong> · 门禁 19 项
+目标读者：写 TPS 用例、做工具卡片、接平台的开发人员。<strong>你不需要懂任何仪器命令</strong>。
+</blockquote></p>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>1. 环境与安装</h2></div>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.10+（本机 <code>D:\ATE\backend\.venv\Scripts\python.exe</code>）</td>
+</tr>
+<tr>
+<td>运行时依赖</td>
+<td><strong>标准库</strong>。串口链路额外需要 <code>pyserial</code>；<code>backend="visa"</code> 额外需要 <code>pyvisa</code>（两者都惰性导入，不装也能用网口、串口原生栈与仿真）</td>
+</tr>
+<tr>
+<td>离线安装</td>
+<td>工控机无外网时，直接把 <code>sdk/</code> 目录拷过去，用 <code>PYTHONPATH</code> 指到它，或 <code>pip install --no-index --find-links &lt;本地wheel目录&gt; .</code></td>
+</tr>
+<tr>
+<td>无硬件</td>
+<td>完全可用。不写地址就是<strong>仿真模式</strong>，所有方法都能跑通</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-powershell"># 本机开发：把 sdk 目录加进 PYTHONPATH
+$env:PYTHONPATH = &quot;D:\ATE\sdk&quot;
+python -c &quot;import ate_drivers; print(ate_drivers.__version__)&quot;
+</code></pre>
+</section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>2. 五分钟上手</h2></div>
+<h3 id="21">2.1 仿真（不接任何硬件）</h3>
+<pre><code class="language-python">from ate_drivers import open_scope
+
+with open_scope(&quot;MSO54&quot;) as scope:            # 型号 = 派发依据；不给地址 = 仿真
+    scope.auto_setup(freq_hz=1000.0, volts_pp=2.4)
+    w = scope.capture(channel=&quot;CH1&quot;, points=1000)
+    print(f&quot;{w['points']} 点，采样间隔 {w['seconds_per_sample']:.3e} s，单位 {w['unit']}&quot;)
+    print(scope.measure((&quot;PK2PK&quot;, &quot;FREQUENCY&quot;, &quot;RISE&quot;)))
+</code></pre>
+<p>真实输出：</p>
+<pre><code>1000 点，采样间隔 5.005e-06 s，单位 V
+{'PK2PK': {'value': 2.4375, 'unit': 'V', 'quality': 'good', 'source': 'simulate'},
+ 'FREQUENCY': {'value': 1002.005013, 'unit': 'Hz', 'quality': 'good', 'source': 'simulate'},
+ 'RISE': {'value': 0.000500250125, 'unit': 's', 'quality': 'good', 'source': 'simulate'}}
+</code></pre>
+<h3 id="22-lan">2.2 网口（LAN）</h3>
+<pre><code class="language-python">with open_scope(&quot;MSO54&quot;, host=&quot;192.168.10.41&quot;, port=4000) as scope:
+    scope.self_test()                          # 上产线前先自检
+    scope.auto_setup(freq_hz=1000.0, volts_pp=2.4)
+    print(scope.measure([&quot;PK2PK&quot;, &quot;FREQUENCY&quot;]))
+</code></pre>
+<h3 id="23-serial">2.3 串口（SERIAL）</h3>
+<pre><code class="language-python">with open_scope(&quot;MSO54&quot;, serial_port=&quot;COM6&quot;, baudrate=115200) as scope:   # 帧格式默认 8N1
+    scope.self_test()
+    print(scope.capture(points=64)[&quot;volts&quot;][:5])
+</code></pre>
+<p><strong>同一台设备的两种接法，代码只差连接参数。</strong> 换品牌同理：型号从 <code>MSO54</code> 改成 <code>MXO44</code>，其余一行不改。</p>
+<h3 id="24">2.4 直接用设备档案打开（平台侧推荐）</h3>
+<p>设备档案（SQLite 行 / dict）里已经有型号与连接参数，直接交给它：</p>
+<pre><code class="language-python">from ate_drivers import open_scope
+
+row = {&quot;device_id&quot;: &quot;SPM-RH-DYN-01&quot;, &quot;model&quot;: &quot;MSO54&quot;, &quot;interface&quot;: &quot;LAN&quot;,
+       &quot;host&quot;: &quot;192.168.10.41&quot;, &quot;port&quot;: 4000}
+with open_scope(device=row) as scope:
+    print(scope.model, scope.interface_kind, scope.endpoint_detail)
+</code></pre>
+<p><code>device=</code> 支持 dict 或 ORM 行对象，自动读 <code>model</code> / <code>interface</code> / <code>host</code> / <code>port</code> / <code>serial_port</code> / <code>baudrate</code> / <code>name</code> / <code>device_id</code>。<strong>型号或连接方式写错会当场报错</strong>，不会替你猜。</p>
+<h3 id="25-pyvisa">2.5 选后端：原生栈还是 PyVISA</h3>
+<p>链路（网口 / 串口）和后端（原生栈 / VISA）是两件事。默认 <code>native</code>，换上 VISA 只多一个参数：</p>
+<pre><code class="language-python">from ate_drivers import open_scope
+
+# 原生栈（默认）：标准库 socket / pyserial，零依赖
+with open_scope(&quot;MSO54&quot;, host=&quot;192.168.10.41&quot;, port=4000) as scope:
+    print(scope.backend, scope.endpoint)          # native 192.168.10.41:4000
+
+# PyVISA：同一台设备、同一段业务代码
+with open_scope(&quot;MSO54&quot;, host=&quot;192.168.10.41&quot;, port=4000, backend=&quot;visa&quot;) as scope:
+    print(scope.backend, scope.visa_resource)     # visa TCPIP0::192.168.10.41::4000::SOCKET
+
+# 串口走 VISA：波特率与帧格式作为会话属性下发（资源名是 ASRL6::INSTR）
+with open_scope(&quot;MSO54&quot;, serial_port=&quot;COM6&quot;, baudrate=115200, backend=&quot;visa&quot;) as scope:
+    print(scope.visa_resource)                    # ASRL6::INSTR
+
+# auto：装了 pyvisa 就走 VISA，否则走原生；实际用了哪个从 backend 查
+with open_scope(&quot;MSO54&quot;, host=&quot;192.168.10.41&quot;, port=4000, backend=&quot;auto&quot;) as scope:
+    print(scope.backend_detail())                 # {'requested': 'auto', 'used': ..., 'visa_available': ...}
+</code></pre>
+<p>也可以把后端写进设备档案（<code>extra.backend</code>），现场统一走 NI-VISA 时不用改用例：</p>
+<pre><code class="language-python">row = {&quot;model&quot;: &quot;MXO44&quot;, &quot;host&quot;: &quot;192.168.10.51&quot;, &quot;port&quot;: 5025, &quot;backend&quot;: &quot;pyvisa&quot;}
+with open_scope(device=row) as scope:            # 档案里的 pyvisa 是别名，归一化后即 visa
+    print(scope.backend)
+</code></pre>
+<p>安装（离线工控机用本地 wheel）：</p>
+<pre><code class="language-bash">pip install pyvisa pyvisa-py     # pyvisa-py = 纯 Python 的 VISA 实现，不用装 NI-VISA
+pip install pyvisa               # 已有 NI-VISA / Keysight VISA 时只装 pyvisa 即可
+</code></pre>
+<p>注意事项：</p>
+<ul>
+<li><strong>没装 pyvisa 就报错，不会静默退回原生栈</strong>：<code>E_CONFIG: VISA 后端需要 pyvisa（当前环境未安装）</code>；</li>
+<li>型号必须声明该后端（<code>BACKENDS</code>），否则 <code>E_CONFIG: MSO54 不支持 visa 后端</code>（并列出该型号支持哪些）；</li>
+<li>仿真模式与后端无关，<code>mode="simulate"</code> 时不需要任何第三方库；</li>
+<li><code>auto</code> 只是省事，<strong>它挑了什么一定写在 <code>scope.backend</code> 上</strong>；</li>
+<li>网口 VISA 用 raw socket 资源（<code>…::SOCKET</code>）；若现场走 VXI-11/GPIB，直接在档案里给资源名或扩展 <code>endpoint</code> 层，不要在用例里拼命令。</li>
+</ul>
+</section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>3. 门面方法一览（Scope）</h2></div>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>参数（单位）</th>
+<th>返回要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open_scope(model=None, host=None, port=None, *, device=None, interface=None, serial_port=None, baudrate=None, bytesize=None, parity=None, stopbits=None, mode="auto", timeout=2.0, transport=None, alias="", verify_model=True, open=False)</code></td>
+<td>型号 + 连接参数</td>
+<td><code>Scope</code> 实例；<code>open=True</code> 立即连接</td>
+</tr>
+<tr>
+<td><code>connect(verify_model=None)</code></td>
+<td>—</td>
+<td>连接并按需核对型号</td>
+</tr>
+<tr>
+<td><code>identity()</code></td>
+<td>—</td>
+<td><code>{vendor, model, serial, firmware, idn}</code></td>
+</tr>
+<tr>
+<td><code>reset()</code></td>
+<td>—</td>
+<td>复位仪器</td>
+</tr>
+<tr>
+<td><code>auto_setup(freq_hz=None, volts_pp=None)</code></td>
+<td>目标频率 Hz、峰峰值 V</td>
+<td>自动设置时基与垂直档位</td>
+</tr>
+<tr>
+<td><code>set_timebase(seconds_per_div=None, offset_seconds=None, divisions=None)</code></td>
+<td>秒/格、秒、格数</td>
+<td>时基状态</td>
+</tr>
+<tr>
+<td><code>set_channel(channel="CH1", volts_per_div=None, coupling=None, offset_volts=None, probe_ratio=None, enabled=None)</code></td>
+<td>V/格、耦合、V</td>
+<td>通道状态</td>
+</tr>
+<tr>
+<td><code>configure(channel="CH1", seconds_per_div=None, volts_per_div=None, coupling=None, offset_volts=None, divisions=None)</code></td>
+<td>—</td>
+<td>时基 + 通道一次配好</td>
+</tr>
+<tr>
+<td><code>capture(channel="CH1", points=1000)</code></td>
+<td>通道、点数</td>
+<td>波形：<code>volts</code>、<code>seconds_per_sample</code>、<code>first_sample_seconds</code>、<code>unit</code></td>
+</tr>
+<tr>
+<td><code>measure(items=None, channel="CH1", points=2000)</code></td>
+<td>测量项列表</td>
+<td><code>{项: {value, unit, quality, source}}</code></td>
+</tr>
+<tr>
+<td><code>run()</code> / <code>stop()</code> / <code>single()</code></td>
+<td>—</td>
+<td>连续 / 停止 / 单次触发</td>
+</tr>
+<tr>
+<td><code>status()</code></td>
+<td>—</td>
+<td>会话全量状态（含 <code>interface_kind</code>、<code>resource</code>、<code>endpoint_detail</code>）</td>
+</tr>
+<tr>
+<td><code>metadata()</code></td>
+<td>—</td>
+<td>驱动与契约元信息（<code>driver</code>、<code>driver_version</code>、<code>contract_api</code>、<code>interfaces</code>、<code>mode</code>）</td>
+</tr>
+<tr>
+<td><code>self_test()</code></td>
+<td>—</td>
+<td>逐项自检清单</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>—</td>
+<td>安全退出，返回本次会话发出的命令条数</td>
+</tr>
+</tbody>
+</table>
+<p>只读属性：<code>model</code> · <code>vendor</code> · <code>label</code> · <code>interface</code> · <code>interfaces</code> · <code>interface_kind</code> · <code>endpoint</code> · <code>endpoint_detail</code> · <code>mode</code> · <code>simulated</code> · <code>metadata()</code>（方法）。</p>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>4. 返回结构怎么看</h2></div>
+<h3 id="41">4.1 动作类</h3>
+<pre><code class="language-json">{&quot;ok&quot;: true, &quot;action&quot;: &quot;set_timebase&quot;, &quot;simulated&quot;: true, &quot;source&quot;: &quot;simulate&quot;,
+ &quot;value&quot;: {&quot;scale_s_per_div&quot;: 0.0005, &quot;divisions&quot;: 10, &quot;offset_s&quot;: 0.0,
+           &quot;window_s&quot;: 0.005, &quot;unit&quot;: &quot;s/div&quot;}}
+</code></pre>
+<h3 id="42-capture">4.2 采集类（<code>capture</code>）</h3>
+<pre><code class="language-json">{&quot;ok&quot;: true, &quot;simulated&quot;: true, &quot;channel&quot;: &quot;CH1&quot;, &quot;points&quot;: 1000,
+ &quot;seconds_per_sample&quot;: 5.005005005005005e-06, &quot;first_sample_seconds&quot;: 0.0,
+ &quot;unit&quot;: &quot;V&quot;, &quot;source&quot;: &quot;simulate&quot;,
+ &quot;volts&quot;: [0.0, 0.0625, 0.0625, 0.109375, ...]}
+</code></pre>
+<p><code>unit</code> 恒为 <code>V</code>（<strong>不返回格数或 ADC 计数</strong>），时间轴用 <code>first_sample_seconds + n × seconds_per_sample</code> 还原。</p>
+<h3 id="43">4.3 测量类</h3>
+<pre><code class="language-json">{&quot;PK2PK&quot;: {&quot;value&quot;: 2.4375, &quot;unit&quot;: &quot;V&quot;, &quot;quality&quot;: &quot;good&quot;, &quot;source&quot;: &quot;simulate&quot;}}
+</code></pre>
+<p>支持 8 个测量项：<code>PK2PK</code>(V) · <code>AMPLITUDE</code>(V) · <code>MEAN</code>(V) · <code>RMS</code>(V) · <code>FREQUENCY</code>(Hz) · <code>PERIOD</code>(s) · <code>RISE</code>(s) · <code>FALL</code>(s)；<code>scope.supported_measurements()</code> 可查。<code>source</code> 为 <code>simulate</code> 时说明数据是仿真生成的——<strong>报告里要如实标注</strong>。</p>
+<h3 id="44">4.4 自检</h3>
+<pre><code class="language-json">{&quot;ok&quot;: true, &quot;model&quot;: &quot;MSO54&quot;, &quot;vendor&quot;: &quot;Tektronix&quot;, &quot;endpoint&quot;: &quot;&quot;, &quot;simulated&quot;: true,
+ &quot;checks&quot;: [{&quot;name&quot;: &quot;会话已建立&quot;, &quot;ok&quot;: true}, {&quot;name&quot;: &quot;可用于采集&quot;, &quot;ok&quot;: true},
+            {&quot;name&quot;: &quot;可测量&quot;, &quot;ok&quot;: true}, {&quot;name&quot;: &quot;型号已核对&quot;, &quot;ok&quot;: true},
+            {&quot;name&quot;: &quot;连接方式可用&quot;, &quot;ok&quot;: true}, {&quot;name&quot;: &quot;无遗留错误&quot;, &quot;ok&quot;: true}],
+ &quot;identity&quot;: {&quot;vendor&quot;: &quot;TEKTRONIX&quot;, &quot;model&quot;: &quot;MSO54&quot;, &quot;serial&quot;: &quot;SIM0001&quot;, &quot;firmware&quot;: &quot;1.2.3&quot;}}
+</code></pre>
+</section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>5. 错误处理</h2></div>
+<pre><code class="language-python">from ate_drivers import open_scope
+from ate_drivers.errors import ConfigurationError, DriverTimeout, ProtocolError
+
+try:
+    with open_scope(device=row) as scope:
+        scope.measure([&quot;PK2PK&quot;])
+except ConfigurationError as e:          # E_CONFIG：改档案 / 查接线，别重试
+    print(&quot;配置问题&quot;, e.code, e)
+except DriverTimeout as e:               # E_TIMEOUT：可重试
+    print(&quot;超时&quot;, e.code, e)
+except ProtocolError as e:               # E_PROTOCOL：方言或固件问题
+    print(&quot;应答解析失败&quot;, e.code, e)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>码</th>
+<th>意思</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E_CONFIG</code></td>
+<td>连接参数不完整/非法、链路歧义、型号不符</td>
+<td>改档案或接线，<strong>不重试</strong></td>
+</tr>
+<tr>
+<td><code>E_NOT_FOUND</code></td>
+<td>型号未登记</td>
+<td>补登记 / 装驱动包</td>
+</tr>
+<tr>
+<td><code>E_TRANSPORT</code></td>
+<td>连不上、写失败</td>
+<td>查线查电源，可重试</td>
+</tr>
+<tr>
+<td><code>E_TIMEOUT</code></td>
+<td>读写超时</td>
+<td>可重试；仍失败查链路</td>
+</tr>
+<tr>
+<td><code>E_PROTOCOL</code></td>
+<td>应答无法解析</td>
+<td>查方言 / 固件版本</td>
+</tr>
+<tr>
+<td><code>E_PARAM</code></td>
+<td>参数越界或枚举未登记</td>
+<td>改参数（消息里带已登记取值）</td>
+</tr>
+<tr>
+<td><code>E_UNSUPPORTED</code></td>
+<td>能力未声明</td>
+<td>先 <code>supports()</code> 判断</td>
+</tr>
+<tr>
+<td><code>E_CONTRACT</code></td>
+<td>契约版本不兼容</td>
+<td>升级驱动或平台</td>
+</tr>
+</tbody>
+</table>
+<p><strong>只按 <code>code</code> 分支，不要解析中文消息文本。</strong></p>
+</section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>6. 命令行工具</h2></div>
+<pre><code class="language-bash">python -m ate_drivers.kit.cli new &lt;key&gt; [--dir DIR] [--cls CLS] [--label LABEL]
+                                    [--vendor VENDOR] [--model MODEL]
+                                    [--interface LAN,SERIAL] [--force]
+python -m ate_drivers.kit.cli check &lt;path&gt; [--json]      # 19 项门禁
+python -m ate_drivers.kit.cli list [dir]                 # 列出已装驱动包
+python -m ate_drivers.kit.cli models [--dir DIR]         # 列出可派发型号
+python -m ate_drivers.kit.cli contract                   # 打印契约说明
+</code></pre>
+<p><code>models</code> 的真实输出：</p>
+<pre><code>注册表自检：通过（型号 5 · 别名 1）
+厂商 Rohde &amp; Schwarz · 驱动 rohde-schwarz-mxo4 v1.5.0 · 接口 LAN / SERIAL · 仿真 支持
+</code></pre>
+<p><code>check</code> 的输出形如：</p>
+<pre><code>ate_drivers/vendors/tektronix_mso | exit=0 | 结果 19/19 通过 | fail=0
+</code></pre>
+</section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>7. 写自己的驱动包（三步）</h2></div>
+<pre><code class="language-bash"># 1. 生成骨架（型号必填：它是派发的唯一依据）
+python -m ate_drivers.kit.cli new acme-scope-3000 --dir drivers --vendor ACME \
+       --label &quot;数字示波器 · ACME 3000&quot; --model ACME-3000 --interface LAN,SERIAL
+
+# 2. 填五个差异面：COMMANDS / PREAMBLE_FIELDS / 量纲缩放 / 枚举映射 / _sim_signal()
+
+# 3. 上架门禁必须 19/19
+python -m ate_drivers.kit.cli check drivers/acme_scope_3000
+</code></pre>
+<p>细节与完整示例见《新设备家族接入指南》；写代码时守《设计准则》。</p>
+</section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>8. 故障排查</h2></div>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>多半是</th>
+<th>怎么办</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E_CONFIG：网口端点不完整：host 与 port 必须成对给</code></td>
+<td>档案只填了 IP 没填端口（或反过来）</td>
+<td>补齐；端口通常是 4000（泰克）/ 5025（R&amp;S）</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：连接方式不明确：网口与串口参数都填了</code></td>
+<td>档案两种参数都有、<code>interface</code> 空</td>
+<td>档案里写明 <code>interface</code>，或调用时显式 <code>interface="LAN"</code></td>
+</tr>
+<tr>
+<td><code>E_CONFIG：串口端点不完整：缺少串口名</code></td>
+<td>只给了波特率</td>
+<td>补 <code>serial_port</code>（如 <code>COM6</code>）</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：设备回读型号与档案不符：档案 MSO54，实测 MXO44</code></td>
+<td>档案型号写错 / 接错机</td>
+<td>改档案；确认不是接错线</td>
+</tr>
+<tr>
+<td><code>E_NOT_FOUND：未登记型号 ... 可用：MSO54, MSO56, ...</code></td>
+<td>型号不在注册表</td>
+<td>写驱动包并登记，或改用已登记型号</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：XXX 不支持 SERIAL 连接</code></td>
+<td>该型号只声明了 LAN</td>
+<td>换网口，或给驱动加 <code>INTERFACES</code> 后重新过门禁</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：未安装 pyserial，串口链路不可用</code></td>
+<td>串口链路缺依赖</td>
+<td><code>pip install pyserial</code>（离线机用本地 wheel）</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：VISA 后端需要 pyvisa（当前环境未安装）</code></td>
+<td>写了 <code>backend="visa"</code> 但没装 pyvisa</td>
+<td><code>pip install pyvisa pyvisa-py</code>（有 NI-VISA 时只装 pyvisa）</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：MSO54 不支持 visa 后端</code></td>
+<td>型号的 <code>BACKENDS</code> 没声明 <code>visa</code></td>
+<td>给驱动补 <code>BACKENDS = ("native", "visa")</code> 并同步清单后重过门禁</td>
+</tr>
+<tr>
+<td><code>E_CONFIG：传输后端不在支持范围：'usb-tmc'</code></td>
+<td>后端写法不在 <code>{native, visa, auto}</code></td>
+<td>改档案 / 改参数；别名（<code>pyvisa</code> / <code>ni</code> / <code>stdlib</code> …）会自动归一</td>
+</tr>
+<tr>
+<td><code>auto</code> 之后 <code>backend</code> 是 <code>native</code></td>
+<td>机器没装 pyvisa</td>
+<td>正常行为（<code>auto</code> 按可用性挑）；要强制走 VISA 就写死 <code>backend="visa"</code></td>
+</tr>
+<tr>
+<td>VISA 打不开 <code>ASRL6::INSTR</code></td>
+<td>串口名与 VISA 端口号不一致，或设备被别的进程占着</td>
+<td>按实际 VISA 实现核对串口名；<code>ASRL::/dev/ttyUSB0::INSTR</code> 是 POSIX 路径写法</td>
+</tr>
+<tr>
+<td><code>E_TIMEOUT</code></td>
+<td>地址/端口错、线没插好、仪器忙</td>
+<td>先 <code>ping</code>、再 <code>scope.self_test()</code></td>
+</tr>
+<tr>
+<td><code>E_PROTOCOL</code></td>
+<td>方言不匹配（固件版本或型号串写错）</td>
+<td>用 <code>verify_model=True</code> 暴露型号问题；核对命令表</td>
+</tr>
+<tr>
+<td><code>capture</code> 出来的波形是方波台阶</td>
+<td>正常现象</td>
+<td>仿真链路带垂直量化；真机看是否触发了 <code>auto_setup</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>9. 注意事项</h2></div>
+<ul>
+<li><strong>先 <code>self_test()</code> 再上产线</strong>：它会核对型号、链路、错误队列；</li>
+<li><strong>超时默认 2 秒</strong>：长采集/长触发场景显式传 <code>timeout=</code>；</li>
+<li><strong>点数与窗口</strong>：<code>capture(points=...)</code> 的点数受当前时基窗口约束，点数越多采样间隔越小；</li>
+<li><strong>报告里要标数据来源</strong>：<code>source == "simulate"</code> 说明是仿真数据，不能当实测结果；</li>
+<li><strong>不要并发操作同一个 <code>Scope</code> 实例</strong>：一台设备一个实例（实例间互不干扰，但同一实例不保证线程安全）；</li>
+<li><strong>实例用完要 <code>close()</code></strong>：<code>with</code> 语句会自动关；异常路径同样建议 <code>with</code>。</li>
+<li><strong>换后端不动用例</strong>：<code>backend</code> 只影响「用哪套栈收发」，命令、参数、返回结构都不变；要全现场统一走 NI-VISA，把 <code>backend</code> 写进设备档案（<code>extra.backend</code>）比改用例更稳；</li>
+<li><strong>别在报告里省略后端</strong>：同一批数据是 socket 还是 VISA 读回来的，排障时要能追；<code>scope.backend</code> 与 <code>scope.visa_resource</code> 会进 <code>status()</code> / <code>metadata()</code>，落报告即可；</li>
+<li><strong>VISA 也要看资源名对不对</strong>：网口是 <code>TCPIP0::host::port::SOCKET</code>，串口是 <code>ASRL6::INSTR</code>；波特率/帧格式不在资源名里，改档案 <code>baudrate</code> 即生效。</li>
+</ul></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 仪器驱动库文档 · 契约 ate.driver.api 1.2</span><span>库位置 D:/ATE/sdk · 上架门禁 19 项一致性检查 · 传输后端 native / visa</span></div>
+</div></body></html>

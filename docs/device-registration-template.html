@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATE Runner · 设备注册模版说明</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:56px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:214px minmax(0,1fr);gap:60px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:72ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:34px 0 6px}
+h3 .g{font-family:var(--mono);color:var(--accent);font-size:13.5px;margin-right:10px;letter-spacing:.06em}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.64;margin:8px 0 24px;tab-size:2}
+pre .c{color:#8d8a80}
+pre .k{color:var(--ink);font-weight:600}
+pre .v{color:var(--ink2)}
+.nb{white-space:nowrap}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:36px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Interface Specification</div>
+<h1>设备注册模版</h1>
+<p class='sub'>一台设备接入 ATE 测试台时需要提供哪些字段、每个字段是什么作用、哪些值会让<span class='nb'>平台的自检</span>与驱动匹配做出不同判断——一页讲清，附可直接复制的 JSONC 模版与三类接口示例。</p>
+<div class='meta'><span><b>模版版本</b>ate.device.registration.v1</span><span><b>修订日期</b>2026-09-16</span><span><b>字段数</b>18</span><span><b>口径依据</b>testbench_registry.py / drivers/factory.py</span></div></header>
+<div class='doc'>
+<aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>模版与放置位置</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>最小可用条目</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>字段参考</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>接口类型与配置完整判定</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>注册后可改 / 只读</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>驱动自动匹配规则</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>预设 BOM 与注册库的字段映射</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>常见的五类错误</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>与 TPS 的衔接</span></a></li>
+<li><a href='#s10'><span class='num'>10</span><span>字段保留策略</span></a></li>
+<li><a href='#s11'><span class='num'>11</span><span>附：模版本体</span></a></li>
+</ol></aside><main>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>模版与放置位置</h2></div>
+<p class='lede'>模版描述的是「注册库里的一条设备记录」，不是一棵新树——设备永远挂在某台测试台下。</p>
+<p>文件 <code>ate-device-template.jsonc</code> 用 JSONC 写法（<code>//</code> 后为备注），去掉注释后就是合法 JSON，可直接进 <code>backend/testresource/testbenches.json</code> 的 <code>testbenches[].devices[]</code>。新建设备时不必手写：在「测试台注册 → 类型选型」里选定预设类型，平台会把该类型的标准 BOM（<code>testbench_presets.json</code>）预填进来，现场只需要改连接参数。</p>
+<p>字段口径来自三处：注册库读写与校验（<code>testbench_registry.py</code> 的 <code>DeviceConfig</code>、<code>_device_configured</code>、<code>DeviceConfigPatch</code>）、驱动自动匹配（<code>drivers/factory.py</code> 的 <code>DRIVER_SPECS</code>）、以及实际注册样本（<code>testbenches.json</code>）。模版的 18 个字段与注册库实际记录的字段完全一致，无缺无多。</p></section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>最小可用条目</h2></div>
+<p class='lede'>被动设备四个字段即可；程控设备在此基础上按接口类型补齐连接参数。</p>
+<pre>// 仅登记、不程控（夹具 / 探头 / 工装）
+{
+  &quot;id&quot;: &quot;rh-fixture&quot;,           // 台内唯一别名，TPS 用它引用
+  &quot;name&quot;: &quot;读头装夹夹具与探针组&quot;,  // 显示名
+  &quot;programmable&quot;: false,        // 不可程控
+  &quot;interface&quot;: &quot;NONE&quot;           // 无程控接口，自检记 skip
+}</pre>
+<p>程控设备必须按接口类型补齐连接参数：网络类给 <code>host</code> + <code>port</code>，串口类给 <code>serial_port</code>，USB / GPIB 类给 <code>address</code>；同时把 <code>model</code>、<code>vendor</code>、<code>category</code>、<code>role</code> 填准，平台才能挂对驱动。</p></section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>字段参考</h2></div>
+<p class='lede'>按作用分五组。带 <span class='tag req'>必填</span> 的字段缺失会被注册自检拦下；标「只读」的由平台计算，不要手填。</p>
+<h3><span class='g'>①</span>标识与识别</h3><p class='glede'>决定这台设备在平台里叫什么、被谁引用。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>作用</th><th>示例</th></tr></thead><tbody>
+<tr><td class='f'>id</td><td>string</td><td><span class='tag req'>必填</span></td><td>设备别名，同一测试台内唯一。TPS 的 device_config 用它引用设备（device_id）</td><td class='f'>rh-scope</td></tr>
+<tr><td class='f'>name</td><td>string</td><td><span class='tag req'>必填</span></td><td>中文显示名，出现在装备树、装备助手工具卡片与测试报告中；参与驱动匹配（权重 1.0）</td><td class='f'>数字示波器</td></tr>
+<tr><td class='f'>model</td><td>string</td><td><span class='tag req'>必填</span></td><td>型号全称。驱动自动匹配的最高权重字段（3.0），写错会挂到错误驱动上</td><td class='f'>Tektronix MSO54</td></tr>
+<tr><td class='f'>vendor</td><td>string</td><td><span class='tag req'>必填</span></td><td>厂商名，驱动匹配权重 2.0</td><td class='f'>Tektronix</td></tr>
+<tr><td class='f'>category</td><td>string</td><td><span class='tag req'>必填</span></td><td>设备类别（示波器 / 万用表 / 电源 / 电子负载 / 信号源 / 运动控制 / 数据采集 / 被动设备…），驱动匹配权重 2.0</td><td class='f'>示波器</td></tr>
+<tr><td class='f'>role</td><td>string</td><td><span class='tag req'>必填</span></td><td>这台设备在本测试台上的用途，驱动匹配权重 1.5；同款设备用途不同时靠它区分</td><td class='f'>读头回放信号波形 / 边沿与噪声观测</td></tr>
+</tbody></table></div>
+<h3><span class='g'>②</span>程控与接口</h3><p class='glede'>决定平台怎么连它、能不能程控。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>作用</th><th>示例</th></tr></thead><tbody>
+<tr><td class='f'>programmable</td><td>bool</td><td><span class='tag req'>必填</span></td><td>是否可编程。false = 被动设备（夹具、探头、工装），只登记、不参与通讯自检</td><td class='f'>true</td></tr>
+<tr><td class='f'>interface</td><td>enum</td><td><span class='tag req'>必填</span></td><td>接口类型，决定「配置完整」的判定方式与自检手段，取值不区分大小写、入库统一转大写</td><td class='f'>LAN</td></tr>
+</tbody></table></div>
+<h3><span class='g'>③</span>连接参数</h3><p class='glede'>注册之后唯一允许修改的一组字段（型号、厂商、类别、用途不允许改）。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>作用</th><th>示例</th></tr></thead><tbody>
+<tr><td class='f'>host</td><td>string</td><td><span class='tag'>网络类必填</span></td><td>设备 IP 或主机名。建议为仪器分配固定 IP（DHCP 保留），否则换网后注册库里的地址会失效</td><td class='f'>192.168.10.41</td></tr>
+<tr><td class='f'>port</td><td>int</td><td><span class='tag'>网络类必填</span></td><td>端口号 1–65535。常见值 4000=VXI-11、5025=SCPI raw socket、3490=Fluke 万用表、30000=ITECH 电源/负载</td><td class='f'>4000</td></tr>
+<tr><td class='f'>serial_port</td><td>string</td><td><span class='tag'>串口类必填</span></td><td>串口号，如 COM6。Windows 下换 USB 口会变号，接入前确认设备管理器里的实际编号</td><td class='f'>COM6</td></tr>
+<tr><td class='f'>baudrate</td><td>int</td><td><span class='tag'>可选</span></td><td>波特率，如 115200。留空时平台按设备默认值尝试</td><td class='f'>115200</td></tr>
+<tr><td class='f'>address</td><td>string</td><td><span class='tag'>USB / GPIB 必填</span></td><td>VISA 资源串。网络设备可填（便于 VISA 通道复用），USB / GPIB 设备必须填，NONE 类留空</td><td class='f'>TCPIP0::192.168.10.41::inst0::INSTR</td></tr>
+<tr><td class='f'>channel</td><td>string</td><td><span class='tag'>可选</span></td><td>默认通道 / 端口号。多路电源、开关单元用它标明默认通道</td><td class='f'>CH1</td></tr>
+<tr><td class='f'>protocol</td><td>string</td><td><span class='tag'>可选</span></td><td>协议说明，写给人看，不参与自检判定</td><td class='f'>VXI-11 (SCPI)</td></tr>
+</tbody></table></div>
+<h3><span class='g'>④</span>管理与约束</h3><p class='glede'>决定注册自检会不会被拦下。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>作用</th><th>示例</th></tr></thead><tbody>
+<tr><td class='f'>required</td><td>bool</td><td><span class='tag req'>必填</span></td><td>是否必备设备。必备且 programmable 的设备若未配置完整，注册自检报 fail 并阻断注册</td><td class='f'>true</td></tr>
+<tr><td class='f'>note</td><td>string</td><td><span class='tag'>可选</span></td><td>备注。建议写固定 IP 要求、量程 / 带宽、校准周期、负责人等排障时要看的信息</td><td class='f'>8 通道；建议固定 IP</td></tr>
+</tbody></table></div>
+<h3><span class='g'>⑤</span>系统回写</h3><p class='glede'>由平台计算，请勿手工填写。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>作用</th><th>示例</th></tr></thead><tbody>
+<tr><td class='f'>configured</td><td>bool</td><td><span class='tag'>只读</span></td><td>平台按 interface 判定配置是否完整：网络类看 host + port，串口类看 serial_port，其余看 address</td><td class='f'>true</td></tr>
+</tbody></table></div>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>接口类型与配置完整判定</h2></div>
+<p class='lede'><code>interface</code> 不只是描述——它直接决定平台判不判这台设备「配置完整」、以及用什么手段自检。</p>
+<div class='tw'><table><thead><tr><th>interface 取值</th><th>类别</th><th>必填连接字段</th><th>配置完整判定</th><th>自检方式</th></tr></thead><tbody>
+<tr><td class='f'>LAN / ETHERNET / TCP / IP</td><td>网络类</td><td class='f'>host + port</td><td>host 非空 且 port 有值</td><td>TCP 探测（真实模式）；仿真模式记模拟自检</td></tr>
+<tr><td class='f'>SERIAL / RS232 / RS485 / UART / COM</td><td>串口类</td><td class='f'>serial_port</td><td>serial_port 非空</td><td>串口探测（真实模式）</td></tr>
+<tr><td class='f'>USB / GPIB / MANUAL / NONE</td><td>不自动探测</td><td class='f'>address（其余留空）</td><td>address 非空</td><td>记 skip，需人工确认连通性</td></tr>
+</tbody></table></div>
+<p>判定逻辑与 <code>_device_configured()</code> 一致：网络类要求 <code>host</code> 非空且 <code>port</code> 有值；串口类只看 <code>serial_port</code>（<code>baudrate</code> 留空不阻断）；USB / GPIB / NONE 以 <code>address</code> 是否登记为准，连通性仍需人工确认，自检结果记为 skip 而不是 fail。</p></section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>注册后可改 / 只读</h2></div>
+<p class='lede'>注册库是唯一事实源：设备属性配置页只写回连接参数，BOM 元信息不允许改，改动可追溯、可单项恢复。</p>
+<div class='split'><div><h4>可改 · 连接参数</h4><ul>
+<li><code>host</code></li>
+<li><code>port</code></li>
+<li><code>protocol</code></li>
+<li><code>serial_port</code></li>
+<li><code>baudrate</code></li>
+<li><code>address</code></li>
+<li><code>channel</code></li>
+<li><code>note</code></li>
+</ul></div><div><h4>只读 · BOM 元信息</h4><ul>
+<li><code>id</code></li>
+<li><code>name</code></li>
+<li><code>model</code></li>
+<li><code>vendor</code></li>
+<li><code>category</code></li>
+<li><code>role</code></li>
+<li><code>programmable</code></li>
+<li><code>interface</code></li>
+<li><code>required</code></li>
+</ul></div></div>
+<p>改连接参数的接口是 <code>DeviceConfigPatch</code>（另带 <code>reset_defaults</code> 可一键恢复为该预设类型 BOM 的默认连接值）。同一测试台内两设备地址重复会被拦截：注册自检报 <code>address_conflict</code>，设备属性配置保存时还会二次校验。</p></section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>驱动自动匹配规则</h2></div>
+<p class='lede'>平台不要求登记驱动名，而是按字段关键字打分自动挂驱动；所以型号 / 厂商 / 类别 / 用途这四个字段要填准。</p>
+<div class='tw'><table><thead><tr><th>优先级</th><th>驱动 key</th><th>覆盖设备</th><th>匹配关键字</th></tr></thead><tbody>
+<tr><td class='f'>20</td><td class='f'>tektronix-mso5</td><td>示波器</td><td>model: mso5 / mso54 / mso64 / dpo5 / tektronix；vendor: tektronix</td></tr>
+<tr><td class='f'>14</td><td class='f'>serial-motion</td><td>运动控制器</td><td>category: 运动控制 / motion / 转速 / spin；interface: SERIAL / RS232 / RS485 / UART / COM</td></tr>
+<tr><td class='f'>12</td><td class='f'>generic-dmm</td><td>数字万用表</td><td>category: 万用表 / dmm / multimeter；role: dmm / 万用表</td></tr>
+<tr><td class='f'>12</td><td class='f'>generic-psu</td><td>可编程直流电源</td><td>category: 电源 / psu / power supply；role: psu / 电源</td></tr>
+<tr><td class='f'>12</td><td class='f'>generic-eload</td><td>可编程电子负载</td><td>category: 电子负载 / eload / load；role: eload / 负载</td></tr>
+<tr><td class='f'>12</td><td class='f'>generic-awg</td><td>波形发生器 / 信号源</td><td>category: 信号源 / 波形 / awg / generator；role: awg / 信号源</td></tr>
+<tr><td class='f'>5</td><td class='f'>passive-device</td><td>被动设备（无通讯）</td><td>interface: NONE / MANUAL / USB / GPIB</td></tr>
+<tr><td class='f'>1</td><td class='f'>generic-scpi</td><td>通用 SCPI 仪器（兜底）</td><td>match 为空：上面全部未命中时回落至此</td></tr>
+</tbody></table></div>
+<p>打分权重：<code>model</code> 3.0、<code>vendor</code> 2.0、<code>category</code> 2.0、<code>role</code> 1.5、<code>interface</code> 1.2、<code>name</code> 1.0；每个字段只要命中一个关键字就加分，取总分最高的驱动，同分时取优先级更高者；全部未命中则回落到 <code>generic-scpi</code> 兜底。</p>
+<p>用模版里的三个示例复算过：网络示波器命中 <code>tektronix-mso5</code>（5.0 分）、转速控制盒命中 <code>serial-motion</code>（3.2 分）、夹具命中 <code>passive-device</code>（1.2 分）。</p></section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>预设 BOM 与注册库的字段映射</h2></div>
+<p class='lede'>预设 BOM 用 <code>default_</code> 前缀表达「默认值」，注册时由 <code>_devices_from_preset()</code> 摊平成注册库字段。</p>
+<div class='tw'><table><thead><tr><th>预设 BOM（testbench_presets.json）</th><th>注册库（testbenches.json）</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>id / name / model / vendor / category / role</td><td class='f'>同名直传</td><td>BOM 元信息，注册后不可改</td></tr>
+<tr><td class='f'>default_host</td><td class='f'>host</td><td>预填默认 IP，现场按实际改</td></tr>
+<tr><td class='f'>default_port</td><td class='f'>port</td><td>预填默认端口</td></tr>
+<tr><td class='f'>default_serial_port</td><td class='f'>serial_port</td><td>预填默认串口号</td></tr>
+<tr><td class='f'>default_baudrate</td><td class='f'>baudrate</td><td>预填默认波特率</td></tr>
+<tr><td class='f'>default_address</td><td class='f'>address</td><td>预填 VISA 资源串</td></tr>
+<tr><td class='f'>default_channel</td><td class='f'>channel</td><td>预填默认通道</td></tr>
+<tr><td class='f'>—（预设 BOM 中不存在）</td><td class='f'>configured</td><td>注册时由平台按接口类型计算</td></tr>
+</tbody></table></div></section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>常见的五类错误</h2></div>
+<p class='lede'>这五条覆盖了现场接入时绝大多数注册失败与「设备连不上」的报障。</p>
+<div class='tw'><table><thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead><tbody>
+<tr><td>注册自检 fail：必备设备未配置</td><td>programmable=true 且 required=true，但按接口类型所需字段为空</td><td>网络类补 host + port，串口类补 serial_port；其余补 address</td></tr>
+<tr><td>注册自检 fail：设备地址冲突</td><td>同一测试台内两台设备用了相同的 IP + 端口</td><td>改端口或换设备 IP；设备属性配置环节也会二次拦截</td></tr>
+<tr><td>设备拿不到工具卡片 / 控制不了</td><td>驱动自动匹配落到 generic-scpi 兜底，或挂到邻近驱动上</td><td>检查 model / vendor / category 的拼写与关键字是否命中驱动规格表</td></tr>
+<tr><td>串口类设备时通时不通</td><td>USB 转串口换插口后 COMn 变化</td><td>固定 USB 插口，或改用串口服务器并固定端口号</td></tr>
+<tr><td>换网络环境后连不上</td><td>仪器使用 DHCP 动态地址，注册库里的 host 已失效</td><td>为仪器配置 DHCP 保留或静态 IP，再到设备属性配置里更新 host</td></tr>
+</tbody></table></div></section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>与 TPS 的衔接</h2></div>
+<p class='lede'>TPS 侧不重复登记设备，只用别名引用——注册这台设备的意义就在这里。</p>
+<p>TPS 的 <code>device_config</code> 里每个功能槽写 <code>device_id</code>（即设备注册的 <code>id</code>）、<code>role</code> 与 <code>note</code>；运行前平台把它与注册库设备清单交叉核对，缺设备或契约版本不匹配会阻断运行并给出补齐清单，无实机时可走仿真通道并明确标注。设备注册的 <code>id</code> 一旦改名，所有引用它的 TPS 都要同步改。</p>
+</section>
+<section id='s10'><div class='sechead'><span class='num'>10</span><h2>字段保留策略</h2></div>
+<p class='lede'>要不要每台设备只留自己接口相关的字段？结论：存储层保留全部 18 个字段（与接口无关的留空占位），表单、校验与提交层按 <code>interface</code> 只处理相关字段——两侧都不裁剪存储结构。</p>
+<div class='split'><div><h4>推荐 · 全字段存储 + 表单按接口裁剪（当前实现）</h4><ul><li>一份 <code>DeviceConfig</code> 模型覆盖所有设备，注册库 / TPS 契约 / 导出 / 报告共用同一套键，读方不用分支</li><li>接口临时改动（把网口设备借来试串口）不会丢掉原有 host / port</li><li>空值语义明确（字符串 <code>""</code>、数字 <code>null</code>），<code>_device_configured</code> 按接口只看该看的字段，空值不误判</li><li>代价：每台设备多带几个空键（一台几十字节），阅读噪音由表单层吸收</li></ul></div><div><h4>不推荐 · 按接口裁剪存储</h4><ul><li>表面收益：单条记录更短、看着干净</li><li>读方（校验 / 导出 / 报告 / 联调脚本）都要按接口分支</li><li>换接口会丢值；「键不存在」与「被清空」无法区分</li><li>预设 BOM、注册库、TPS 三处 schema 容易漂移，文件 diff 与评审按设备各异</li></ul></div></div>
+<p>真实注册记录印证了这一点：LAN / SERIAL / NONE 三类设备都是同一组 18 个键——网口示波器带 <code>"serial_port": ""</code> 与 <code>"baudrate": null</code>，串口转速盒带 <code>"host": ""</code> 与 <code>"port": null</code>，夹具则是全部连接字段留空。而前端 <code>payload()</code> 只提交本接口分支的键。字段按接口的适用性如下：</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>LAN 网络类</th><th>SERIAL 串口类</th><th>USB / GPIB</th><th>NONE 被动</th><th>说明</th></tr></thead><tbody>
+<tr><td>元信息 10 项：id / name / model / vendor / category / role / programmable / interface / required / note</td><td>必填</td><td>必填</td><td>必填</td><td>必填</td><td>与接口无关，所有设备一致，注册后只读（note 可改）</td></tr>
+<tr><td class='f'>host</td><td>必填</td><td>不适用</td><td>不适用</td><td>不适用</td><td>IP / 主机名；网口类判定「配满」的必要项</td></tr>
+<tr><td class='f'>port</td><td>必填</td><td>不适用</td><td>不适用</td><td>不适用</td><td>端口；网口类判定「配满」的必要项</td></tr>
+<tr><td class='f'>serial_port</td><td>不适用</td><td>必填</td><td>不适用</td><td>不适用</td><td>串口号；串口类判定「配满」的唯一必要项</td></tr>
+<tr><td class='f'>baudrate</td><td>不适用</td><td>选填</td><td>不适用</td><td>不适用</td><td>留空按设备默认值尝试，不阻断判定</td></tr>
+<tr><td class='f'>address</td><td>选填（VISA 通道复用）</td><td>选填</td><td>必填</td><td>不适用</td><td>VISA 资源串；USB / GPIB 以它判定「配满」</td></tr>
+<tr><td class='f'>channel</td><td>不适用</td><td>不适用</td><td>选填</td><td>不适用</td><td>多路电源 / 开关单元的默认通道</td></tr>
+<tr><td class='f'>protocol</td><td>选填</td><td>选填</td><td>选填</td><td>不适用</td><td>协议说明，写给人看，不参与判定</td></tr>
+<tr><td class='f'>configured</td><td>系统回写</td><td>系统回写</td><td>系统回写</td><td>系统回写</td><td>平台按接口计算的配置完整标记，只读</td></tr>
+</tbody></table></div>
+<p>表单侧不是「隐藏字段」，而是按接口分组提交——这也是 <code>DeviceConfigPatch</code> 只接受连接参数的原因：</p>
+<div class='tw'><table><thead><tr><th>interface 分支</th><th>提交键</th><th>校验规则</th></tr></thead><tbody>
+<tr><td class='f'>网络类（LAN / ETHERNET / TCP / IP）</td><td class='f'>host / port / protocol + note</td><td>IP 或主机名非空且格式合法；端口为 1–65535 整数</td></tr>
+<tr><td class='f'>串口类（SERIAL / RS232 / RS485 / UART / COM）</td><td class='f'>serial_port / baudrate / protocol + note</td><td>串口号形如 COM3 合法性校验；波特率 300–1000000（留空不报错）</td></tr>
+<tr><td class='f'>其余（USB / GPIB / MANUAL / NONE）</td><td class='f'>address / channel / protocol + note</td><td>仅当 programmable 时要求资源地址非空；通道与资源地址做字符集校验</td></tr>
+</tbody></table></div>
+<p><b>落地三条：</b>① 注册库永不裁剪，所有设备写满 18 键，空值统一 <code>""</code> / <code>null</code>；② 需要「干净」外观时只在导出 / 展示层裁剪（导出可加 <code>omit_empty</code>，报告与页面按接口只渲染相关字段）；③ 确实要改存储形态时，必须同步改 <code>DeviceConfig</code>、<code>_devices_from_preset</code>、<code>_device_configured</code>、TPS 契约与全部读方，不建议。</p></section>
+<section id='s11'><div class='sechead'><span class='num'>11</span><h2>附：模版本体</h2></div>
+<p class='glede'>下面即 <code>ate-device-template.jsonc</code> 全文；灰色为字段备注，去掉后可直接解析。</p>
+<pre><span class="c">// =============================================================================</span>
+<span class="c">// ATE Runner · 设备注册模版（JSONC）</span>
+<span class="c">// -----------------------------------------------------------------------------</span>
+<span class="c">// 文件性质：JSON with Comments（JSONC）。`//` 后为该字段的备注，程序解析前请去掉注释</span>
+<span class="c">//           （strip 后即为合法 JSON，已在 Python json.loads 下校验通过）。</span>
+<span class="c">// 用途    ：登记一台接入 ATE 测试台的设备；注册后的设备清单是装备属性配置、装备助手</span>
+<span class="c">//           工具卡片、TPS 设备清单校验的唯一事实源。</span>
+<span class="c">// 放置位置：注册库 backend/testresource/testbenches.json 的 testbenches[].devices[] 一条。</span>
+<span class="c">//           新建设备时由「测试台注册 → 类型选型」把预设 BOM（testbench_presets.json）</span>
+<span class="c">//           预填进来，现场只改连接参数。</span>
+<span class="c">// 字段依据：backend/testbench_registry.py（DeviceConfig / _device_configured /</span>
+<span class="c">//           DeviceConfigPatch）、backend/drivers/factory.py（DRIVER_SPECS 驱动自动匹配）</span>
+<span class="c">//          、backend/testresource/testbenches.json（实际注册样本）</span>
+<span class="c">// 维护    ：字段增删须同步 registry / 前端表单 / 本模版三处</span>
+<span class="c">// =============================================================================</span>
+{
+  &quot;schema&quot;: &quot;ate.device.registration.v1&quot;,   <span class="c">// 模版版本标识：字段结构变更时递增尾号</span>
+  &quot;updated_at&quot;: &quot;2026-09-16&quot;,               <span class="c">// 本模版最后修订日期（YYYY-MM-DD）</span>
+
+<span class="c">  // ===========================================================================</span>
+<span class="c">  // 一条设备条目：下列字段即注册库 devices[] 的一条记录（扁平结构，无嵌套）</span>
+<span class="c">  // ===========================================================================</span>
+  &quot;device&quot;: {
+
+<span class="c">    // ---------- ① 标识：决定这台设备在平台里叫什么、被谁引用 ----------</span>
+    &quot;id&quot;: &quot;rh-scope&quot;,                       <span class="c">// 【必填·台内唯一】设备别名。TPS 的 device_config 用它引用设备（device_id）；建议小写字母 + 短横线，不含空格</span>
+    &quot;name&quot;: &quot;数字示波器&quot;,                    <span class="c">// 【必填】中文显示名。装备树、工具卡片、报告里显示的就是它；也参与驱动匹配（权重 1.0）</span>
+    &quot;model&quot;: &quot;Tektronix MSO54&quot;,             <span class="c">// 【必填】型号全称。驱动自动匹配的第一权重字段（3.0），型号写错会挂到错误的驱动上</span>
+    &quot;vendor&quot;: &quot;Tektronix&quot;,                  <span class="c">// 【必填】厂商名。驱动匹配权重 2.0</span>
+    &quot;category&quot;: &quot;示波器&quot;,                    <span class="c">// 【必填】设备类别（示波器/万用表/电源/电子负载/信号源/运动控制/数据采集/被动设备…）。驱动匹配权重 2.0</span>
+    &quot;role&quot;: &quot;读头回放信号波形 / 边沿与噪声观测&quot;,  <span class="c">// 【必填】这台设备在本测试台上的用途。驱动匹配权重 1.5；同款设备在两条测试台上用途不同时，靠它区分</span>
+
+<span class="c">    // ---------- ② 程控与接口：决定平台怎么连它、能不能程控 ----------</span>
+    &quot;programmable&quot;: <span class="v">true</span>,                   <span class="c">// 【必填】是否可编程/可程控。false = 被动设备（夹具、探头、工装），只登记不参与通讯自检</span>
+    &quot;interface&quot;: &quot;LAN&quot;,                     <span class="c">// 【必填】接口类型，决定&quot;配置完整&quot;的判定方式与自检手段：</span>
+<span class="c">                                            //   LAN / ETHERNET / TCP / IP  → 网络类，必须给 host + port，自检走 TCP 探测</span>
+<span class="c">                                            //   SERIAL / RS232 / RS485 / UART / COM → 串口类，必须给 serial_port，自检走串口探测</span>
+<span class="c">                                            //   USB / GPIB / MANUAL / NONE → 不自动探测，以 address 登记，自检结果记 skip（需人工确认）</span>
+<span class="c">                                            //   取值不区分大小写，平台入库时统一转大写</span>
+
+<span class="c">    // ---------- ③ 连接参数：注册后【唯一允许修改】的一组字段 ----------</span>
+    &quot;host&quot;: &quot;192.168.10.41&quot;,                <span class="c">// 网络类必填：设备 IP 或主机名。建议为仪器分配固定 IP（DHCP 保留），否则换网后注册库里的地址会失效</span>
+    &quot;port&quot;: <span class="v">4000</span>,                           <span class="c">// 网络类必填：端口 1–65535。常见值 4000=VXI-11、5025=SCPI raw socket、3490=Fluke 万用表、30000=ITECH 电源/负载</span>
+    &quot;protocol&quot;: &quot;VXI-11 (SCPI)&quot;,            <span class="c">// 可选：协议说明，写给人看。例：VXI-11 (SCPI) / SCPI (raw socket) / SCPI (LAN socket) / Modbus TCP</span>
+    &quot;serial_port&quot;: &quot;&quot;,                      <span class="c">// 串口类必填：串口号，如 COM6。Windows 下换 USB 口会变号，接入前请确认设备管理器里的实际编号</span>
+    &quot;baudrate&quot;: <span class="v">null</span>,                       <span class="c">// 串口可选但建议填：波特率，如 115200。留空时平台按设备默认值尝试</span>
+    &quot;address&quot;: &quot;TCPIP0::<span class="v">192.168</span>.10.41::inst0::INSTR&quot;,
+<span class="c">                                            // 可选：VISA 资源串。网络设备可填（便于 VISA 通道复用），USB/GPIB 设备必须填，NONE 类留空</span>
+    &quot;channel&quot;: &quot;&quot;,                          <span class="c">// 可选：通道/端口号，如 CH1、CH2。多路电源、开关单元用它标明默认通道</span>
+
+<span class="c">    // ---------- ④ 管理与约束：决定自检会不会被拦下 ----------</span>
+    &quot;required&quot;: <span class="v">true</span>,                       <span class="c">// 【必填】是否必备设备。必备且 programmable 的设备若未配置完整，注册自检会报 fail 并阻断注册</span>
+    &quot;note&quot;: &quot;8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口&quot;,
+<span class="c">                                            // 可选：备注。建议写固定 IP 要求、量程/带宽、校准周期、负责人等排障时要看的信息</span>
+
+<span class="c">    // ---------- ⑤ 系统回写：由平台计算，请不要手工填写 ----------</span>
+    &quot;configured&quot;: <span class="v">true</span>                      <span class="c">// 只读：平台按 interface 判定配置是否完整——网络类看 host+port，串口类看 serial_port，其余看 address</span>
+  },
+
+<span class="c">  // ===========================================================================</span>
+<span class="c">  // 三类接口的填写示例（可直接复制改值；字段含义同上）</span>
+<span class="c">  // ===========================================================================</span>
+  &quot;examples&quot;: {
+
+    &quot;LAN&quot;: {                                <span class="c">// 网络类：示波器，VXI-11，固定 IP + 4000</span>
+      &quot;id&quot;: &quot;rh-scope&quot;,
+      &quot;name&quot;: &quot;数字示波器&quot;,
+      &quot;model&quot;: &quot;Tektronix MSO54&quot;,
+      &quot;vendor&quot;: &quot;Tektronix&quot;,
+      &quot;category&quot;: &quot;示波器&quot;,
+      &quot;role&quot;: &quot;读头回放信号波形 / 边沿与噪声观测&quot;,
+      &quot;programmable&quot;: <span class="v">true</span>,
+      &quot;interface&quot;: &quot;LAN&quot;,
+      &quot;host&quot;: &quot;192.168.10.41&quot;,
+      &quot;port&quot;: <span class="v">4000</span>,
+      &quot;protocol&quot;: &quot;VXI-11 (SCPI)&quot;,
+      &quot;serial_port&quot;: &quot;&quot;,
+      &quot;baudrate&quot;: <span class="v">null</span>,
+      &quot;address&quot;: &quot;TCPIP0::<span class="v">192.168</span>.10.41::inst0::INSTR&quot;,
+      &quot;channel&quot;: &quot;&quot;,
+      &quot;required&quot;: <span class="v">true</span>,
+      &quot;note&quot;: &quot;8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口&quot;
+    },
+
+    &quot;SERIAL&quot;: {                             <span class="c">// 串口类：转速控制盒，COM + 波特率</span>
+      &quot;id&quot;: &quot;rh-spin&quot;,
+      &quot;name&quot;: &quot;读头转速控制盒&quot;,
+      &quot;model&quot;: &quot;SPIN-CTRL-01&quot;,
+      &quot;vendor&quot;: &quot;内部工装&quot;,
+      &quot;category&quot;: &quot;运动控制&quot;,
+      &quot;role&quot;: &quot;读头转速闭环控制&quot;,
+      &quot;programmable&quot;: <span class="v">true</span>,
+      &quot;interface&quot;: &quot;SERIAL&quot;,
+      &quot;host&quot;: &quot;&quot;,
+      &quot;port&quot;: <span class="v">null</span>,
+      &quot;protocol&quot;: &quot;自定义 ASCII 帧&quot;,
+      &quot;serial_port&quot;: &quot;COM6&quot;,
+      &quot;baudrate&quot;: <span class="v">115200</span>,
+      &quot;address&quot;: &quot;&quot;,
+      &quot;channel&quot;: &quot;&quot;,
+      &quot;required&quot;: <span class="v">true</span>,
+      &quot;note&quot;: &quot;换 USB 口会变号；接入前确认设备管理器里的 COM 编号&quot;
+    },
+
+    &quot;PASSIVE&quot;: {                            <span class="c">// 被动设备：夹具探头，无程控接口，只登记</span>
+      &quot;id&quot;: &quot;rh-fixture&quot;,
+      &quot;name&quot;: &quot;读头装夹夹具与探针组&quot;,
+      &quot;model&quot;: &quot;FIX-SPM-RH-01&quot;,
+      &quot;vendor&quot;: &quot;内部工装&quot;,
+      &quot;category&quot;: &quot;被动设备&quot;,
+      &quot;role&quot;: &quot;读头装夹与信号引出&quot;,
+      &quot;programmable&quot;: <span class="v">false</span>,
+      &quot;interface&quot;: &quot;NONE&quot;,
+      &quot;host&quot;: &quot;&quot;,
+      &quot;port&quot;: <span class="v">null</span>,
+      &quot;protocol&quot;: &quot;&quot;,
+      &quot;serial_port&quot;: &quot;&quot;,
+      &quot;baudrate&quot;: <span class="v">null</span>,
+      &quot;address&quot;: &quot;&quot;,
+      &quot;channel&quot;: &quot;&quot;,
+      &quot;required&quot;: <span class="v">false</span>,
+      &quot;note&quot;: &quot;非程控设备，不参与通讯自检&quot;
+    }
+  },
+
+<span class="c">  // ===========================================================================</span>
+<span class="c">  // 上位包封（可选）：设备清单挂在测试台注册里，这是它所在的位置</span>
+<span class="c">  // ===========================================================================</span>
+  &quot;envelope_hint&quot;: {
+    &quot;id&quot;: &quot;tb_xxxxxxxxxx&quot;,                  <span class="c">// 测试台 ID，平台生成，不要手填</span>
+    &quot;preset_id&quot;: &quot;SPM-RH-DYN-01&quot;,           <span class="c">// 【必填】预设测试台类型：决定预填哪份标准 BOM</span>
+    &quot;title&quot;: &quot;SPM读头动态测试台&quot;,             <span class="c">// 【必填】测试台名称</span>
+    &quot;serial&quot;: &quot;SPMTS202609120001&quot;,          <span class="c">// 【必填】测试台编号，格式 SPMTS + 12 位数字</span>
+    &quot;station&quot;: {                            <span class="c">// 产线 / 工位信息</span>
+      &quot;line&quot;: &quot;SPM 总装线&quot;,                  <span class="c">// 【必填】产线</span>
+      &quot;station&quot;: &quot;读头动态测试工位&quot;,           <span class="c">// 【必填】工位</span>
+      &quot;location&quot;: &quot;一号厂房 A 区 3 号工位&quot;,     <span class="c">// 可选：物理位置</span>
+      &quot;remark&quot;: &quot;&quot;                          <span class="c">// 可选：备注</span>
+    },
+    &quot;devices&quot;: []                           <span class="c">// ← 上面 &quot;device&quot; 那种条目就放在这个数组里（一条一台设备）</span>
+  }
+}
+</pre>
+</section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 设备注册模版 ate.device.registration.v1</span><span>字段口径同步自 testbench_registry.py / drivers/factory.py</span></div>
+</div></body></html>

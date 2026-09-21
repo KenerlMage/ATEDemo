@@ -1,0 +1,32 @@
+{
+  "schema": "ate.driver.manifest.v1",
+  "key": "tektronix-mso5",
+  "version": "1.5.0",
+  "family": "scope",
+  "api": "1.2",
+  "label": "数字示波器 · 泰克 MSO5 系列（示例包）",
+  "vendor": "Tektronix",
+  "entry": "tek_mso5.driver:TekMso5Scope",
+  "interfaces": ["LAN", "SERIAL"],
+  "backends": ["native", "visa"],
+  "models": [
+    "MSO54"
+  ],
+  "capabilities": [
+    "identify",
+    "reset",
+    "state",
+    "scope.autoset",
+    "scope.timebase",
+    "scope.channel",
+    "scope.acquire_waveform",
+    "scope.measure",
+    "scope.run",
+    "scope.stop",
+    "scope.single"
+  ],
+  "simulate": true,
+  "min_platform": "1.0.0",
+  "depends": [],
+  "signature": ""
+}

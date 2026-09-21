@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>ATE Runner 仪器驱动库 · 设计准则</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Driver SDK · Guidelines</div>
+<h1>ATE Runner 仪器驱动库 · 设计准则</h1>
+<p class='sub'>12 条红线：命令不外露、型号直连派发、差异收敛、物理量出口统一、错误不静默、零硬依赖、仿真与真机同构、契约只增不改、会话安全、实例隔离、链路与后端显式声明、门禁即上架。</p>
+<div class='meta'><span><b>准则</b>G1 – G12</span><span><b>门禁</b>19 项一致性检查</span><span><b>评审清单</b>9 项合并前检查</span><span><b>反例</b>逐条给出</span><span><b>库位置</b>D:/ATE/sdk</span></div></header>
+<div class='doc'><aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>准则总览</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>G1 命令不外露</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>G2 型号直连派发</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>G3 差异收敛到五个差异面</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>G4 物理量出口统一</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>G5 错误不静默</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>G6 零硬依赖</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>G7 仿真与真机同构</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>G8 契约只增不改</span></a></li>
+<li><a href='#s10'><span class='num'>10</span><span>G9 会话必须安全可重入</span></a></li>
+<li><a href='#s11'><span class='num'>11</span><span>G10 实例互不干扰</span></a></li>
+<li><a href='#s12'><span class='num'>12</span><span>G11 连接方式与传输后端显式声明</span></a></li>
+<li><a href='#s13'><span class='num'>13</span><span>G12 门禁即上架</span></a></li>
+<li><a href='#s14'><span class='num'>14</span><span>命名与文件规矩</span></a></li>
+<li><a href='#s15'><span class='num'>15</span><span>编码与文档纪律</span></a></li>
+<li><a href='#s16'><span class='num'>16</span><span>评审清单（合并前逐条过）</span></a></li>
+<li><a href='#s17'><span class='num'>17</span><span>迁移与统一（未完成事项）</span></a></li>
+</ol></aside><main>
+<p class='lede'><blockquote>
+适用版本：<code>ate_drivers</code> 1.2.0 · 契约 <strong>1.2</strong> · 门禁 19 项
+这份文档是<strong>写驱动与改库时的红线</strong>。每条准则给：为什么、怎么做、反例、对应门禁。评审时逐条过。
+</blockquote></p>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>准则总览</h2></div>
+<table>
+<thead>
+<tr>
+<th>号</th>
+<th>准则</th>
+<th>一句话</th>
+<th>门禁</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>命令不外露</td>
+<td>命令只许出现在厂商包里</td>
+<td>C05、C07</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>型号直连派发</td>
+<td>不猜型号、不打分、不兜底</td>
+<td>C17</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>差异收敛</td>
+<td>厂商包只填五个差异面，不动别的</td>
+<td>C01、C03、C04</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>物理量出口统一</td>
+<td>出口是伏/秒/赫兹，不是格数或计数</td>
+<td>C08</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>错误不静默</td>
+<td>缺参数、非法枚举一律报错，不替换</td>
+<td>C09</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>零硬依赖</td>
+<td>标准库之外只能惰性可选 + 可注入</td>
+<td>C15</td>
+</tr>
+<tr>
+<td>G7</td>
+<td>仿真与真机同构</td>
+<td>同一动作、同一返回结构</td>
+<td>C06、C12</td>
+</tr>
+<tr>
+<td>G8</td>
+<td>契约只增不改</td>
+<td>改语义先加新动作、旧动作进弃用表</td>
+<td>C02、C14、C16</td>
+</tr>
+<tr>
+<td>G9</td>
+<td>会话必须安全可重入</td>
+<td>open/close 幂等，退出不能让仪器留在危险态</td>
+<td>C10、C11</td>
+</tr>
+<tr>
+<td>G10</td>
+<td>实例互不干扰</td>
+<td>同型号多实例并行不能串数据</td>
+<td>C13</td>
+</tr>
+<tr>
+<td>G11</td>
+<td>连接方式与后端显式声明</td>
+<td>声明了才算支持；歧义报错</td>
+<td>C18、C19</td>
+</tr>
+<tr>
+<td>G12</td>
+<td>门禁即上架</td>
+<td>19 项全绿才算完成</td>
+<td>全部</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>G1 命令不外露</h2></div>
+<p><strong>为什么</strong>：一旦上层能写命令，就又会退化成「每个品牌一份测试脚本」。真正的解耦点是动作，不是命令。</p>
+<p><strong>怎么做</strong>：命令拼写只出现在 <code>vendors/&lt;厂商&gt;/driver.py</code> 的 <code>COMMANDS</code> 表与应答解析里；参数校验、单位换算、错误分类都在家族层与厂商包内完成，门面只暴露业务方法。</p>
+<p><strong>反例</strong>：</p>
+<pre><code class="language-python"># 反例：门面里拼命令（把品牌方言泄漏给了上层）
+def set_scale(self, v):
+    self.write(f&quot;:CH1:SCAle {v}&quot;)
+</code></pre>
+<p><strong>正例</strong>：<code>scope.set_channel("CH1", volts_per_div=0.5)</code> —— 上层不知道这条命令在泰克是 <code>:CH1:SCAle 0.5</code>、在 R&amp;S 是 <code>:CHANnel1:SCALe 0.5</code>。</p>
+<p>自检手段：单测直接扫描 <code>api.py</code> 源码与公开返回数据，<code>:CURVe</code> / <code>:WFMOutpre</code> / <code>:ACQuire</code> / <code>:TIMebase</code> 等字样出现次数必须为 0。</p>
+</section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>G2 型号直连派发</h2></div>
+<p><strong>为什么</strong>：型号是设备档案里的<strong>确定字段</strong>，不是需要猜测的线索。打分选型会在型号写错时「挑一个最像的」去问仪器——这比报错难查得多。</p>
+<p><strong>怎么做</strong>：<code>normalize_model()</code>（只留字母数字、转大写）后<strong>精确相等</strong>；别名必须显式登记（<code>MODEL_ALIASES</code>，如 <code>MXO4 → MXO44</code>）；同名冲突用 <code>model_conflicts()</code> 报出来；未登记型号抛 <code>DriverNotFound</code> 并列出全部已登记型号。</p>
+<p><strong>反例</strong>：给型号加相似度打分、按 <code>vendor</code>/<code>category</code> 兜底、留一个 <code>GenericScope</code> 万能驱动。</p>
+<p><strong>一句话</strong>：<strong>宁可当场报错，也不猜。</strong></p>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>G3 差异收敛到五个差异面</h2></div>
+<p>厂商驱动包只允许填这五处，其余一切继承家族层：</p>
+<table>
+<thead>
+<tr>
+<th>差异面</th>
+<th>载体</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 命令表</td>
+<td><code>COMMANDS</code>（键必须覆盖 <code>REQUIRED_COMMANDS</code>）</td>
+<td>泰克 <code>:AUTOSet EXECute</code> / R&amp;S <code>:AUToset</code></td>
+</tr>
+<tr>
+<td>② 应答解析</td>
+<td><code>PREAMBLE_FIELDS</code> + <code>simulate_command()</code> 的解析分支</td>
+<td><code>WFMOutpre</code> 前导字段顺序、逗号 vs 分号</td>
+</tr>
+<tr>
+<td>③ 量纲缩放</td>
+<td>解析时把裸值换成物理单位</td>
+<td>R&amp;S 头里没缩放系数 → 走 <code>FORMat ASCii</code>（手册示例即伏特）</td>
+</tr>
+<tr>
+<td>④ 枚举映射</td>
+<td>家族枚举 → 本机取值</td>
+<td>耦合 <code>DC/AC</code>；仪器不支持的 <code>GND</code> → <code>E_PARAM</code></td>
+</tr>
+<tr>
+<td>⑤ 仿真模型</td>
+<td><code>_sim_signal()</code> / <code>simulate_command()</code></td>
+<td>泰克叠加 8 bit 垂直量化</td>
+</tr>
+</tbody>
+</table>
+<p><strong>反例</strong>：在厂商包里重写 <code>measure()</code> 算法、改动作名、改返回结构、把某个品牌的特殊处理写进家族层。</p>
+</section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>G4 物理量出口统一</h2></div>
+<p><strong>为什么</strong>：上层不知道（也不该知道）仪器当前的垂直档位、ADC 位数、ASCII/二进制编码。</p>
+<p><strong>怎么做</strong>：<code>Waveform.samples</code> 恒为<strong>伏</strong>（<code>unit="V"</code>），时间轴恒为<strong>秒</strong>（<code>x_incr_s</code> / <code>x_start_s</code>），测量项自带 <code>unit</code>；换算（<code>YMULT</code>/<code>YOFF</code>、<code>XINcr</code>/<code>XZEro</code>、位宽位序）全部在厂商包内完成。</p>
+<p><strong>反例</strong>：返回原始计数、返回「格数」、让上层自己乘 <code>v_per_div</code>、把单位写在文档里而不是返回值里。</p>
+<p><strong>门禁</strong>：C08 会检查每个测量项都带单位。</p>
+</section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>G5 错误不静默</h2></div>
+<p><strong>为什么</strong>：静默替换物理量、静默降级链路，会把「接错线」「参数写错」拖成难查的偶发故障。</p>
+<p><strong>怎么做</strong>：</p>
+<ul>
+<li>缺参数（host 没 port、串口名缺失、波特率非法）→ <code>E_CONFIG</code>；</li>
+<li>枚举未登记（耦合写 <code>GND</code> 而驱动只登记 <code>DC/AC</code>）→ <code>E_PARAM</code>，消息里附上<strong>已登记取值清单</strong>；</li>
+<li>型号回读不符 → <code>E_CONFIG</code>，消息里给出档案型号与实测型号；</li>
+<li>链路不匹配 → <code>E_CONFIG</code>，附带该型号支持的链路。</li>
+</ul>
+<p><strong>反例</strong>：把 <code>GND</code> 当 <code>DC</code> 处理；host 缺 port 时自动转仿真；<code>*IDN?</code> 回读不符只打个 warning 继续跑。</p>
+</section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>G6 零硬依赖</h2></div>
+<p><strong>为什么</strong>：目标部署环境是客户工控机，可能离线、可能不允许装包。</p>
+<p><strong>怎么做</strong>：运行时只用标准库；确需第三方时（串口 <code>pyserial</code>、VISA <code>pyvisa</code>）三条都要做到：</p>
+<ol>
+<li><strong>函数体内惰性导入</strong>（<code>_pyserial()</code> / <code>_pyvisa()</code>），模块顶层不许出现；</li>
+<li>缺它时报可读的 <code>E_CONFIG</code>（消息里带 <code>pip install …</code>），<strong>不是</strong> <code>ImportError</code>，也不静默降级；</li>
+<li>提供注入点（<code>set_serial_factory()</code> / <code>set_visa_factory()</code>），测试与自研实现都能塞替身。</li>
+</ol>
+<p><strong>反例</strong>：模块顶部 <code>import serial</code> / <code>import pyvisa</code>；没装 VISA 就悄悄走 socket；把 numpy 引进数据处理（缩放与测量算法必须纯 Python）。</p>
+<p><strong>门禁</strong>：C15 扫 AST 区分「硬依赖 / 惰性可选依赖」，<code>OPTIONAL_RUNTIME = ("serial", "pyvisa")</code> 只允许后者。</p>
+</section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>G7 仿真与真机同构</h2></div>
+<p><strong>为什么</strong>：没有硬件时要能开发、能做回归、能复现问题。</p>
+<p><strong>怎么做</strong>：仿真是<strong>链路</strong>而不是分支判断；<code>mode="auto"</code> 无端点即仿真，<code>mode="simulate"</code> 强制仿真；仿真必须支持全部声明能力（C06），且同样输入必须同样输出（C12）；仿真数据要遵循同一套物理模型（正弦 + 噪声 + 量化），不是随机数。</p>
+<p><strong>反例</strong>：真机路径写一套、仿真路径写另一套返回结构；仿真返回随机数导致用例不稳定。</p>
+</section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>G8 契约只增不改</h2></div>
+<p><strong>为什么</strong>：TPS 用例是资产，不能因为驱动升级而集体失效。</p>
+<p><strong>怎么做</strong>：动作与参数<strong>只增</strong>；要改语义就加新动作，把旧的写进 <code>DEPRECATIONS</code> 指向替代项（C16），旧动作继续可跑（C14）；<code>driver.json</code> 里的 <code>api</code> 与 <code>min_platform</code> 声明兼容边界，<code>check_compatible()</code> 在加载阶段拒绝不兼容包。</p>
+</section>
+<section id='s10'><div class='sechead'><span class='num'>10</span><h2>G9 会话必须安全可重入</h2></div>
+<p><strong>为什么</strong>：产线上反复开合、异常中断很常见。</p>
+<p><strong>怎么做</strong>：<code>open()</code> / <code>close()</code> 幂等（重复调用不报错）；<code>close()</code> 走 <code>protect_on_close()</code> 的安全退出（先停采集、必要时复位）；异常路径也要走同一套退出逻辑，不能把仪器留在「等待触发」之类的挂起态。</p>
+</section>
+<section id='s11'><div class='sechead'><span class='num'>11</span><h2>G10 实例互不干扰</h2></div>
+<p><strong>为什么</strong>：一个台位可能挂两台同型号设备。</p>
+<p><strong>怎么做</strong>：状态挂在<strong>实例</strong>上（时基/通道/仿真参数），不挂类；<code>device_id</code> 随会话流动；单测里两个实例交叉配置必须互不影响（C13）。</p>
+</section>
+<section id='s12'><div class='sechead'><span class='num'>12</span><h2>G11 连接方式与传输后端显式声明</h2></div>
+<p><strong>为什么</strong>：同一台设备网口与串口都能接（<code>kind</code>），同一套命令也能走原生 socket 或 PyVISA（<code>backend</code>），靠猜会接错线、也会"以为走的是 VISA 其实走的是 socket"。</p>
+<p><strong>怎么做</strong>：</p>
+<ul>
+<li>驱动类声明 <code>INTERFACES</code>（多值，如 <code>("LAN", "SERIAL")</code>），<code>driver.json</code> 同步 <code>interfaces</code> 数组；
+  解析顺序 = 显式参数 &gt; 档案 <code>interface</code> &gt; 端口填充；两种参数都填又没写明 → 报「连接方式不明确」；
+  型号不支持的链路 → 报错并列出支持项；</li>
+<li>驱动类声明 <code>BACKENDS</code>（多值，如 <code>("native", "visa")</code>），<code>driver.json</code> 同步 <code>backends</code> 数组；
+  解析顺序 = 显式 <code>backend=</code> &gt; 档案 <code>extra.backend</code> &gt; 默认 <code>native</code>；型号没声明的后端 → 报错；
+  <code>auto</code> 不写进 <code>BACKENDS</code>（它是调用时的选择）；</li>
+<li><strong>实际生效值必须可查</strong>：<code>scope.interface</code> / <code>scope.backend</code> / <code>status()</code> 里都要有，别让现场靠猜。</li>
+</ul>
+<p><strong>反例</strong>：档案里同时写 <code>host</code> 与 <code>serial_port</code> 就默认走网口；只声明网口的型号收到串口端点时静默忽略串口参数；
+某台机器装了 VISA 就自动改走 VISA 而不写进状态（<code>auto</code> 也必须把结果落到 <code>backend</code> 上）。</p>
+</section>
+<section id='s13'><div class='sechead'><span class='num'>13</span><h2>G12 门禁即上架</h2></div>
+<p><strong>怎么做</strong>：交付前必须跑</p>
+<pre><code class="language-bash">python -m ate_drivers.kit.cli check &lt;驱动包&gt;     # 19 项必须全绿，退出码 0
+python -m pytest tests -q                        # 库自带 47 项自测必须全绿
+</code></pre>
+<p>不绿就不算完成——<strong>没有「先上架、后面补」这一说</strong>。</p>
+</section>
+<section id='s14'><div class='sechead'><span class='num'>14</span><h2>命名与文件规矩</h2></div>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>规矩</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>驱动 key</td>
+<td>小写 + 连字符；<code>driver.json</code> 的 <code>key</code> 与类属性 <code>driver_key</code> 必须一致</td>
+<td><code>tektronix-mso5</code></td>
+</tr>
+<tr>
+<td>包目录</td>
+<td><strong>合法 Python 模块名</strong>（下划线，不是连字符）</td>
+<td><code>vendors/rohde_schwarz_mxo/</code></td>
+</tr>
+<tr>
+<td>型号</td>
+<td>归一化后精确匹配；别名走 <code>MODEL_ALIASES</code></td>
+<td><code>MODEL_ALIASES = ("MXO4",)</code></td>
+</tr>
+<tr>
+<td>链路</td>
+<td><code>INTERFACES</code>（元组，多值）；旧单值 <code>INTERFACE</code> 仍兼容</td>
+<td><code>INTERFACES = ("LAN", "SERIAL")</code></td>
+</tr>
+<tr>
+<td>后端</td>
+<td><code>BACKENDS</code>（元组，多值）；旧单值 <code>BACKEND</code> 仍兼容；不许写 <code>auto</code></td>
+<td><code>BACKENDS = ("native", "visa")</code></td>
+</tr>
+<tr>
+<td>名字不串用</td>
+<td><code>ALIASES</code> 是<strong>家族层的动作别名表</strong>，厂商包<strong>禁止</strong>拿它登记型号</td>
+<td>型号别名一律用 <code>MODEL_ALIASES</code></td>
+</tr>
+<tr>
+<td>清单</td>
+<td><code>driver.json</code> 的 <code>models</code> / <code>interfaces</code> / <code>backends</code> / <code>capabilities</code> 必须与类属性一致</td>
+<td>C17 / C18 / C19 / C03 会验</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>踩过的坑：在厂商驱动里写 <code>ALIASES = ("MXO4",)</code> 覆盖了基类的动作别名字典，导致该驱动<strong>所有动作</strong>报 <code>'tuple' object has no attribute 'get'</code>。三个名字（<code>ALIASES</code> / <code>MODEL_ALIASES</code> / <code>INTERFACES</code>）互不串用。</p>
+</blockquote>
+</section>
+<section id='s15'><div class='sechead'><span class='num'>15</span><h2>编码与文档纪律</h2></div>
+<ul>
+<li>源码 UTF-8，首行 <code># -*- coding: utf-8 -*-</code>，模块写中文 docstring 说明「这个包负责哪几个差异面」；</li>
+<li>公开方法必须有 docstring：参数、单位、返回、可能抛的错误码；</li>
+<li><strong>只写真实核验过的内容</strong>：手册没读到的枚举标注「待现场核对」，不要凭印象补；</li>
+<li>单位一律写符号（V / s / Hz / s/div / V/div），不要混用「伏特」「V」两种写法。</li>
+</ul>
+</section>
+<section id='s16'><div class='sechead'><span class='num'>16</span><h2>评审清单（合并前逐条过）</h2></div>
+<ul>
+<li>[ ] 新加的动作是否已进 <code>capabilities</code> 并更新 <code>driver.json</code>？</li>
+<li>[ ] 命令表是否覆盖全部 <code>REQUIRED_COMMANDS</code>（<code>missing_commands()</code> 为空）？</li>
+<li>[ ] 出错路径是否都带明确错误码（不裸抛 <code>Exception</code>、不靠文案判断）？</li>
+<li>[ ] 仿真是否覆盖全部声明能力、且可复现？</li>
+<li>[ ] 是否引入第三方硬依赖（含测试之外的新 import）？pyserial / pyvisa 是否都在函数体内惰性导入并留了注入点？</li>
+<li>[ ] <code>api.py</code> 里是否有命令字样？</li>
+<li>[ ] <code>models</code> / <code>interfaces</code> / <code>backends</code> 是否与类属性一致？</li>
+<li>[ ] <code>cli check</code> 19/19、<code>pytest</code> 全绿是否跑过并把输出留在交付说明里？</li>
+</ul>
+</section>
+<section id='s17'><div class='sechead'><span class='num'>17</span><h2>迁移与统一（未完成事项）</h2></div>
+<p>平台侧 <code>backend/drivers/factory.py</code> 目前仍是<strong>打分选型版</strong>（<code>DRIVER_SPECS</code> 8 条 + 权重 <code>model/vendor/category/role/interface/name</code> + <code>generic-scpi</code> 兜底）。SDK 侧的目标口径是<strong>型号直连派发</strong>。下列项未落地，落地时按本准则 G2 处理：</p>
+<ul>
+<li>平台侧 <code>DRIVER_SPECS</code> 的 <code>match</code> / <code>priority</code> 字段清理，改为 <code>models</code> + <code>interfaces</code>；</li>
+<li>平台侧打分函数与兜底驱动移除；</li>
+<li>平台侧 <code>backend/drivers/transport.py</code> 仍是原生 socket / pyserial 两分支，<strong>未接 PyVISA</strong>（SDK 侧已支持 <code>backend="visa"</code>）；</li>
+<li>契约层 v1.3 规划中的 6 个新能力与 5 个数据模型（见《示波器通用接口设计》文档）尚未实现，门禁停在 19 项；</li>
+<li>R&amp;S 耦合枚举（<code>CHANnel&lt;ch&gt;:COUPling</code> 取值表）未从手册正文取到，当前只登记 <code>DC/AC</code>，<code>GND</code> 报 <code>E_PARAM</code>；需现场核验。</li>
+</ul></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 仪器驱动库文档 · 契约 ate.driver.api 1.2</span><span>库位置 D:/ATE/sdk · 上架门禁 19 项一致性检查 · 传输后端 native / visa</span></div>
+</div></body></html>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATE Runner · 仪器驱动库开发模板与使用说明</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Driver SDK Guide</div>
+<h1>仪器驱动库开发模板与使用说明</h1>
+<p class='sub'>示波器、信号发生器、万用表、电源——这些通用外设的驱动怎么写成平台可加载的库：版本差异只准出现在五处（命令表 / 应答解析 / 量纲缩放 / 枚举映射 / 仿真模型），其余语义由契约层与家族层保证，换品牌的示波器时 TPS 用例零改动。</p>
+<div class='meta'><span><b>契约版本</b>ate.driver.api 1.2</span><span><b>结果结构</b>ate.driver.result.v1</span><span><b>上架门禁</b>一致性检查 19 项</span><span><b>本机实测</b>各包 19/19 通过 · pytest 47 passed</span><span><b>库位置</b>D:/ATE/sdk</span></div></header>
+<div class='doc'>
+<aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>一分钟上手</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>库的结构与分层</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>三步写出一个示波器驱动</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>契约清单（能力 / 单位）</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>返回结构与错误码</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>十二条兼容性铁律</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>一致性检查 19 项</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>驱动包清单 driver.json</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>平台侧接入</span></a></li>
+<li><a href='#s10'><span class='num'>10</span><span>真机调试与常见错误</span></a></li>
+</ol></aside><main>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>一分钟上手</h2></div>
+<p class='lede'>三条命令：生成骨架 → 填五处差异面 → 跑上架门禁。骨架<b>开箱即过 19 项检查</b>，开发者的工作只是把五处差异面填成真实值。</p>
+<pre># 1. 生成驱动包骨架（目录名会自动转成合法模块名）
+python -m ate_drivers.kit.cli new acme-scope-3000 --dir samples
+
+# 2. 填五处差异面后，跑上架门禁（退出码 0 = 可上架）
+python -m ate_drivers.kit.cli check samples/acme_scope_3000
+
+# 3. 列出已装驱动包 / 打印契约规则
+python -m ate_drivers.kit.cli list samples
+python -m ate_drivers.kit.cli contract</pre>
+<div class='tw'><table><thead><tr><th>生成物</th><th>作用</th></tr></thead><tbody>
+<tr><td class='f'>driver.py</td><td>驱动实现（继承家族类，填五处差异面）</td></tr>
+<tr><td class='f'>driver.json</td><td>驱动包清单（key / 版本 / 契约 / 匹配关键字 / 能力）</td></tr>
+<tr><td class='f'>test_driver.py</td><td>一致性检查用例（CI 里跑）</td></tr>
+<tr><td class='f'>__init__.py / README.md</td><td>包导出与开发说明</td></tr>
+</tbody></table></div></section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>库的结构与分层</h2></div>
+<p class='lede'>四层各司其职：越靠内越稳定、越靠外越易变。驱动包只允许 import 契约层与家族层，不得 import 平台内部模块（否则无法独立测试与分发）。</p>
+<div class='tw'><table><thead><tr><th>层</th><th>内容</th><th>约束</th></tr></thead><tbody>
+<tr><td class='f'>L0 契约层</td><td>ate_drivers/（contract.py / capabilities.py / errors.py / models.py / endpoint.py / transport.py / base.py）</td><td>随平台内置、**冻结**，只增不改；驱动包 import 它，不 import 平台</td></tr>
+<tr><td class='f'>L1 家族层</td><td>ate_drivers/family/*.py（scope.py 示波器，后续 dmm / psu / awg / motion）</td><td>一类仪器的语义：动作、参数、单位、返回结构、测量算法、默认仿真</td></tr>
+<tr><td class='f'>L2 型号层</td><td>驱动包（如 samples/tek_mso5/），装到 <ATE>/drivers/<key>/</td><td>只填五处差异面（命令表 / 应答解析 / 量纲缩放 / 枚举映射 / 仿真模型）；可货架分发</td></tr>
+<tr><td class='f'>L3 私有层</td><td>客户专有设备包（侧载、不上架）</td><td>同上，但走本地侧载通道，签名校验可显式豁免并留痕</td></tr>
+</tbody></table></div>
+<p>传输层再分两个<b>后端</b>：<code>native</code>（标准库 socket / pyserial，零依赖）与 <code>visa</code>（PyVISA，资源名走 <code>TCPIP0::host::port::SOCKET</code> / <code>ASRL6::INSTR</code>，波特率作为会话属性下发）；由 <code>backend=</code> 选择、由驱动声明的 <code>BACKENDS</code> 限定，业务代码与返回结构不变。</p>
+<p>依赖方向单向：<code>TPS 用例 / 装备助手 → 家族层 → 契约层 → transport</code>。真实仪器与离线仿真在 transport 层一处（<code>make_transport()</code>）分叉，所以同一个驱动类既能上产线也能在没有实机时跑仿真。</p></section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>三步写出一个示波器驱动</h2></div>
+<p class='lede'>动作名、参数、单位、返回结构、测量算法、安全退出全部由 <code>ScopeDriver</code> 家族保证；型号驱动只填下面五处差异面。</p>
+<div class='tw'><table><thead><tr><th>差异</th><th>位置</th><th>说明</th><th>示例</th></tr></thead><tbody>
+<tr><td>① 命令表</td><td class='f'>COMMANDS（dict）</td><td>只覆盖与家族默认不同的键；**键名固定不可改**，平台按键做能力映射</td><td class='f'>&quot;timebase_set&quot;: &quot;:TIM:SCAL {scale:g}&quot;</td></tr>
+<tr><td>② 应答解析</td><td class='f'>PREAMBLE_FIELDS / _decode_preamble()</td><td>波形前导字段顺序，按手册填名取值；不填则退化为通用位置启发式</td><td class='f'>(&quot;byt_nr&quot;, …, &quot;x_incr&quot;, &quot;y_mult&quot;, &quot;y_off&quot;, &quot;y_zero&quot;)</td></tr>
+<tr><td>③ 仿真模型</td><td class='f'>_sim_signal()</td><td>无实机时让用例跑通；**同参数必须同结果**（一致性检查会验证）</td><td class='f'>在家族默认模型上叠加 8 bit 量化</td></tr>
+<tr><td>③ 量纲缩放</td><td class='f'>解析函数内</td><td>裸值 → 物理单位（伏/秒/赫兹），出口统一</td><td class='f'>(raw - y_off) * y_mult</td></tr>
+<tr><td>④ 枚举映射</td><td class='f'>家族枚举 → 本机取值</td><td>不支持的取值报 `E_PARAM`，**不静默替换**</td><td class='f'>耦合 DC/AC；GND 报错</td></tr>
+</tbody></table></div>
+<pre>from ate_drivers import ScopeDriver
+
+
+class AcmeScope3000(ScopeDriver):
+    driver_key = &quot;acme-scope-3000&quot;
+    family = &quot;scope&quot;
+    label = &quot;Acme 3000 系列示波器&quot;
+    driver_version = &quot;0.1.0&quot;
+    sim_idn = &quot;ACME,SCOPE-3000,SIM,0.1.0&quot;
+
+    # ① 只覆盖与家族不同的命令键
+    COMMANDS = dict(ScopeDriver.COMMANDS, **{
+        &quot;timebase_set&quot;: &quot;:TIM:SCAL {scale:g}&quot;,
+        &quot;waveform_data&quot;: &quot;:WAV:DATA?&quot;,
+    })
+
+    # ② 前导字段顺序（按手册填；填了就按名取值，不靠位置猜）
+    PREAMBLE_FIELDS = (&quot;byt_nr&quot;, &quot;bit_nr&quot;, &quot;encdg&quot;, &quot;bn_fmt&quot;, &quot;byt_or&quot;, &quot;wfid&quot;,
+                       &quot;nr_pt&quot;, &quot;pt_fmt&quot;, &quot;x_incr&quot;, &quot;x_zero&quot;, &quot;pt_off&quot;,
+                       &quot;y_off&quot;, &quot;y_mult&quot;, &quot;y_zero&quot;)
+
+    # ③ 仿真模型：在家族默认模型上叠加厂商特征
+    def _sim_signal(self, points: int, window_s: float) -&gt; list[float]:
+        return super()._sim_signal(points, window_s)</pre>
+<p>调用侧（TPS 用例 / 装备助手）与品牌无关，同一份代码换驱动即可复用：</p>
+<pre>dev.do(&quot;scope.autoset&quot;, freq_hz=1000.0, vpp_v=2.4)
+wave = dev.do(&quot;scope.acquire_waveform&quot;, points=4000)[&quot;value&quot;]   # unit: V
+items = dev.do(&quot;scope.measure&quot;, items=[&quot;PK2PK&quot;, &quot;FREQUENCY&quot;])[&quot;value&quot;]
+assert 2.2 &lt; items[0][&quot;value&quot;] &lt; 2.6</pre></section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>契约清单（能力 / 单位）</h2></div>
+<p class='lede'>能力用点分命名空间。调用方先 <code>supports()</code> 再 <code>do()</code>，所以新增能力不会让老驱动失效。</p>
+<div class='tw'><table><thead><tr><th>分组</th><th>能力</th><th>作用</th><th>要求</th></tr></thead><tbody>
+<tr><td>核心（所有驱动必须有）</td><td class='f'>identify / reset / state</td><td>识别、复位、取状态</td><td>必选</td></tr>
+<tr><td>示波器家族</td><td class='f'>scope.acquire_waveform</td><td>取一段波形（采样点 + 时间轴）</td><td>家族基线·必选</td></tr>
+<tr><td>示波器家族</td><td class='f'>scope.measure</td><td>测量项（8 项，单位固定）</td><td>家族基线·必选</td></tr>
+<tr><td>示波器家族</td><td class='f'>scope.timebase / scope.channel</td><td>时基与通道配置</td><td>可选</td></tr>
+<tr><td>示波器家族</td><td class='f'>scope.autoset</td><td>自动设置</td><td>可选</td></tr>
+<tr><td>示波器家族</td><td class='f'>scope.run / scope.stop / scope.single</td><td>采集控制（启动后自动登记安全退出）</td><td>可选</td></tr>
+<tr><td>厂商扩展</td><td class='f'>vendor.<厂商>.<动作></td><td>平台不解释的私有能力，命名必须带厂商前缀</td><td>可选</td></tr>
+</tbody></table></div>
+<p>单位写死在返回结构里——单位不一致视为契约破坏，这是跨品牌比对数据的前提：</p>
+<div class='tw'><table><thead><tr><th>物理量</th><th>单位</th><th>涉及字段</th></tr></thead><tbody>
+<tr><td>电压</td><td class='f'>V</td><td>波形采样值、`PK2PK` / `AMPLITUDE` / `MEAN` / `RMS`</td></tr>
+<tr><td>时间</td><td class='f'>s</td><td>`PERIOD` / `RISE` / `FALL` / `x_incr_s` / 时基 `scale_s_per_div`</td></tr>
+<tr><td>频率</td><td class='f'>Hz</td><td>`FREQUENCY` / 仿真信号 `freq_hz`</td></tr>
+<tr><td>垂直档位</td><td class='f'>V/div</td><td>通道 `scale_v_per_div`</td></tr>
+<tr><td>时基档位</td><td class='f'>s/div</td><td>`scale_s_per_div`</td></tr>
+</tbody></table></div></section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>返回结构与错误码</h2></div>
+<p class='lede'>每个动作返回同一结构：键只增不改。<code>driver</code> + <code>driver_version</code> + <code>api</code> 三个值必须落进运行记录，出问题才能定位到具体驱动版本。</p>
+<div class='tw'><table><thead><tr><th>键</th><th>类型</th><th>作用</th></tr></thead><tbody>
+<tr><td class='f'>ok</td><td>bool</td><td>动作是否成功（失败一律抛异常，不返回 ok=False）</td></tr>
+<tr><td class='f'>schema</td><td>str</td><td>结果结构版本 `ate.driver.result.v1`；上层按它判兼容</td></tr>
+<tr><td class='f'>driver / driver_version / api</td><td>str</td><td>驱动标识与版本，**运行记录必须落这三个值**（可复现）</td></tr>
+<tr><td class='f'>action / requested</td><td>str</td><td>规范动作名 / 调用方写的原名（旧别名可追溯）</td></tr>
+<tr><td class='f'>value</td><td>any</td><td>动作主结果（**必须可 JSON 序列化**，报告直接写盘）</td></tr>
+<tr><td class='f'>detail</td><td>dict</td><td>附加信息（时基、通道、来源…），只增键不改名</td></tr>
+<tr><td class='f'>quality</td><td>str</td><td>`good` / `approximate` / `simulated`，让报告能标注数据可信度</td></tr>
+<tr><td class='f'>source</td><td>str</td><td>`instrument`（实机）/ `simulate`（仿真）</td></tr>
+<tr><td class='f'>elapsed_ms / warnings</td><td>int / list</td><td>耗时与告警（不阻断但要在报告里体现）</td></tr>
+</tbody></table></div>
+<p>错误一律抛异常（不返回 <code>ok=False</code>），并且带稳定错误码；上层按码分支，不解析中文文案：</p>
+<div class='tw'><table><thead><tr><th>错误码</th><th>异常类</th><th>触发场景</th></tr></thead><tbody>
+<tr><td class='f'>E_DRIVER</td><td class='f'>DriverError</td><td>驱动通用错误（基类）；`to_dict()` 给结构化输出</td></tr>
+<tr><td class='f'>E_PARAM</td><td class='f'>DriverError(code=`E_PARAM`)</td><td>参数非法：枚举越界、≤0、未知测量项（`detail` 列出可选值）</td></tr>
+<tr><td class='f'>E_CONFIG</td><td class='f'>ConfigurationError</td><td>连接参数缺失/非法（缺 IP、端口、串口）</td></tr>
+<tr><td class='f'>E_NOT_FOUND</td><td class='f'>DriverNotFound</td><td>注册库里找不到驱动实现，或设备未登记</td></tr>
+<tr><td class='f'>E_TRANSPORT</td><td class='f'>TransportError</td><td>链路错误：连不上、写失败、串口打不开</td></tr>
+<tr><td class='f'>E_TIMEOUT</td><td class='f'>DriverTimeout</td><td>读写超时（与链路错误分开，因为可重试）</td></tr>
+<tr><td class='f'>E_PROTOCOL</td><td class='f'>ProtocolError</td><td>应答不符合协议（解析不出前导/曲线为空）</td></tr>
+<tr><td class='f'>E_UNSUPPORTED</td><td class='f'>UnsupportedCapability</td><td>驱动未声明该能力（调用方应先 `supports()`）</td></tr>
+<tr><td class='f'>E_CONTRACT</td><td class='f'>ContractMismatch</td><td>契约版本不兼容（加载阶段就拒绝）</td></tr>
+</tbody></table></div></section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>十二条兼容性铁律</h2></div>
+<p class='lede'>未来兼容性不是靠约定，而是靠这十二条 + 19 项自动检查把不合规拦在装机之前。</p>
+<div class='tw'><table><thead><tr><th>铁律</th><th>内容</th><th>对应检查项</th></tr></thead><tbody>
+<tr><td>只增不减</td><td>新增能力 / 动作 / `detail` 键可以；删除、改名、改语义不行</td><td class='f'>C03 / C04 / C07</td></tr>
+<tr><td>单位写进结构</td><td>所有物理量字段带单位并统一 SI 基本单位，避免"1.5 是 V 还是 mV"</td><td class='f'>C08</td></tr>
+<tr><td>参数只增可选</td><td>新参数必须可选 + 有默认值；位置参数顺序不得调整</td><td class='f'>C06</td></tr>
+<tr><td>破坏性变更升 major</td><td>`API_VERSION` major 变化即不兼容；驱动包 major 必须与平台相等</td><td class='f'>C02</td></tr>
+<tr><td>弃用跨一个 minor</td><td>弃用动作必须给替代动作与移除版本，期间保留可调用</td><td class='f'>C16</td></tr>
+<tr><td>错误码稳定</td><td>抛 `DriverError` 子类 + `E_*` 码；上层按码分支，不解析中文文案</td><td class='f'>C09</td></tr>
+<tr><td>仿真必须实现</td><td>`simulate: true` 是上架硬要求：产线多数时间没有实机</td><td class='f'>C06 / C12</td></tr>
+<tr><td>仿真必须可复现</td><td>同参数同结果（用参数派生的种子，不用随机时钟）</td><td class='f'>C12</td></tr>
+<tr><td>实例不共享状态</td><td>状态挂在实例上，不挂类属性；两台设备互不干扰</td><td class='f'>C13</td></tr>
+<tr><td>会话可重入</td><td>open/close 幂等，关掉能再开；关闭前先下发安全退出命令</td><td class='f'>C10 / C11</td></tr>
+<tr><td>零第三方依赖</td><td>只用标准库（产线工控机可能离线且不许装包）；串口 `pyserial` 与 VISA 后端 `pyvisa` 是**唯一例外**：必须函数体内惰性导入 + 留注入点</td><td class='f'>C15 / C19</td></tr>
+<tr><td>旧名保留一版</td><td>历史 TPS 里的短动作名（`waveform`）保留映射，用告警引导迁移</td><td class='f'>C14</td></tr>
+</tbody></table></div></section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>一致性检查 19 项</h2></div>
+<p class='lede'>上架门禁：<code>python -m ate_drivers.kit.cli check &lt;包目录&gt;</code> 必须 19/19 通过，退出码 0 才允许装到现场。</p>
+<div class='tw'><table><thead><tr><th>编号</th><th>检查项</th><th>判据</th></tr></thead><tbody>
+<tr><td class='f'>C01</td><td>类元数据完整</td><td>key / family / label / version 非空且格式合法</td></tr>
+<tr><td class='f'>C02</td><td>契约版本兼容</td><td>驱动声明的 api 与平台契约可兼容</td></tr>
+<tr><td class='f'>C03</td><td>能力声明合法</td><td>家族基线能力不缺；未登记能力须带 `vendor.` 前缀</td></tr>
+<tr><td class='f'>C04</td><td>能力均有实现</td><td>每个声明的能力都能解析到方法</td></tr>
+<tr><td class='f'>C05</td><td>命令表完整</td><td>家族要求的命令键全部存在（型号驱动漏填会在这里拦下）</td></tr>
+<tr><td class='f'>C06</td><td>仿真可执行全部能力</td><td>仿真模式下逐个能力动作能跑通且 `ok`</td></tr>
+<tr><td class='f'>C07</td><td>返回结构可序列化</td><td>结果含全部规定键且能 `json.dumps`（报告落盘不炸）</td></tr>
+<tr><td class='f'>C08</td><td>测量项带单位</td><td>测量结果单位齐全且与约定一致（PK2PK→V、FREQUENCY→Hz）</td></tr>
+<tr><td class='f'>C09</td><td>错误可分类</td><td>未知动作抛 `UnsupportedCapability`；非法参数抛带 `E_*` 的 `DriverError`</td></tr>
+<tr><td class='f'>C10</td><td>会话可重入</td><td>open/close 幂等，close 后能重开并识别</td></tr>
+<tr><td class='f'>C11</td><td>安全退出</td><td>启动采集后登记 stop，关闭会话时下发（不把仪器留在危险状态）</td></tr>
+<tr><td class='f'>C12</td><td>仿真可复现</td><td>同参数两次调用、以及跨实例结果一致</td></tr>
+<tr><td class='f'>C13</td><td>实例互不干扰</td><td>两台设备实例状态不串（类属性共享会在这里暴露）</td></tr>
+<tr><td class='f'>C14</td><td>旧动作别名有效</td><td>`ALIASES` 里每个旧名都指向存在的动作</td></tr>
+<tr><td class='f'>C15</td><td>零第三方依赖</td><td>AST 扫描驱动包模块：只允许标准库与 `ate_drivers`；`pyserial` / `pyvisa` 只允许惰性导入</td></tr>
+<tr><td class='f'>C16</td><td>弃用项有替代</td><td>弃用登记表每项都有替代动作与移除版本</td></tr>
+<tr><td class='f'>C17</td><td>型号可派发</td><td>`MODELS` 已声明、与清单 `models` 一致，未登记型号能被明确拒绝</td></tr>
+<tr><td class='f'>C18</td><td>连接方式可声明</td><td>`INTERFACES` ⊆ {LAN, SERIAL}、与清单 `interfaces` 一致，且能解析出真实端点</td></tr>
+<tr><td class='f'>C19</td><td>传输后端可声明</td><td>`BACKENDS` ⊆ {native, visa}、与清单 `backends` 一致；每种后端在网口/串口都能解析到链路类</td></tr>
+</tbody></table></div></section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>驱动包清单 driver.json</h2></div>
+<p class='lede'>一个驱动包 = 一个目录（内含 <code>driver.json</code>），装到 <code>&lt;ATE&gt;/drivers/&lt;key&gt;/</code>。清单里的 <code>api</code> 与 <code>match</code> 决定能不能装、会被平台选中。</p>
+<div class='tw'><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>schema</td><td>str</td><td><span class='tag req'>必填</span></td><td>`ate.driver.manifest.v1`（固定）</td></tr>
+<tr><td class='f'>key</td><td>str</td><td><span class='tag req'>必填</span></td><td>驱动唯一标识，形如 `vendor-model`；同 key 只能有一个 active 版本</td></tr>
+<tr><td class='f'>version</td><td>str</td><td><span class='tag req'>必填</span></td><td>驱动自身版本 `x.y.z`；写入运行记录便于复现</td></tr>
+<tr><td class='f'>family</td><td>str</td><td><span class='tag req'>必填</span></td><td>家族：`scope` / `dmm` / `psu` / `awg` / `motion` / `passive` / `generic`</td></tr>
+<tr><td class='f'>api</td><td>str</td><td><span class='tag req'>必填</span></td><td>实现哪套契约（`1.2`）；major 必须与平台相等</td></tr>
+<tr><td class='f'>entry</td><td>str</td><td><span class='tag req'>必填</span></td><td>`包.模块:类名`，如 `tek_mso5.driver:TekMso5Scope`</td></tr>
+<tr><td class='f'>label</td><td>str</td><td><span class='tag'>建议</span></td><td>中文名，出现在工具卡片、报告与驱动库页</td></tr>
+<tr><td class='f'>match</td><td>dict</td><td><span class='tag req'>必填</span></td><td>命中字段与关键字：`model` / `vendor` / `category` / `role` / `interface` / `name`</td></tr>
+<tr><td class='f'>priority</td><td>int</td><td><span class='tag'>建议</span></td><td>同分时的优先级；型号专用驱动应高于通用驱动（示例 20 vs 12）</td></tr>
+<tr><td class='f'>capabilities</td><td>list</td><td><span class='tag'>建议</span></td><td>声明能力清单，平台据此做界面与用例能力过滤</td></tr>
+<tr><td class='f'>simulate</td><td>bool</td><td><span class='tag req'>必填</span></td><td>是否自带仿真模型；上架要求 `true`</td></tr>
+<tr><td class='f'>min_platform</td><td>str</td><td><span class='tag'>可选</span></td><td>要求的最低平台版本，安装前预检</td></tr>
+<tr><td class='f'>signature</td><td>str</td><td><span class='tag'>可选</span></td><td>Ed25519 签名（离线可验），L3 私有包可显式豁免</td></tr>
+</tbody></table></div></section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>平台侧接入</h2></div>
+<p class='lede'>平台把「内置规格」与「已装驱动包清单」合成一张注册表，选择逻辑与现有实现同一套权重，所以阶段 1 是零行为变化重构。</p>
+<pre>from ate_drivers.kit import scan_dir, merge_specs, resolve_spec
+
+specs = merge_specs(DRIVER_SPECS, scan_dir(&quot;&lt;ATE&gt;/drivers&quot;))  # 内置 + 已装包 → 一张注册表
+spec  = resolve_spec(device, specs)                           # 打分选择（权重同平台现有实现）
+cls   = resolve_entry(spec[&quot;manifest&quot;])                       # 只有命中已装包时才会动态导入</pre>
+<div class='tw'><table><thead><tr><th>阶段</th><th>内容</th><th>行为变化</th><th>预估</th></tr></thead><tbody>
+<tr><td class='f'>阶段 1</td><td>`DRIVER_SPECS` 改为「内置 + 目录扫描合并」；定义 `driver.json` 规范</td><td>零行为变化（纯重构，回归全绿为准）</td><td>1–2 天</td></tr>
+<tr><td class='f'>阶段 2</td><td>`<ATE>/drivers/` 目录 + 安装/卸载/启停/回滚 + 前端「驱动库」页</td><td>新增界面与接口</td><td>2–3 天</td></tr>
+<tr><td class='f'>阶段 3</td><td>签名校验（复用现有 Ed25519）+ 离线目录源 + `index.json`</td><td>安装需过校验</td><td>1–2 天</td></tr>
+<tr><td class='f'>阶段 4</td><td>把内置 MSO5 驱动抽成第一个货架包（本 SDK 的 `samples/tek_mso5` 即样板）</td><td>第一个真实货架条目</td><td>1–2 天</td></tr>
+</tbody></table></div>
+<p>内置的 MSO5 驱动抽包时不要另写一份：直接用本 SDK 的 <code>samples/tek_mso5</code> 作为样板，它已过 19 项检查，且与平台现有 <code>scope.py</code> 的协议一致。</p></section>
+<section id='s10'><div class='sechead'><span class='num'>10</span><h2>真机调试与常见错误</h2></div>
+<p class='lede'>没有硬件时用 <code>FakeTransport</code> 精确构造应答——真机分支（前导解析、曲线换算）也能在本地被覆盖，不必等设备到位。</p>
+<pre>from ate_drivers.kit import FakeTransport
+
+t = FakeTransport()
+t.expect(&quot;*IDN?&quot;, &quot;TEKTRONIX,MSO54,SN123456,1.2.3&quot;)
+t.expect(&quot;:WFMOUTPre?&quot;, &quot;2;8;RIBINARY;RI;MSB;CH1;3;Y;1e-05;0;0;0.0;0.01;0.0;TIME;ANALOG&quot;)
+t.expect(&quot;:CURVe?&quot;, &quot;128,130,132&quot;)
+
+dev = TekMso5Scope(DeviceConfig.from_dict({&quot;device_id&quot;: &quot;dut-scope&quot;, &quot;interface&quot;: &quot;LAN&quot;,
+                                           &quot;host&quot;: &quot;192.168.10.41&quot;, &quot;port&quot;: 4000}),
+                   mode=&quot;real&quot;, transport=t)
+dev.open()
+assert dev.do(&quot;scope.acquire_waveform&quot;, points=3)[&quot;value&quot;][&quot;samples&quot;] == [1.28, 1.3, 1.32]</pre>
+<div class='tw'><table><thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead><tbody>
+<tr><td>一致性检查 C05 失败：命令表缺键</td><td>型号驱动覆盖 `COMMANDS` 时漏了家族要求的键</td><td>对照 `ScopeDriver.REQUIRED_COMMANDS` 补齐；只覆盖差异键，其余继承</td></tr>
+<tr><td>C15 失败：引入第三方硬依赖</td><td>模块顶部 import 了 `numpy` / `serial` / `pyvisa`</td><td>只有 `pyserial`（串口）与 `pyvisa`（VISA 后端）允许函数体内惰性导入并留注入点；其余改用标准库</td></tr>
+<tr><td>C12 失败：仿真不可复现</td><td>仿真里用了 `random.random()` / `time.time()` 做种子</td><td>用参数派生种子（`random.Random(f"{参数}")`），同参数必得同结果</td></tr>
+<tr><td>C13 失败：实例状态串台</td><td>把状态写成类属性（所有实例共享）</td><td>状态一律在 `__init__` 里挂 `self`</td></tr>
+<tr><td>真机取不到波形</td><td>前导字段顺序与 `PREAMBLE_FIELDS` 不符，或曲线是二进制编码</td><td>按手册核对顺序；二进制编码时覆盖 `_parse_curve()`</td></tr>
+<tr><td>测量值与仪器读数不一致</td><td>仪器内测量用了平均/带宽限制，而家族算法按采样点自算</td><td>这是**设计取舍**：跨品牌口径一致优先；需要仪器口径时新增独立动作，不改 `scope.measure`</td></tr>
+<tr><td>设备被挂到错误的驱动</td><td>`match` 关键字过宽（如只写厂商名），未知型号也被吸走</td><td>关键字要写到型号级；厂商级兜底交给 `generic-scpi`，必要时调 `priority`</td></tr>
+</tbody></table></div></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 驱动库开发模板 · 契约 ate.driver.api 1.2</span><span>库位置 D:/ATE/sdk · 上架门禁 19 项一致性检查</span></div>
+</div></body></html>

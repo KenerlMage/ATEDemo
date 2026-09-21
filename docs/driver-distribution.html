@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>设备驱动库的分发方式与货架方案建议</title>
+<style>
+  :root{
+    --accent:#6d28d9; --accent-rgb:109,40,217; --ink:#1e1b31; --muted:#5b5570;
+    --line:#e6e2f5; --bg:#f7f6fb; --panel:#ffffff; --code-bg:#f4f2fb;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.75 "Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px 70px}
+  header{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%);color:#fff;
+    padding:38px 0 30px;margin-bottom:26px;box-shadow:0 10px 30px rgba(76,29,149,.22)}
+  header .wrap{padding-bottom:0}
+  header h1{margin:0 0 8px;font-size:29px;letter-spacing:.4px}
+  header p{margin:0;opacity:.9;font-size:14.5px}
+  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);
+    border-radius:999px;padding:4px 12px;font-size:12.5px}
+  section,body>div.wrap>h2,body>div.wrap>p,body>div.wrap>table,body>div.wrap>ul,body>div.wrap>ol{position:relative}
+  h2{font-size:20px;margin:26px 0 12px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:16.5px;margin:20px 0 10px;color:#4c1d95}
+  h4{font-size:15px;margin:16px 0 8px}
+  p{margin:10px 0}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px dashed rgba(var(--accent-rgb),.5)}
+  code{font-family:var(--mono);font-size:13px;background:var(--code-bg);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#4c1d95}
+  pre{background:#241f3a;color:#eae6ff;border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.6}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:12.8px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  th{background:#f1eefb;text-align:left;font-weight:600;color:#3b2f63}
+  th,td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fbfaff}
+  ul,ol{padding-left:22px;margin:10px 0}
+  li{margin:5px 0}
+  blockquote{margin:12px 0;padding:10px 16px;background:#f6f2ff;border-left:4px solid var(--accent);
+    border-radius:0 8px 8px 0;color:#3f3a58}
+  hr{border:none;border-top:1px dashed var(--line);margin:26px 0}
+  strong{color:#3b2f63}
+  footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:26px}
+  @media(max-width:720px){header h1{font-size:23px}table{font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>设备驱动库的分发方式与货架方案建议</h1>
+    <p>2026-09-13 ｜ 依据 backend/drivers 现状 + 离线工控机部署约束 ｜ 设计建议（未实施）</p>
+    <div class="badges">
+      <span class="badge">分层分发：契约内置 + 型号打包 + 私有侧载</span>
+      <span class="badge">货架只是三种来源之一</span>
+      <span class="badge">签名离线可验</span>
+      <span class="badge">复用 DRIVER_SPECS 打分与 SimulateTransport</span>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+<h1>设备驱动库的分发方式与「货架」方案建议</h1>
+<p><strong>日期</strong>：2026-09-13　<strong>状态</strong>：设计建议（未实施）　<strong>依据</strong>：当前 <code>backend/drivers/</code> 实现 + 离线工控机部署约束</p>
+<p><strong>一句话结论</strong>：<strong>分层分发</strong>——平台内置「稳定契约 + 通用设备家族」，型号/品牌专用驱动走<strong>货架包</strong>，客户专有驱动走<strong>现场侧载</strong>；远端服务器只是三种驱动来源之一，安装器必须同时支持离线镜像（U 盘 / 内网目录 / 共享盘），否则离线工控机会被货架卡死。</p>
+<hr />
+<h2>一、先分清两类消费者，再谈"用什么方式提供"</h2>
+<p>现在的 <code>drivers/</code> 是<strong>一份代码同时服务两种人</strong>，这是分发方案要拆开的根本原因。</p>
+<table>
+<thead>
+<tr>
+<th>消费者</th>
+<th>他要什么</th>
+<th>变化频率</th>
+<th>该给什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>测试用例开发者（TPS 作者）</td>
+<td>稳定的调用契约：类名、方法、单位、异常、示例</td>
+<td>低（季度级）</td>
+<td><strong>内置契约包 + 类型存根 + 示例用例 + 装备助手调试台</strong></td>
+</tr>
+<tr>
+<td>平台 / 集成工程师</td>
+<td>具体型号的实现：SCPI 命令、解析、仿真模型</td>
+<td>高（每来一个新设备型号一次）</td>
+<td><strong>可插拔驱动包（货架 / 侧载）</strong></td>
+</tr>
+</tbody>
+</table>
+<p>对应到内容，也分三层：<strong>契约（稳定 API）→ 通用实现 → 型号细节</strong>。今天 <code>factory.py</code> 里的 <code>DRIVER_SPECS</code> 把这三层混在一张硬编码表里（<code>cls</code> 直接指向类对象），意味着<strong>新增一个型号 = 改平台代码 + 重启后端</strong>。</p>
+<hr />
+<h2>二、推荐架构：四层驱动</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>内容</th>
+<th>分发方式</th>
+<th>举例（对应现状）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L0 契约层</strong></td>
+<td><code>Driver</code> 基类、<code>DeviceConfig</code>、错误类型、会话句柄、<code>scope.v1</code> / <code>dmm.v1</code> 这类 API 版本约定</td>
+<td><strong>随平台内置，冻结</strong></td>
+<td><code>drivers/base.py</code>、<code>models.py</code>、<code>errors.py</code></td>
+</tr>
+<tr>
+<td><strong>L1 通用家族</strong></td>
+<td>不挑品牌、靠 SCPI 通用命令就能干活的能力族</td>
+<td><strong>随平台内置</strong></td>
+<td><code>scpi.py</code> 的 <code>Dmm/Psu/ELoad/Awg/Motion</code>、<code>generic-scpi</code> 兜底</td>
+</tr>
+<tr>
+<td><strong>L2 型号专用包</strong></td>
+<td>型号级细节 + 仿真模型 + 自检清单</td>
+<td><strong>货架包，可下载</strong></td>
+<td><code>scope.py</code> 的泰克 MSO5 系列（现硬编码在内）</td>
+</tr>
+<tr>
+<td><strong>L3 现场私有包</strong></td>
+<td>客户专有设备、保密协议下的实现</td>
+<td><strong>侧载，不上架</strong></td>
+<td>暂无（预留）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>判断一个新驱动该放哪层，用三个问题</strong>：① 它是否有跨品牌的稳定抽象？→ 有则属 L1 契约/通用层；② 换品牌后命令是否就得改？→ 是则属 L2 型号包；③ 客户是否要求代码不外流？→ 是则属 L3 私有包。<strong>"常用"不是入内层的标准</strong>——常见但命令各异的型号（如各家的电子负载）仍应做成包。</p>
+<hr />
+<h2>三、货架方式是否合适：合适，但要修正两点</h2>
+<p>你的方向是对的，且是这个规模的必经之路；需要修正的是边界。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>优点</th>
+<th>致命问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A. 全部内置在平台代码</strong>（现状）</td>
+<td>版本一致、最稳、无网络依赖</td>
+<td>每加一个型号就要发版；现场离线升级成本高；平台代码随设备数量线性膨胀</td>
+</tr>
+<tr>
+<td><strong>B. 全部走远端货架下载</strong></td>
+<td>扩展快、平台体积小、可按需装</td>
+<td><strong>离线工控机直接不可用</strong>；无签名则等于远程代码执行；版本漂移导致"同一版本平台行为不一致"</td>
+</tr>
+<tr>
+<td><strong>C. 分层 + 多来源（推荐）</strong></td>
+<td>兼顾稳定性与扩展性；离线可用；可控可审计</td>
+<td>需要先定义包规范与兼容矩阵，有一次性设计成本</td>
+</tr>
+</tbody>
+</table>
+<p>需要修正的两点：</p>
+<ol>
+<li><strong>"常用设备预装"的标准应改成"契约与通用家族预装"</strong>。预装的是 L0/L1；型号细节即使常见，也应做成 L2 包，这样平台不会因为某个品牌命令变更而被迫发版。</li>
+<li><strong>远端货架只能是"来源之一"，不能是唯一来源</strong>。现场验收、产线断网、客户内网隔离都是常态。安装/更新界面必须同时提供：官方远端源、离线目录源（U 盘/共享盘）、本地 zip 侧载——<strong>三者走同一套 manifest 与校验流程</strong>。</li>
+</ol>
+<hr />
+<h2>四、驱动包标准（决定货架能不能跑起来）</h2>
+<p>每个驱动包 = 一个 zip（内含纯 Python 代码，零第三方依赖优先），根目录一个 <code>driver.json</code>：</p>
+<pre><code class="language-json">{
+  &quot;schema&quot;: &quot;ate.driver.pkg.v1&quot;,
+  &quot;key&quot;: &quot;tektronix-mso5&quot;,
+  &quot;version&quot;: &quot;1.2.0&quot;,
+  &quot;family&quot;: &quot;scope&quot;,
+  &quot;api&quot;: &quot;scope.v1&quot;,
+  &quot;min_platform&quot;: &quot;1.0.0&quot;,
+  &quot;entry&quot;: &quot;driver:ScopeDriver&quot;,
+  &quot;match&quot;: { &quot;model&quot;: [&quot;mso5&quot;, &quot;mso54&quot;, &quot;mso64&quot;, &quot;dpo5&quot;], &quot;vendor&quot;: [&quot;tektronix&quot;] },
+  &quot;priority&quot;: 20,
+  &quot;capabilities&quot;: [&quot;identify&quot;, &quot;acquire_waveform&quot;, &quot;measure&quot;, &quot;timebase&quot;, &quot;channel&quot;],
+  &quot;simulate&quot;: true,
+  &quot;depends&quot;: [],
+  &quot;files&quot;: [{ &quot;path&quot;: &quot;driver.py&quot;, &quot;sha256&quot;: &quot;…&quot; }],
+  &quot;signature&quot;: &quot;base64(ed25519(driver.json + files))&quot;
+}
+</code></pre>
+<p>关键字段的作用：</p>
+<ul>
+<li><code>api</code>：声明实现哪套契约（<code>scope.v1</code>）。<strong>平台按 api 版本判断兼容性，而不是死绑平台版本</strong>——契约不变，平台小版本升级不必重编驱动。</li>
+<li><code>match</code> + <code>priority</code>：直接并入现有 <code>resolve_spec()</code> 打分选择；平台侧只需把"内置 <code>DRIVER_SPECS</code>"与"已装包 manifest"<strong>合并成一张注册表</strong>，选择逻辑零改动。</li>
+<li><code>simulate</code>：<strong>必须声明是否带仿真模型</strong>。工控机现场常常没有实机，装完包能在装备助手直接看波形，是货架可用性的底线。</li>
+<li><code>signature</code>：Ed25519 签名，<strong>离线也能验</strong>。</li>
+</ul>
+<h3>加载与隔离</h3>
+<ul>
+<li>目录：<code>&lt;ATE&gt;/drivers/&lt;key&gt;/&lt;version&gt;/</code>；已装清单位于 <code>&lt;ATE&gt;/drivers/packages.json</code>（版本、来源、安装时间、启停状态、校验结果）。</li>
+<li>装载：进程内 <code>importlib</code> 动态加载；<strong>单个包加载失败只降级（回落到 <code>generic-scpi</code>）并告警，不阻断平台启动</strong>。</li>
+<li>风险控制：驱动包是可执行代码。一期用<strong>签名 + 白名单 + 审计日志</strong>；L3 私有包可显式关闭签名校验（需管理员操作并留痕）。若将来要跑第三方提供的代码，再考虑子进程隔离。</li>
+</ul>
+<hr />
+<h2>五、三种来源，一套流程</h2>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>场景</th>
+<th>实现</th>
+<th>校验</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>官方货架</td>
+<td>联网 / 客户内网有镜像</td>
+<td><code>GET index.json</code> → 下载包</td>
+<td>签名 + <code>index.json</code> 自身签名</td>
+</tr>
+<tr>
+<td>离线目录</td>
+<td>U 盘、共享盘、内网 HTTP 目录</td>
+<td>指向目录，扫 <code>index.json</code></td>
+<td>同上（离线镜像与官方同签）</td>
+</tr>
+<tr>
+<td>本地 zip 侧载</td>
+<td>单个私有包、临时调试</td>
+<td>直接选文件安装</td>
+<td>签名可豁免（显式开关 + 审计）</td>
+</tr>
+</tbody>
+</table>
+<p><code>index.json</code>（货架目录清单）建议只做静态文件 + 签名，<strong>一期不要写服务</strong>——用 Nginx/共享盘托一个目录就够，后期再考虑权限与统计。</p>
+<hr />
+<h2>六、版本与兼容治理（避免货架变垃圾场）</h2>
+<ul>
+<li><strong>同 key 只允许一个 active 版本</strong>，保留上一版以便回滚；禁止同 key 多版本并存参与打分（会导致结果不可复现）。</li>
+<li>安装前做<strong>兼容性预检</strong>：<code>api</code> 是否受支持、<code>min_platform</code> 是否满足、<code>depends</code> 是否齐备，不满足则拒绝并给出明确原因。</li>
+<li><strong>双通道</strong>：<code>stable</code> / <code>beta</code>，现场默认 stable。</li>
+<li><strong>兼容矩阵</strong>：每个包在文档里给出「型号 → 驱动 key → api 版本 → 已验证固件/序列号」。</li>
+<li><strong>可复现</strong>：报告与运行记录里落 <code>driver.key + version</code>，出问题能定位到具体驱动版本。</li>
+</ul>
+<hr />
+<h2>七、面向用例开发者，用什么方式交付"库"</h2>
+<table>
+<thead>
+<tr>
+<th>交付形态</th>
+<th>说明</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>契约包 + 类型存根</td>
+<td>内置 <code>ate_drivers</code>（<code>.pyi</code> 或纯 Python stub），用例里 <code>from ate_drivers import scope</code> 即有补全与签名提示</td>
+<td>必做</td>
+</tr>
+<tr>
+<td>示例用例</td>
+<td>每个驱动包附 <code>examples/</code>（可直接抄进 TPS 的 pytest 片段）</td>
+<td>必做</td>
+</tr>
+<tr>
+<td>装备助手即调试台</td>
+<td>装包后工具卡片自动出现（现 <code>TOOL_CARDS</code> 机制），"边装边试"比纯文档有效</td>
+<td>必做</td>
+</tr>
+<tr>
+<td>兼容矩阵文档</td>
+<td>型号 → key → api → 验证记录</td>
+<td>建议</td>
+</tr>
+<tr>
+<td><strong>不建议</strong>：把驱动源码给用例开发者改</td>
+<td>会 fork 出私有分支，升级时无法合并——用 L3 私有包机制替代 fork</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>八、可直接复用的现有资产</h2>
+<table>
+<thead>
+<tr>
+<th>现有能力</th>
+<th>复用到货架场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>factory.py</code> 的 <code>DRIVER_SPECS</code> 打分选择（<code>_score</code> / <code>priority</code> / 匹配字段权重）</td>
+<td>作为"内置 + 已装包"注册表合并入口，选择逻辑零改动</td>
+</tr>
+<tr>
+<td><code>scope.py</code> 的 <code>_sim_samples</code> + <code>transport.py</code> 的 <code>SimulateTransport</code></td>
+<td>驱动包自带仿真的既有范式，作为 L2 包的必备项</td>
+</tr>
+<tr>
+<td><code>license_utils.py</code> 的 Ed25519 公钥验签</td>
+<td>驱动包签名与 <code>index.json</code> 签名，<strong>离线可验</strong></td>
+</tr>
+<tr>
+<td><code>instrument_tools.py</code> 的 <code>TOOL_CARDS</code></td>
+<td>工具卡片随驱动包上架，形成"驱动 + 工具"一体的货架条目</td>
+</tr>
+<tr>
+<td>打包方案里的嵌入式运行时与 <code>&lt;ATE&gt;/</code> 目录</td>
+<td><code>&lt;ATE&gt;/drivers/</code> 天然可放安装目录内，升级只换 <code>app/</code>、<code>web/</code>、<code>drivers/</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>九、分阶段落地路线</h2>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>内容</th>
+<th>行为变化</th>
+<th>预估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>DRIVER_SPECS</code> 改为「内置 + 目录扫描合并」，定义 <code>driver.json</code> 规范；仍只加载官方包</td>
+<td><strong>零</strong>（纯重构，回归全绿为准）</td>
+<td>1–2 天</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>&lt;ATE&gt;/drivers/</code> 目录 + 安装/卸载/启停/回滚接口 + 前端「驱动库」页（列表、版本、来源、校验、兼容性）</td>
+<td>新增界面与接口</td>
+<td>2–3 天</td>
+</tr>
+<tr>
+<td>3</td>
+<td>签名校验（复用 Ed25519）+ <code>index.json</code> + 离线目录源</td>
+<td>安装需过校验</td>
+<td>1–2 天</td>
+</tr>
+<tr>
+<td>4</td>
+<td>官方货架（静态目录托管）+ beta 通道；把现有 MSO5 驱动抽成第一个包作为样板</td>
+<td>第一个真实货架条目</td>
+<td>1–2 天</td>
+</tr>
+<tr>
+<td>5</td>
+<td>L3 私有包侧载 + 权限/审计；可选子进程隔离</td>
+<td>支持客户专有设备</td>
+<td>按需</td>
+</tr>
+</tbody>
+</table>
+<p>阶段 1 是<strong>纯搬运的零行为变化重构</strong>，建议先做它——做完就能验证"驱动包注册表"这条路走得通，再往后投入界面与货架。</p>
+<hr />
+<h2>十、风险与对策</h2>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>对策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>货架包成为远程代码执行入口</td>
+<td>Ed25519 签名 + 白名单 + 审计；L3 豁免需管理员显式开启</td>
+</tr>
+<tr>
+<td>离线现场装不上</td>
+<td>三种来源同流程；安装器内置"离线目录"入口，不依赖联网</td>
+</tr>
+<tr>
+<td>版本漂移导致不可复现</td>
+<td>同 key 单 active 版本 + 记录 <code>key@version</code> 到运行记录 + 支持回滚</td>
+</tr>
+<tr>
+<td>平台升级后旧驱动失配</td>
+<td>契约版本化（<code>scope.v1</code>）+ <code>min_platform</code> 预检 + 兼容矩阵</td>
+</tr>
+<tr>
+<td>驱动包质量参差（无实机验证）</td>
+<td>上架要求：带仿真模型 + 自检清单通过 + 至少一台实机验证记录</td>
+</tr>
+<tr>
+<td>货架内容膨胀、重复造包</td>
+<td>上架评审：跨品牌稳定抽象一律进 L1，不进 L2</td>
+</tr>
+</tbody>
+</table>
+  <footer>ATE Runner · 设备驱动库的分发方式与货架方案建议</footer>
+</div>
+</body>
+</html>

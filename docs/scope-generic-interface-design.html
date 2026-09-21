@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATE Runner · 示波器通用接口设计（依据泰克手册重新总结）</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Generic Scope Interface Design</div>
+<h1>示波器通用接口设计</h1>
+<p class='sub'>依据泰克编程手册重新总结：通用接口应从「按命令名包一层」升级为三层封装——数据通路（编码 + 前导 + 缩放）、语义参数（V/div、s/div、采样率而非设备内部档位）、口径（参考电平、平均次数、模式）。同时给出与现行契约 1.2 的逐条差异。</p>
+<div class='meta'><span><b>依据</b>泰克官方命令文档 + 官方 FAQ 原文</span><span><b>命令族</b>七段</span><span><b>测量枚举</b>29 项</span><span><b>新增能力</b>6 个 · 新模型 5 个</span><span><b>门禁</b>16 → 22 项</span></div></header>
+<div class='doc'>
+<aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>依据与方法</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>泰克手册的命令族全景（七段）</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>数据通路设计（核心）</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>测量设计（29 项枚举 → 统一 kind）</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>差异收敛面</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>与现行契约 1.2 的差异</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>上架门禁同步调整</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>未核验项与风险</span></a></li>
+</ol></aside><main>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>依据与方法</h2></div>
+<p class='lede'>每一条设计判断都指向下面某份材料；读不到的明确标注为未核验，不靠印象补。</p>
+<div class='tw'><table><thead><tr><th>来源</th><th>具体材料</th><th>用到什么</th></tr></thead><tbody>
+<tr><td><strong>泰克官方 FAQ</strong></td><td>How do I get voltage data after sending the CURVE? or WAVFRM? query?（tek.com，FAQ ID 52596）</td><td>**已读原文**：码值→电压换算公式、256 个量化级、8/10.24 格显示、1 V/div 时 YMULT=40 mV 的算例</td></tr>
+<tr><td><strong>泰克命令文档（手册自动生成）</strong></td><td>tm_devices 官方文档：WFMOutpre / DATa / ACQuire / CH&lt;x&gt; / HORizontal / MEASUrement / TRIGger 模块</td><td>**已读原文**：波形前导字段清单与二分法、编码枚举、采集命令、通道/水平命令、29 项测量枚举、触发命令</td></tr>
+<tr><td><strong>手册标识</strong></td><td>《4, 5, 6 Series MSO Programmer Manual》（文档号 077-1305-12，约 1,610 页；另有 5 Series MSO 版 1,116 页）</td><td>来自泰克支持页的型号—手册对照；本环境无法直接下载该 PDF（download.tek.com 返回 404），故命令树以官方自动生成文档为据</td></tr>
+<tr><td><strong>本平台实现</strong></td><td>`D:/ATE/sdk/ate_drivers/`（契约 1.2）与 `.openclaw/tmp/ate/recon/scope_returns.txt`</td><td>用来对比「手册口径」与「现行契约」的差距，差异逐条列在 §07</td></tr>
+</tbody></table></div></section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>泰克手册的命令族全景（七段）</h2></div>
+<p class='lede'>手册的命令树按子系统组织，抽象后正好对应七段能力；⑤ 与 ⑥ 是抽象收益最大、也最容易做错的两段。</p>
+<div class='tw'><table><thead><tr><th>段</th><th>手册命令（节选）</th><th>抽象成能力</th><th>设计要点</th></tr></thead><tbody>
+<tr><td>① 通用与状态</td><td class='f'>*IDN? *RST *CLS *OPC? *ESR? :SYST:ERR?</td><td class='f'>identify reset state clear_status</td><td>IEEE 488.2 公共面，所有仪器共有 —— 驱动的**最小可运行集**</td></tr>
+<tr><td>② 采集控制</td><td class='f'>:ACQuire:STATE {OFF|ON|RUN|STOP} :ACQuire:STOPAfter {RUNSTop|SEQuence} :ACQuire:MODe {SAMple|AVErage} :ACQuire:NUMAVg :ACQuire:NUMACq? :ACQuire:MAXSamplerate?</td><td class='f'>scope.run scope.stop scope.single scope.acquisition</td><td>四件事：跑、停、跑一次、**怎么跑**（采样或平均、跑完停不停、平均多少次）</td></tr>
+<tr><td>③ 垂直系统</td><td class='f'>:CH<x>:SCAle <NR3> :CH<x>:COUPling {AC|DC|GND} :CH<x>:OFFSet :CH<x>:BANdwidth :CH<x>:INVert :CH<x>:PRObe:{GAIN|UNIts|ID|RESistance|AUTOZero|DEGAUss}</td><td class='f'>scope.channel scope.probe</td><td>档位用 **V/div**（物理量）而不是数字档位；**探头倍率属于量程的一部分**（手册把 `PRObe:GAIN` 与 `SCAle` 并列）</td></tr>
+<tr><td>④ 水平系统</td><td class='f'>:HORizontal:MAIN:SCAle :HORizontal:MAIN:SAMPLERate :HORizontal:ACQLENGTH? :HORizontal:DELay:{TIMe|MODe|POSition}</td><td class='f'>scope.timebase scope.acquisition（采样率/记录长度）</td><td>时基、采样率、记录长度**三者互相约束**：只给「采样点数」会掩盖量程信息</td></tr>
+<tr><td>⑤ 数据传输</td><td class='f'>:DATa:SOUrce {CH<x>|MATH|REF<x>|D<x>} :DATa:ENCdg {ASCIi|RIBinary|RPBinary|SRIbinary|SRPbinary|FAStest} :DATa:RESOlution {FULL|REDUced} :DATa:COMPosition :DATa:STARt/:STOP :WFMOutpre? :CURVe?</td><td class='f'>scope.acquire_waveform scope.acquire_raw</td><td>**最需要抽象的一段**：编码 + 前导 + 缩放公式必须被驱动吃掉，用例只该看到「伏特 + 秒」</td></tr>
+<tr><td>⑥ 测量</td><td class='f'>:MEASUrement:IMMed:TYPe {29 项} :MEASUrement:IMMed:VALue? :MEASUrement:IMMed:UNIts? :MEASUrement:IMMed:SOUrce1/2 :MEASUrement:MEAS<x>:{TYPe|VALue?|COUNt?|MAXimum?|MINImum?|MEAN?|STDdev?} :MEASUrement:METHod {Auto|HIStogram|MINMax} :MEASUrement:REFLevel:{ABSolute|PERCent}:{HIGH|LOW|MID|MID2}</td><td class='f'>scope.measure scope.measure_statistics scope.ref_levels</td><td>枚举各厂不同 → 统一成固定 kind 表；**参考电平（10%/50%/90% 或绝对值）是口径参数**，不显式化就跨品牌不可比</td></tr>
+<tr><td>⑦ 触发</td><td class='f'>:TRIGger:FORCe :TRIGger:A:SETLevel :TRIGger:A:{EDGE|PULSe|LOGIC|BUS…}</td><td class='f'>scope.trigger（基线只收边沿 + 电平）</td><td>触发类型是**长尾**（总线解码、串行协议…）：基线只收最通用两种，其余走 `vendor.*`</td></tr>
+</tbody></table></div></section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>数据通路设计（核心）</h2></div>
+<p class='lede'>手册把前导字段明确分成 <b>formatting</b>（<code>ENCdg</code> <code>BN_Fmt</code> <code>BYT_Or</code> <code>BYT_Nr</code> <code>BIT_Nr</code>，决定怎么解析字节）与 <b>interpretation</b>（其余字段，由 <code>DATa:SOUrce</code> 决定）。这个二分法就是通用模型的骨架。</p>
+<div class='tw'><table><thead><tr><th>泰克前导字段</th><th>含义</th><th>通用字段</th><th>单位</th></tr></thead><tbody>
+<tr><td class='f'>ENCdg</td><td>编码方式 `ASCii|BINary`</td><td class='f'>SampleInfo.encoding</td><td>—</td></tr>
+<tr><td class='f'>BN_Fmt</td><td>二进制表示 `RI`（有符号）/ `RP`（正整型）</td><td class='f'>SampleInfo.binary_format</td><td>—</td></tr>
+<tr><td class='f'>BYT_Or</td><td>字节序 `MSB|LSB`</td><td class='f'>SampleInfo.byte_order</td><td>—</td></tr>
+<tr><td class='f'>BYT_Nr</td><td>每点字节数</td><td class='f'>SampleInfo.bytes_per_point</td><td>—</td></tr>
+<tr><td class='f'>BIT_Nr</td><td>每点位数（8 或 16；手册原文：8 or 16）</td><td class='f'>SampleInfo.bits_per_point</td><td>—</td></tr>
+<tr><td class='f'>PT_Fmt</td><td>点格式 `Y|XY`</td><td class='f'>SampleInfo.point_format</td><td>—</td></tr>
+<tr><td class='f'>PT_ORder</td><td>位序</td><td class='f'>SampleInfo.bit_order</td><td>—</td></tr>
+<tr><td class='f'>NR_Pt</td><td>点数</td><td class='f'>Waveform.points</td><td>—</td></tr>
+<tr><td class='f'>PT_Off</td><td>触发点相对偏移</td><td class='f'>ScalingFactors.point_offset</td><td>—</td></tr>
+<tr><td class='f'>XINcr</td><td>水平采样间隔</td><td class='f'>ScalingFactors.x_incr_s</td><td>**s**</td></tr>
+<tr><td class='f'>XZEro</td><td>水平零点</td><td class='f'>ScalingFactors.x_zero_s</td><td>**s**</td></tr>
+<tr><td class='f'>XUNit</td><td>水平单位</td><td class='f'>ScalingFactors.x_unit</td><td>s</td></tr>
+<tr><td class='f'>YMUlt</td><td>垂直缩放因子（伏/码值）</td><td class='f'>ScalingFactors.y_mult</td><td>**V**</td></tr>
+<tr><td class='f'>YOFf</td><td>垂直偏移（码值电平）</td><td class='f'>ScalingFactors.y_off</td><td>—</td></tr>
+<tr><td class='f'>YZEro</td><td>垂直零点</td><td class='f'>ScalingFactors.y_zero</td><td>**V**</td></tr>
+<tr><td class='f'>YUNit</td><td>垂直单位</td><td class='f'>ScalingFactors.y_unit</td><td>V</td></tr>
+<tr><td class='f'>WFId</td><td>波形标识</td><td class='f'>Waveform.waveform_id</td><td>—</td></tr>
+<tr><td class='f'>RECOrdlength</td><td>记录长度</td><td class='f'>AcquireSetup.record_length</td><td>—</td></tr>
+<tr><td class='f'>COMPosition</td><td>波形形态 `SINGULAR_YT|COMPOSITE_YT|COMPOSITE_ENV`</td><td class='f'>Waveform.composition</td><td>—</td></tr>
+<tr><td class='f'>FILTERFreq / FRACTional</td><td>滤波频率 / 小数位</td><td class='f'>SampleInfo.filter_freq_hz / decimals</td><td>**Hz**</td></tr>
+</tbody></table></div>
+<pre># 电压换算（官方 FAQ 原文）：
+#   Voltage = (Digitizing Level - YOFF) * YMULT
+#   示例：1 V/div 时 YMULT = 4.0e-2（40 mV/级）；码值 125 → 5 V
+#   手册说明：256 个量化级，屏幕只显示 10.24 格中的 8 格 → 每格 25 级
+#
+# 时间轴（由前导字段语义推得，待真机核验）：
+#   t[n] = XZEro + (n - PT_Off) * XINcr
+
+# 驱动内部必须做的事（用例不该看到这一层）：
+samples = [ (level - scaling.y_off) * scaling.y_mult for level in raw_levels ]
+x_incr  = scaling.x_incr_s           # s
+wave    = { &quot;schema&quot;: &quot;ate.driver.waveform.v1&quot;, &quot;channel&quot;: &quot;CH1&quot;,
+            &quot;points&quot;: len(samples), &quot;samples&quot;: samples,
+            &quot;x_start_s&quot;: 0.0, &quot;x_incr_s&quot;: x_incr, &quot;unit&quot;: &quot;V&quot; }</pre></section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>测量设计（29 项枚举 → 统一 kind）</h2></div>
+<p class='lede'>泰克两组 TYPe 命令共用同一组 29 个取值（本页实测抓取）。统一 kind 的作用是：同一份 TPS 用例在泰克/是德/普源上判定一致。</p>
+<div class='tw'><table><thead><tr><th>泰克枚举</th><th>统一 kind</th><th>物理量</th><th>单位</th></tr></thead><tbody>
+<tr><td class='f'>AMPlitude</td><td class='f'>AMPLITUDE</td><td>幅值</td><td>V</td></tr>
+<tr><td class='f'>AREa</td><td class='f'>AREA</td><td>面积</td><td>V·s</td></tr>
+<tr><td class='f'>BURst</td><td class='f'>BURST_WIDTH</td><td>猝发宽度</td><td>s</td></tr>
+<tr><td class='f'>CARea</td><td class='f'>CYCLE_AREA</td><td>单周期面积</td><td>V·s</td></tr>
+<tr><td class='f'>CMEan</td><td class='f'>CYCLE_MEAN</td><td>单周期均值</td><td>V</td></tr>
+<tr><td class='f'>CRMs</td><td class='f'>CYCLE_RMS</td><td>单周期有效值</td><td>V</td></tr>
+<tr><td class='f'>DELay</td><td class='f'>DELAY</td><td>通道间延时</td><td>s</td></tr>
+<tr><td class='f'>FALL</td><td class='f'>FALL_TIME</td><td>下降时间</td><td>s</td></tr>
+<tr><td class='f'>FREQuency</td><td class='f'>FREQUENCY</td><td>频率</td><td>Hz</td></tr>
+<tr><td class='f'>HIGH</td><td class='f'>HIGH_LEVEL</td><td>高电平</td><td>V</td></tr>
+<tr><td class='f'>LOW</td><td class='f'>LOW_LEVEL</td><td>低电平</td><td>V</td></tr>
+<tr><td class='f'>MAXimum</td><td class='f'>MAX</td><td>最大值</td><td>V</td></tr>
+<tr><td class='f'>MEAN</td><td class='f'>MEAN</td><td>均值</td><td>V</td></tr>
+<tr><td class='f'>MINImum</td><td class='f'>MIN</td><td>最小值</td><td>V</td></tr>
+<tr><td class='f'>NDUty</td><td class='f'>NEG_DUTY</td><td>负占空比</td><td>%</td></tr>
+<tr><td class='f'>NEDGECount</td><td class='f'>NEG_EDGE_COUNT</td><td>下降沿计数</td><td>—（计数）</td></tr>
+<tr><td class='f'>NOVershoot</td><td class='f'>NEG_OVERSHOOT</td><td>负过冲</td><td>%</td></tr>
+<tr><td class='f'>NPULSECount</td><td class='f'>NEG_PULSE_COUNT</td><td>负脉冲计数</td><td>—（计数）</td></tr>
+<tr><td class='f'>NWIdth</td><td class='f'>NEG_WIDTH</td><td>负脉宽</td><td>s</td></tr>
+<tr><td class='f'>PDUty</td><td class='f'>POS_DUTY</td><td>正占空比</td><td>%</td></tr>
+<tr><td class='f'>PEDGECount</td><td class='f'>POS_EDGE_COUNT</td><td>上升沿计数</td><td>—（计数）</td></tr>
+<tr><td class='f'>PERIod</td><td class='f'>PERIOD</td><td>周期</td><td>s</td></tr>
+<tr><td class='f'>PHAse</td><td class='f'>PHASE</td><td>相位</td><td>°（待核）</td></tr>
+<tr><td class='f'>PK2Pk</td><td class='f'>PK2PK</td><td>峰峰值</td><td>V</td></tr>
+<tr><td class='f'>POVershoot</td><td class='f'>POS_OVERSHOOT</td><td>正过冲</td><td>%</td></tr>
+<tr><td class='f'>PPULSECount</td><td class='f'>POS_PULSE_COUNT</td><td>正脉冲计数</td><td>—（计数）</td></tr>
+<tr><td class='f'>PWIdth</td><td class='f'>POS_WIDTH</td><td>正脉宽</td><td>s</td></tr>
+<tr><td class='f'>RISe</td><td class='f'>RISE_TIME</td><td>上升时间</td><td>s</td></tr>
+<tr><td class='f'>RMS</td><td class='f'>RMS</td><td>有效值</td><td>V</td></tr>
+</tbody></table></div>
+<p>手册还显式提供两层——<code>MEASUrement:METHod {Auto|HIStogram|MINMax}</code> 与 <code>MEASUrement:REFLevel:{ABSolute|PERCent}:{HIGH|LOW|MID|MID2}</code>（参考电平），以及统计 <code>MEAS&lt;x&gt;:COUNt?/MAXimum?/MINImum?/MEAN?/STDdev?</code>。现行契约一律按 10%/50%/90% 自算且不暴露统计 → 需要 <code>scope.ref_levels</code> 与 <code>scope.measure_statistics</code> 两个能力补齐。</p></section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>差异收敛面</h2></div>
+<p class='lede'>上一版总结的「三处差异」在手册面前要精确化：三处必填、两处需声明。</p>
+<div class='tw'><table><thead><tr><th>类别</th><th>差异面</th><th>型号驱动要做什么</th><th>依据</th></tr></thead><tbody>
+<tr><td>必填</td><td class='f'>① 命令表 COMMANDS</td><td>每个命令键对应一个真实命令字符串（键名冻结）</td><td>手册命令树；漏填由 `missing_commands()` 与门禁 C05 拦下</td></tr>
+<tr><td>必填</td><td class='f'>② 前导映射 PREAMBLE_FIELDS</td><td>本型号 `:WFMOutpre?` 的字段顺序与命名（按名取值，不按位置猜）</td><td>`WFMOutpre?` 的返回顺序（手册逐字段列出）</td></tr>
+<tr><td>必填</td><td class='f'>③ 解码与缩放实现</td><td>`_parse_curve()` 与缩放公式（二进制分块、字节序、`YMULT/YOFF`）</td><td>官方 FAQ 的换算式 + `DATa:ENCdg/RESOlution` 枚举</td></tr>
+<tr><td>需声明</td><td class='f'>④ 能力裁剪</td><td>哪些可选能力真支持（时基/通道/触发/统计/原始数据…）</td><td>以仪器选项与固件版本为准，`supports()` 回答</td></tr>
+<tr><td>需声明</td><td class='f'>⑤ 口径声明</td><td>参考电平（10%/50%/90% 或绝对）、平均次数、仿真模型</td><td>`MEASUrement:REFLevel:*` 与 `ACQuire:NUMAVg` 对应的语义</td></tr>
+</tbody></table></div></section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>与现行契约 1.2 的差异</h2></div>
+<p class='lede'>6 个新增能力，每个都给签名、返回结构与用途。</p>
+<h3>`scope.acquisition`</h3>
+<pre>`def acquisition(self, mode: str | None = None, averages: int | None = None, stop_after: str | None = None, sample_rate_sa_s: float | None = None, record_length: int | None = None, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>{mode, averages, stop_after, sample_rate_sa_s, record_length, digitizing_levels}</td></tr><tr><th>用途</th><td>采样/平均模式、平均次数、跑完是否停下、采样率、记录长度一并读写</td></tr></tbody></table></div>
+<h3>`scope.trigger`</h3>
+<pre>`def trigger(self, type: str | None = None, source: str | None = None, level_v: float | None = None, slope: str | None = None, force: bool = False, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>{type, source, level_v, slope, forced}</td></tr><tr><th>用途</th><td>基线只做 `edge`（含电平与斜率）；`force` 对应 `TRIGger FORCe`</td></tr></tbody></table></div>
+<h3>`scope.probe`</h3>
+<pre>`def probe(self, channel: str = &quot;CH1&quot;, gain: float | None = None, units: str | None = None, autozero: bool = False, degauss: bool = False, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>{channel, gain, ratio, units, impedance_ohm, autozero_done, degauss_done}</td></tr><tr><th>用途</th><td>探头倍率/单位/阻抗与自动调零——**量程的一部分**，此前遗漏</td></tr></tbody></table></div>
+<h3>`scope.acquire_raw`</h3>
+<pre>`def acquire_raw(self, points: int = 1000, channel: str = &quot;CH1&quot;, encoding: str = &quot;binary&quot;, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>{sample_info: {...}, scaling: {...}, raw_b64, ascii}</td></tr><tr><th>用途</th><td>给归档留证与自算场景：返回**未经缩放**的码值 + 完整前导，可用同一份数学复现 `acquire_waveform`</td></tr></tbody></table></div>
+<h3>`scope.measure_statistics`</h3>
+<pre>`def measure_statistics(self, items: list | None = None, channel: str = &quot;CH1&quot;, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>[{type, value, unit, count, mean, min, max, stddev}]</td></tr><tr><th>用途</th><td>对应 `MEAS<x>:{COUNt?|MEAN?|MAXimum?|MINImum?|STDdev?}`，把仪器侧统计暴露出来</td></tr></tbody></table></div>
+<h3>`scope.ref_levels`</h3>
+<pre>`def ref_levels(self, method: str | None = None, low_pct: float | None = None, mid_pct: float | None = None, high_pct: float | None = None, **_) -&gt; dict`</pre>
+<div class='tw'><table><tbody><tr><th>返回 value</th><td class='f'>{method, low_pct, mid_pct, high_pct}</td></tr><tr><th>用途</th><td>把测量口径显式化；`measure(...)` 增加 `ref_levels=` 参数</td></tr></tbody></table></div>
+<h3>新增数据模型</h3>
+<div class='tw'><table><thead><tr><th>模型</th><th>签名</th><th>作用</th></tr></thead><tbody>
+<tr><td class='f'>SampleInfo</td><td class='f'>`(encoding: str, binary_format: str = &quot;RI&quot;, byte_order: str = &quot;MSB&quot;, bytes_per_point: int = 2, bits_per_point: int = 16, bit_order: str = &quot;MSB&quot;, point_format: str = &quot;Y&quot;, filter_freq_hz: float = 0.0, decimals: int = 0)`</td><td>手工册前导的 formatting 部分——**决定怎么解析字节**</td></tr>
+<tr><td class='f'>ScalingFactors</td><td class='f'>`(x_incr_s: float, x_zero_s: float = 0.0, x_unit: str = &quot;s&quot;, y_mult: float = 1.0, y_off: float = 0.0, y_zero: float = 0.0, y_unit: str = &quot;V&quot;, point_offset: int = 0)`</td><td>手工册前导的 interpretation 部分——**决定怎么变成伏特与秒**</td></tr>
+<tr><td class='f'>AcquireSetup</td><td class='f'>`(mode: str = &quot;sample&quot;, averages: int = 1, stop_after: str = &quot;run_stop&quot;, sample_rate_sa_s: float = 0.0, record_length: int = 0, digitizing_levels: int = 256)`</td><td>采集方式与约束；`digitizing_levels` 来自官方 FAQ 的 256 级</td></tr>
+<tr><td class='f'>TriggerSetup</td><td class='f'>`(type: str = &quot;edge&quot;, source: str = &quot;CH1&quot;, level_v: float = 0.0, slope: str = &quot;rising&quot;)`</td><td>触发基线配置</td></tr>
+<tr><td class='f'>RefLevels</td><td class='f'>`(method: str = &quot;percent&quot;, low_pct: float = 10.0, mid_pct: float = 50.0, high_pct: float = 90.0)`</td><td>测量口径（百分位或绝对值），跨品牌可比的前提</td></tr>
+</tbody></table></div>
+<p>另有 3 处既有接口修订：<code>scope.timebase</code> 回显 <code>sample_rate_sa_s</code> / <code>record_length</code>；<code>scope.measure</code> 增加 <code>ref_levels=</code> 参数并在返回项带口径；<code>scope.acquire_waveform</code> 的 <code>detail</code> 带 <code>sample_info</code> / <code>scaling</code> 摘要（归档对照用）。</p></section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>上架门禁同步调整</h2></div>
+<p class='lede'>16 项 → <b>22 项</b>；新增的 6 项全部针对本轮手册核对暴露的风险，不是凑数。</p>
+<div class='tw'><table><thead><tr><th>编号</th><th>检查项</th><th>判据</th></tr></thead><tbody>
+<tr><td class='f'>C17</td><td>前导字段全覆盖</td><td>型号驱动声明的 `PREAMBLE_FIELDS` 必须覆盖 `SampleInfo`/`ScalingFactors` 所需字段，且按名取值（禁止按位置猜）</td></tr>
+<tr><td class='f'>C18</td><td>波形结构自检</td><td>仿真下 `len(samples) == points` 且 `x_incr_s > 0`、`unit == "V"`</td></tr>
+<tr><td class='f'>C19</td><td>缩放公式可验证</td><td>给定码值 + 前导断言 `V = (level − YOFF) × YMULT` 成立，误差 < 1e-9</td></tr>
+<tr><td class='f'>C20</td><td>口径已声明</td><td>`scope.measure` 返回项必须带 `ref_levels` 口径（默认值也要显式标注）</td></tr>
+<tr><td class='f'>C21</td><td>参数单位后缀</td><td>物理参数名必须带单位后缀（`_v` / `_s` / `_hz` / `_sa_s`），禁止无量纲裸数当量程</td></tr>
+<tr><td class='f'>C22</td><td>原始数据可追溯</td><td>`acquire_raw` 的 `sample_info + scaling` 必须能复现 `acquire_waveform` 的浮点结果（同一份数学）</td></tr>
+</tbody></table></div></section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>未核验项与风险</h2></div>
+<p class='lede'>读不到的地方写清楚，比含糊过去便宜。</p>
+<div class='tw'><table><thead><tr><th>事项</th><th>情况</th><th>处理</th></tr></thead><tbody>
+<tr><td><strong>未能直接读到手册 PDF</strong></td><td>download.tek.com 的 PDF 直链返回 404；Rigol 手册为扫描件或被 403 拦截</td><td>命令树以泰克官方自动生成文档（含逐字段语法与枚举）+ 官方 FAQ 为据；现场仍需用 `*IDN?` 与固件版本对应的手册页码复核</td></tr>
+<tr><td><strong>ASCII 编码下的量纲</strong></td><td>FAQ 只给了二进制（RPBinary）的换算公式，未说明 ASCII 下采样值是否已是伏特</td><td>驱动对两种编码都返回伏特，但 ASCII 分支需真机核验；`acquire_raw` 保留原始应答便于比对</td></tr>
+<tr><td><strong>x 轴公式</strong></td><td>`XZEro` / `PT_Off` / `XINcr` 三字段语义明确，但把三者串成公式属推导</td><td>以真机 `:CURVe?` + 前导与仪器屏上刻度对照验证</td></tr>
+<tr><td><strong>单位与统计口径细节</strong></td><td>`PHAse` 的单位、计数类测量项是否有单位/统计口径，手册页未逐条取到</td><td>在 §05 表中已标注「待核」；实现时以真机 `MEAS<x>:UNIts?` 回读为准</td></tr>
+<tr><td><strong>触发长尾与序列采集</strong></td><td>`TRIGger:A:BUS:*`（I2C/SPI/CAN/RS232）与 `ACQuire:STOPAfter SEQuence` 只留了接口位</td><td>归入 `vendor.*` 扩展与后续迭代，不进基线（避免基线被长尾拖垮）</td></tr>
+</tbody></table></div></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 示波器通用接口设计 · 依据泰克编程手册与官方 FAQ 重新总结</span><span>现行契约 ate.driver.api 1.2 · 建议升 1.3</span></div>
+</div></body></html>

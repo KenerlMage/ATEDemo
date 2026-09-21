@@ -1,0 +1,66 @@
+{
+  "id": "demo_tps",
+  "name": "Demo 测试程序集",
+  "description": "演示 TPS：初始化测试环境 -> 依次执行 6 条 pytest 用例 -> 终止测试环境",
+  "version": "1.0.0",
+  "project": "Demo 项目",
+  "dut": "Demo DUT",
+  "environment": {
+    "name": "ATE Demo 测试环境",
+    "device": "模拟电源 + 模拟串口设备",
+    "interfaces": ["电源通道", "UART"],
+    "uart_speed": "9600 / 115200 / 460800",
+    "firmware": "v1.0.0",
+    "location": "本地模拟环境"
+  },
+  "steps": [
+    {
+      "type": "init",
+      "name": "测试环境初始化",
+      "script": "ops/init_env.py",
+      "description": "初始化模拟电源与串口连接，准备测试环境"
+    },
+    {
+      "type": "test",
+      "name": "上电电压测试",
+      "testcase_id": "test_cases/test_demo.py::TestPowerOn::test_device_power_on_voltage",
+      "description": "验证设备上电电压在 3.3V ±5% 范围内"
+    },
+    {
+      "type": "test",
+      "name": "断电电流测试",
+      "testcase_id": "test_cases/test_demo.py::TestPowerOn::test_device_power_off_current",
+      "description": "验证设备断电待机电流不超过 0.1mA"
+    },
+    {
+      "type": "test",
+      "name": "UART 握手测试 @9600",
+      "testcase_id": "test_cases/test_demo.py::TestCommunication::test_uart_handshake[9600]",
+      "description": "9600 波特率下串口握手通信"
+    },
+    {
+      "type": "test",
+      "name": "UART 握手测试 @115200",
+      "testcase_id": "test_cases/test_demo.py::TestCommunication::test_uart_handshake[115200]",
+      "description": "115200 波特率下串口握手通信"
+    },
+    {
+      "type": "test",
+      "name": "UART 握手测试 @460800",
+      "testcase_id": "test_cases/test_demo.py::TestCommunication::test_uart_handshake[460800]",
+      "description": "460800 波特率下串口握手通信"
+    },
+    {
+      "type": "test",
+      "name": "固件校验和检查",
+      "testcase_id": "test_cases/test_demo.py::TestFirmware::test_firmware_checksum",
+      "description": "校验固件校验和与出厂值一致"
+    },
+    {
+      "type": "teardown",
+      "name": "测试环境终止",
+      "script": "ops/teardown_env.py",
+      "description": "关闭模拟电源与串口连接，释放测试环境"
+    }
+  ]
+}

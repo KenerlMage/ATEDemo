@@ -1,0 +1,32 @@
+{
+  "ABC123DEF456": {
+    "batch": "BATCH-20260801",
+    "type": "ATE-DEMO-A",
+    "model": "Demo Board A",
+    "remark": "预置演示数据: 通过 SN 从远端获取 UUT 属性, 当前先预置在本地"
+  },
+  "XYZ789GHI012": {
+    "batch": "BATCH-20260802",
+    "type": "ATE-DEMO-B",
+    "model": "Demo Board B",
+    "remark": "预置演示数据"
+  },
+  "SN20260806001": {
+    "batch": "BATCH-20260806",
+    "type": "ATE-DEMO-C",
+    "model": "Demo Board C",
+    "remark": "预置演示数据"
+  },
+  "SN20260806002": {
+    "batch": "BATCH-20260806",
+    "type": "ATE-DEMO-C",
+    "model": "Demo Board C",
+    "remark": "预置演示数据"
+  },
+  "SN20260806003": {
+    "batch": "BATCH-20260806",
+    "type": "ATE-DEMO-D",
+    "model": "Demo Board D",
+    "remark": "预置演示数据"
+  }
+}

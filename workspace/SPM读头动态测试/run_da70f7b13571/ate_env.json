@@ -1,0 +1,28 @@
+{
+  "schema": "ate.run.env.v1",
+  "created_at": "2026-09-12 23:19:53",
+  "task_id": "da70f7b13571",
+  "uut": "SPMDYN000042",
+  "tps_id": "spm_rh_dyn",
+  "tps_name": "SPM读头动态测试",
+  "tps_source": "D:\\ATE\\backend\\testresource\\spm_rh_dyn",
+  "workspace": "D:\\ATE\\workspace",
+  "tps_dir": "D:\\ATE\\workspace\\SPM读头动态测试",
+  "run_dir": "D:\\ATE\\workspace\\SPM读头动态测试\\run_da70f7b13571",
+  "ate_backend": "D:\\ATE\\backend",
+  "db_path": "D:\\ATE\\backend\\ate.db",
+  "bench_id": "tb_80da1e4e55",
+  "bench_title": "SPM读头动态测试台",
+  "bench_serial": "SPMTS202609120001",
+  "bench_preset_id": "SPM-RH-DYN-01",
+  "mode": "simulate",
+  "on_driver_error": "",
+  "conftest_version": 2,
+  "keep_runs": 5,
+  "generated_file": "test_tps_generated.py",
+  "case_count": {
+    "setup": 1,
+    "test": 5,
+    "teardown": 1
+  }
+}

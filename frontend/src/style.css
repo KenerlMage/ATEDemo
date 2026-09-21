@@ -1,0 +1,125 @@
+/* ============================================================
+   ATE Runner · 全局主题（紫色 + 白色背景 · 工业风）
+   ------------------------------------------------------------
+   改配色只改这里的变量即可，各页面样式均引用这些变量；
+   半透明底色统一用 rgba(var(--accent-rgb), 透明度) 写法。
+   ============================================================ */
+:root {
+  /* 底色：白底 + 淡紫工业网格 */
+  --bg: #ffffff;
+  --bg-soft: #faf9ff;
+  --panel: #ffffff;
+  --panel-2: #f5f2fd;
+  --panel-3: #ede8fb;
+  --border: #e4def6;
+  --border-strong: #cec3ec;
+  --grid: rgba(109, 40, 217, 0.045);
+
+  /* 文字 */
+  --text: #1d1733;
+  --muted: #6e688a;
+
+  /* 主色：工业紫 */
+  --accent: #6d28d9;
+  --accent-2: #8b5cf6;
+  --accent-3: #a78bfa;
+  --accent-rgb: 109, 40, 217;
+  --accent-2-rgb: 139, 92, 246;
+
+  /* 语义色（白底上取深色，保证对比度） */
+  --ok: #15803d;
+  --warn: #b45309;
+  --err: #dc2626;
+
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app { height: 100%; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 480px at 88% -12%, rgba(109, 40, 217, 0.07), transparent 62%),
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--bg-soft);
+  color: var(--text);
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 工业风细斜纹分隔条（可放在任意块顶部） */
+.hazard-rule {
+  height: 4px;
+  background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px);
+  opacity: 0.75;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text);
+  padding: 9px 18px;
+  border-radius: 7px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.05s, box-shadow 0.15s;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.12);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.28);
+}
+.btn.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.08); }
+.btn.block { width: 100%; }
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.btn.ghost:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--panel-2);
+  box-shadow: none;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input::placeholder { color: #b0a9c6; }
+.input:hover { border-color: var(--border-strong); }
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
+}
+
+/* 滚动条：浅紫工业风 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--panel-2); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; border: 2px solid var(--panel-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-3); }

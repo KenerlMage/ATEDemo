@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATE Runner - 装备属性配置 · 装备助手(数字示波器)</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6; --border-strong: #cec3ec;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --accent-2-rgb: 139, 92, 246;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); font-size: 14px; line-height: 1.65;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; box-shadow: 0 10px 30px rgba(var(--accent-rgb), .06); }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 12px; margin-top: 22px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .metric b { display: block; font-size: 21px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14.5px; margin: 20px 0 8px; color: var(--accent2); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 8px; font-size: 14.5px; }
+  .card p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .timeline { border-left: 2px solid var(--border); margin: 6px 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 15px; }
+  .step { position: relative; }
+  .step::before { content: ''; position: absolute; left: -27px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15); }
+  .step b { display: block; font-size: 14px; }
+  .step span { color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21, 128, 61, .4); background: rgba(21, 128, 61, .1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180, 83, 9, .4); background: rgba(180, 83, 9, .1); }
+  .badge.acc { color: var(--accent); border-color: rgba(var(--accent-rgb), .35); background: rgba(var(--accent-rgb), .1); }
+  /* 布局示意 */
+  .mock { display: grid; grid-template-columns: 196px 1fr; gap: 12px; }
+  .mock-side { border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(180deg, #fbfaff, #fff); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .mi { font-size: 12px; padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; color: var(--muted); }
+  .mi.on { color: var(--accent); background: rgba(var(--accent-rgb), .1); border-color: rgba(var(--accent-rgb), .28); border-left: 3px solid var(--accent); font-weight: 700; }
+  .mock-main { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .mrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .mcard { border: 1px solid var(--border); border-radius: 9px; padding: 8px 9px; background: var(--panel2); font-size: 11.5px; color: var(--muted); }
+  .mcard b { display: block; color: var(--text); font-size: 12.5px; }
+  .menu-mock { border: 1px solid var(--border-strong); border-radius: 9px; background: #fff; padding: 5px; max-width: 210px; box-shadow: 0 10px 24px rgba(29,23,51,.12); }
+  .menu-mock div { font-size: 12.5px; padding: 6px 8px; border-radius: 6px; }
+  .menu-mock div.hl { background: rgba(var(--accent-rgb), .1); color: var(--accent); font-weight: 700; }
+  .screen-mock { border: 1px solid var(--border-strong); border-radius: 9px; height: 120px; background:
+      linear-gradient(rgba(var(--accent-rgb), .07) 1px, transparent 1px) 0 0 / 22px 22px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .07) 1px, transparent 1px) 0 0 / 22px 22px, #fff;
+      position: relative; overflow: hidden; }
+  .screen-mock svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="stripe"></div>
+    <h1>装备属性配置 · 装备助手</h1>
+    <p>装备页改为按测试台注册 BOM 管理设备连接属性(可编程设备右键改 IP/端口),并新增「装备助手」以卡片形式提供仪器控制小工具,首期落地数字示波器(泰克 MSO54 方案)。</p>
+    <div class="metrics">
+      <div class="metric"><b>5</b><span>左侧导航标签</span></div>
+      <div class="metric"><b>7</b><span>新增接口</span></div>
+      <div class="metric"><b>1</b><span>首期工具:数字示波器</span></div>
+      <div class="metric"><b>12</b><span>示波器操作动作</span></div>
+      <div class="metric"><b>6</b><span>仿真波形类型</span></div>
+      <div class="metric"><b>8</b><span>测量项</span></div>
+      <div class="metric"><b>2</b><span>运行模式（真实/仿真）</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>1. 两个页面的定位</h2>
+    <div class="grid2">
+      <div class="card">
+        <h4>装备属性配置 <span class="badge acc">/equipment</span></h4>
+        <p>回答"这台测试台上装了哪些设备、各自的连接参数是什么、能不能改"。</p>
+        <ul>
+          <li>设备清单<b>不是</b>独立维护的,直接来自各测试台注册时该类型 BOM 清单</li>
+          <li>按测试台分组切换,支持关键词搜索与「仅看可编程 / 未配置」筛选</li>
+          <li><b>可编程设备右键</b> → 修改设备属性 / 恢复 BOM 默认值 / 复制资源地址 / 变更历史</li>
+          <li>非可编程设备(夹具、探针组等)属性只读,右键给出明确提示</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>装备助手 <span class="badge acc">/assistant</span></h4>
+        <p>回答"怎么用这些设备干活"。</p>
+        <ul>
+          <li>工具以<b>卡片</b>呈现:名称、协议、能力清单、可用性</li>
+          <li>单击 / 双击卡片选中 → 点右上角「运行工具」启动</li>
+          <li>首期:<b>数字示波器</b>(泰克 MSO54 方案,SCPI over socket)</li>
+          <li>其余工位(万用表 / 可编程电源 / 电子负载)已预留卡片</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. 导航与页面结构</h2>
+    <div class="mock">
+      <div class="mock-side">
+        <div class="mi">▶ 测试执行</div>
+        <div class="mi on">⚙ 装备属性配置</div>
+        <div class="mi">⚒ 装备助手</div>
+        <div class="mi">▤ 测试记录</div>
+        <div class="mi">▦ 测试台导航</div>
+      </div>
+      <div class="mock-main">
+        <div class="mrow">
+          <div class="mcard"><b>3</b>测试台</div>
+          <div class="mcard"><b>24</b>设备</div>
+          <div class="mcard"><b>21</b>可编程</div>
+          <div class="mcard"><b>18/21</b>已配置</div>
+        </div>
+        <div class="mrow" style="grid-template-columns: repeat(3, 1fr)">
+          <div class="mcard"><b>数字示波器</b>IP : 端口 · 192.168.10.21:4000<br>右键 → 修改设备属性</div>
+          <div class="mcard"><b>可编程直流电源</b>IP : 端口 · 192.168.10.22:30000<br>右键 → 修改设备属性</div>
+          <div class="mcard"><b>测试夹具与探针组套</b>资源地址 · 未配置<br>非可编程设备 · 属性只读</div>
+        </div>
+        <div class="screen-mock">
+          <svg viewBox="0 0 600 120" preserveAspectRatio="none">
+            <path d="M0,60 C30,10 60,110 90,60 C120,10 150,110 180,60 C210,10 240,110 270,60 C300,10 330,110 360,60 C390,10 420,110 450,60 C480,10 510,110 540,60 C570,10 585,110 600,60"
+                  fill="none" stroke="#6d28d9" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:10px">左侧导航第三项新增「装备助手」,「测试台导航」仍固定在最下方;窄屏(≤900px)自动切换为顶部横向导航。</p>
+  </section>
+
+  <section>
+    <h2>3. 右键菜单(可编程设备)</h2>
+    <div class="grid2">
+      <div class="menu-mock">
+        <div style="border-bottom:1px solid var(--border);padding:7px 9px;font-weight:700">● 数字示波器</div>
+        <div class="hl">✎ 修改设备属性 &nbsp;<span style="color:var(--muted);font-weight:400">IP / 端口</span></div>
+        <div>↺ 恢复 BOM 默认值</div>
+        <div>⧉ 复制资源地址</div>
+        <div>≡ 查看变更历史</div>
+      </div>
+      <div class="card">
+        <h4>属性弹窗按接口类型渲染</h4>
+        <table>
+          <tr><th>接口</th><th>可编辑字段</th></tr>
+          <tr><td>网口 LAN</td><td><code>IP / 主机名</code>、<code>端口</code>、<code>协议</code>、备注</td></tr>
+          <tr><td>串口 SERIAL</td><td><code>串口号</code>(形如 COM3)、<code>波特率</code>、<code>协议</code>、备注</td></tr>
+          <tr><td>USB / GPIB</td><td><code>资源地址</code>(如 GPIB0::22::INSTR)、<code>通道号</code>、<code>协议</code>、备注</td></tr>
+        </table>
+        <p style="margin-top:10px">型号 / 厂商 / 类别 / 用途属于 BOM 元信息,弹窗中以只读卡片展示,不参与提交。</p>
+      </div>
+    </div>
+    <h3>保存前的双重校验</h3>
+    <ul>
+      <li>格式:IP/主机名、端口范围 1-65535、串口号 <code>COM3</code> 样式、波特率 300-1000000、资源地址字符集、通道号字符集</li>
+      <li>冲突:同一测试台内 <code>IP:端口</code> 不允许被两台设备占用(前后端同一套规则)</li>
+      <li>留痕:每次变更记录字段级前后值,最多保留 10 条,可在「变更历史」中查看</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>4. 装备助手:数字示波器工作流</h2>
+    <div class="timeline">
+      <div class="step"><b>1 选中工具</b><span>点击卡片(单击选中、双击直接运行);未选中或工具未上线时「运行工具」给出明确提示。</span></div>
+      <div class="step"><b>2 绑定设备</b><span>下拉列出已注册测试台中的网口设备,示波器优先;显示 <code>IP:端口</code> 与所属测试台。设备来自注册 BOM,不另维护清单。</span></div>
+      <div class="step"><b>③ 连接与识别</b><span>选择「仿真信号源 / 真实仪器」后点「进入仿真」或「连接并识别」；仿真模式可不选设备（自动使用内置仿真信号源 <code>SIM-SCOPE</code>）：建立 SCPI socket 会话（仿真为内存会话），执行 <code>*IDN?</code>，并回读时基与各通道状态。</span></div>
+      <div class="step"><b>4 操作</b><span>运行 / 停止 / 单次、自动设置(<code>AUTOSet EXECute</code>)、时基 ×2 ÷2 与常用档位、通道 ON/OFF 与量程 / 耦合(DC·AC·GND)。</span></div>
+      <div class="step"><b>5 读取与呈现</b><span>取波形(<code>DATa:*</code> + <code>CURVe?</code> + <code>WFMOutpre:*</code> 标定)后用 Canvas 绘制在 10×8 工业风网格上,按通道量程标注刻度。</span></div>
+      <div class="step"><b>6 测量</b><span>峰峰值、幅值、频率、周期、平均值、有效值、上升/下降时间;每项带来源标签(<span class="badge ok">实测</span> / <span class="badge warn">模拟</span> / <span class="badge" style="color:var(--err)">无效</span>)。</span></div>
+      <div class="step"><b>7 追溯</b><span>面板底部实时显示 SCPI 命令日志(发送 / 应答 / 提示),便于现场排查与复现。</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. 仿真信号源（无硬件也能看正弦波）</h2>
+    <p>示波器面板左侧新增<b>仿真信号源</b>区块：点「一键仿真」即可进入仿真（不选设备也行，后端自动使用内置仿真信号源），面板随即出现<b>模拟正弦波</b>与测量值。</p>
+    <table>
+      <tr><th>控件</th><th>范围 / 选项</th><th>说明</th></tr>
+      <tr><td>波形类型</td><td>正弦波 · 方波 · 三角波 · 锯齿波 · 直流 · 噪声</td><td>切换后波形与测量值立即重算；测量项按样本自算，与波形一致</td></tr>
+      <tr><td>频率</td><td>10 Hz – 1 MHz（16 档对数滑块）</td><td>改频率时自动重算时基，保持「屏内周期」不变</td></tr>
+      <tr><td>幅度 Vpp</td><td>0.1 – 10 V</td><td>同步自动挑 1-2-5 档 V/div，波形约占总高 60%；手动改过档位后不再自动适配</td></tr>
+      <tr><td>偏置</td><td>-5 – +5 V</td><td>均值测量随偏置变化（可用于验证 MEAN）</td></tr>
+      <tr><td>噪声</td><td>0 – 0.5（× 幅度）</td><td>叠加均匀噪声，波形不再是理想曲线</td></tr>
+      <tr><td>屏内周期</td><td>1 · 2 · 5 · 10</td><td>直接决定时基：<code>时基 = 周期数 /（10 × 频率）</code>，右侧实时显示 µs/div</td></tr>
+    </table>
+    <h3>自洽性校验（后端算法）</h3>
+    <ul>
+      <li>时基与频率配套：屏内恰好 N 个周期，避免高频时整屏不到一个周期变成直线；</li>
+      <li>频率测量用<b>带迟滞的过中点检测</b>（先越过下限再越过上限才计一个上升沿），噪声不会在中点附近造出伪穿越，实测频率与设定频率一致（1~10 周期、10 Hz~1 MHz 均对得上）；</li>
+      <li>幅度按示波器习惯取 Top/Base 直方图均值差，与偏置无关；</li>
+      <li>仿真数据统一标注 <code>source=simulate</code>、测量标签显示「模拟」，不冒充实测；切到「真实仪器」后仿真参数不影响实测波形。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 接口一览</h2>
+    <table>
+      <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+      <tr><td>GET</td><td><code>/api/testbench/devices</code></td><td>装备属性配置页数据源:各测试台 BOM 设备拍平(含 <code>bench_id</code>、<code>resource</code> 资源串)</td></tr>
+      <tr><td>PATCH</td><td><code>/api/testbenches/{id}/devices/{device_id}</code></td><td>修改设备连接属性,或 <code>reset_defaults:true</code> 恢复 BOM 默认值</td></tr>
+      <tr><td>GET</td><td><code>/api/tools</code></td><td>装备助手工具卡片清单</td></tr>
+      <tr><td>GET</td><td><code>/api/tools/oscilloscope/bindings</code></td><td>可绑定示波器设备(来自注册 BOM,示波器优先)</td></tr>
+      <tr><td>POST</td><td><code>/api/tools/oscilloscope/connect</code></td><td>建立会话:<code>mode=real|simulate</code>、<code>allow_fallback</code></td></tr>
+      <tr><td>POST</td><td><code>/api/tools/oscilloscope/action</code></td><td><code>identify / run / stop / single / autoset / timebase / channel / acquire / measure / frame / close</code></td></tr>
+      <tr><td>GET</td><td><code>/api/tools/oscilloscope/state</code></td><td>会话状态:连接态、IDN、时基、通道、命令日志</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>7. 数据与代码落点</h2>
+<pre>backend/
+├── testbench_registry.py   # + 设备清单 / 属性 PATCH(校验 + 冲突 + config_history)/ registry_path() / find_device()
+├── instrument_tools.py     # 新增:TOOL_CARDS 卡片注册表 + ScopeSession 示波器会话 + 离线模拟
+├── main.py                 # 末尾多两行挂载(testbench_registry / instrument_tools)
+└── testresource/
+    ├── testbench_presets.json   # 设备 BOM 与默认连接值(改默认 IP/端口在这里)
+    └── testbenches.json         # 当前连接属性 + config_history + 自检结果
+
+frontend/src/
+├── views/EquipmentView.vue   # 重写:装备属性配置(右键菜单 + 属性弹窗 + 变更历史)
+├── views/AssistantView.vue   # 新增:装备助手(工具卡片 + 示波器面板 + Canvas 波形)
+├── api.js                    # + getEquipmentDevices / updateDeviceConfig / getTools / 示波器 4 个方法
+├── router/index.js           # + /assistant
+└── App.vue                   # 导航「测试装备」→「装备属性配置」,新增「装备助手」</pre>
+    <p><b>改哪里:</b>工具卡片文案与可用性 → <code>instrument_tools.py</code> 的 <code>TOOL_CARDS</code>;示波器命令与解析 → 同文件的 <code>ScopeSession</code>;设备属性校验规则 → <code>testbench_registry.py</code> 的 <code>_validate_device_patch</code> / <code>_conflict_with_peers</code>;波形绘制与配色 → <code>AssistantView.vue</code> 的 <code>draw()</code>。</p>
+  </section>
+
+  <section>
+    <h2>8. 验证记录</h2>
+    <ul>
+      <li><span class="badge ok">通过</span> 装备属性配置数据源:注册一台 8 设备测试台后,接口返回 8 条设备(7 可编程),带所属测试台、资源串与配置状态</li>
+      <li><span class="badge ok">通过</span> 属性修改:IP/端口改写成功并回写注册库;非法端口、同台地址冲突、非可编程设备修改均被拦截并给出中文原因</li>
+      <li><span class="badge ok">通过</span> 恢复 BOM 默认值与变更留痕(多次修改变更历史累积)</li>
+      <li><span class="badge ok">通过</span> 装备助手:工具卡片 4 张(1 可用);绑定列表示波器排首位</li>
+      <li><span class="badge ok">通过</span> 仿真信号源：52 条断言全通过——无设备一键仿真、默认 1 kHz 正弦、6 种波形自洽、频率/时基/屏内周期自适配（10 Hz–1 MHz × 1/2/5/10 周期）、Vpp/偏置/相位生效、非法参数拦截、真实模式如实降级、既有接口回归；同时 <code>test_tools.py</code>(47 条) / <code>test_lifecycle.py</code>(47 条) / <code>test_default_bench.py</code>(28 条) 回归全绿</li>
+      <li><span class="badge ok">通过</span> 示波器仿真全流程：一键仿真 → 正弦波显示 → 频率测量 1,000 Hz、PK2PK 2.44 V → 切方波/三角/锯齿/直流/噪声 → 调频率 10 kHz 后时基自动 2 µs/div波形 → 测量 Vpp 2.43 V、频率 1.000 MHz(与信号源一致)→ 单次/运行/停止 → 会话与命令日志</li>
+      <li><span class="badge ok">通过</span> 真实模式连接超时:开启降级时自动切离线模拟并明确提示,关闭降级时如实报错;未连接直接操作被拒</li>
+      <li><span class="badge warn">待人工</span> 真实泰克示波器联通验证(需现场仪器);浏览器端可视化巡检(本机无可用浏览器自动化节点)</li>
+    </ul>
+    <pre>后端:cd D:\ATE\backend  →  .venv\Scripts\python.exe -m uvicorn main:app --port 8000   (或 start_all.bat)
+前端:cd D:\ATE\frontend →  npm run dev  →  http://127.0.0.1:5173
+验收路径:登录 → 左侧「装备属性配置」(右键可编程设备改 IP)→ 左侧「装备助手」(点卡片 → 运行工具 → 连接并识别)</pre>
+  </section>
+
+</div>
+</body>
+</html>

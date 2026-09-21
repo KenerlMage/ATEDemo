@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ate-drivers"
+version = "1.2.0"
+description = "ATE Runner 仪器驱动库（契约层 + 示波器等设备家族 + 型号驱动开发工具链）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = []                      # 零第三方依赖是硬约束：产线工控机可能离线
+
+[project.scripts]
+ate-driver = "ate_drivers.kit.cli:main"
+
+[tool.setuptools]
+packages = ["ate_drivers", "ate_drivers.family", "ate_drivers.kit"]

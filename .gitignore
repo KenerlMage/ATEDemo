@@ -1,0 +1,38 @@
+﻿# ---- dependencies / virtualenv ----
+**/.venv/
+**/venv/
+**/env/
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+
+# ---- build output ----
+**/dist/
+**/build/
+frontend/dist/
+
+# ---- secrets / licenses (DO NOT COMMIT) ----
+backend/tools/private_key.pem
+backend/license.dat
+backend/ate.db
+*.lic
+*.pem
+*.key
+*.pfx
+*.p12
+.env
+**/.env
+
+# ---- runtime data / logs ----
+backend/logs/
+**/*.log
+**/*.sqlite
+**/*.sqlite3
+
+# ---- editor / os ----
+.vscode/
+.idea/
+.thumbs/
+Thumbs.db
+desktop.ini

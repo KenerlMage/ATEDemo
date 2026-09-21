@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATE Runner 安装指导</title>
+<style>
+  :root{
+    --accent:#6d28d9; --accent-rgb:109,40,217; --ink:#1e1b31; --muted:#5b5570;
+    --line:#e6e2f5; --bg:#f7f6fb; --panel:#ffffff; --code-bg:#f4f2fb;
+    --ok:#15803d; --warn:#b45309; --err:#b91c1c; --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.75 "Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px 70px}
+  header{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%);color:#fff;
+    padding:38px 0 30px;margin-bottom:26px;box-shadow:0 10px 30px rgba(76,29,149,.22)}
+  header .wrap{padding-bottom:0}
+  header h1{margin:0 0 8px;font-size:29px;letter-spacing:.4px}
+  header p{margin:0;opacity:.9;font-size:14.5px}
+  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);
+    border-radius:999px;padding:4px 12px;font-size:12.5px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px 26px;margin:18px 0;box-shadow:0 1px 3px rgba(30,27,49,.04)}
+  h2{font-size:20px;margin:6px 0 14px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:16.5px;margin:20px 0 10px;color:#4c1d95}
+  h4{font-size:15px;margin:16px 0 8px}
+  p{margin:10px 0}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px dashed rgba(var(--accent-rgb),.5)}
+  code{font-family:var(--mono);font-size:13px;background:var(--code-bg);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#4c1d95}
+  pre{background:#241f3a;color:#eae6ff;border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.6}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:12.8px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{background:#f1eefb;text-align:left;font-weight:600;color:#3b2f63}
+  th,td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fbfaff}
+  ul,ol{padding-left:22px;margin:10px 0}
+  li{margin:5px 0}
+  blockquote{margin:12px 0;padding:10px 16px;background:#f6f2ff;border-left:4px solid var(--accent);
+    border-radius:0 8px 8px 0;color:#3f3a58}
+  hr{border:none;border-top:1px dashed var(--line);margin:26px 0}
+  strong{color:#3b2f63}
+  footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:26px}
+  @media(max-width:720px){header h1{font-size:23px}section{padding:16px 14px}table{font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>ATE Runner 安装指导</h1>
+    <p>离线部署 · 双击安装 · 目标机无需 Python / Node / Docker / 联网</p>
+    <div class="badges">
+      <span class="badge">Windows 10/11 x64 工控机</span>
+      <span class="badge">嵌入式 Python 3.13 运行时</span>
+      <span class="badge">前端与后端同端口托管</span>
+      <span class="badge">安装包 ≈ 33 MB</span>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+<h1 id="ate-runner">ATE Runner 安装指导</h1>
+<p>面向客户工控机的<strong>离线、双击安装</strong>部署说明。安装包内已经包含前端构建产物、后端程序与嵌入式 Python 运行时，目标机<strong>不需要</strong>安装 Python、Node.js、Docker，也<strong>不需要联网</strong>。</p>
+<hr />
+<h2 id="1">1. 前置条件</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>操作系统</td>
+<td>Windows 10 / 11 x64（Windows Server 2019+ 亦可）</td>
+</tr>
+<tr>
+<td>权限</td>
+<td>安装到 <code>C:\ATERunner</code> 需管理员权限；绿色便携方式只需目录写权限</td>
+</tr>
+<tr>
+<td>运行时依赖</td>
+<td>无（Python 3.13 + FastAPI + pytest + cryptography 全部随包携带）</td>
+</tr>
+<tr>
+<td>磁盘</td>
+<td>≥ 1.5 GB 可用（安装后约 70 MB，运行数据随时间增长：日志、报告、TPS 运行副本）</td>
+</tr>
+<tr>
+<td>端口</td>
+<td>默认 TCP 8000（被占用时启动器自动顺延到 8001–8010，也可用 <code>ATE_PORT</code> 指定）</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>单机使用无需网络；车间其他电脑要访问界面时，需放行 8000 端口</td>
+</tr>
+<tr>
+<td>浏览器</td>
+<td>Edge / Chrome（仅用于显示界面，服务与界面都在本机）</td>
+</tr>
+<tr>
+<td>授权</td>
+<td>首次使用需导入 lic 文件；预置 lic 放在 <code>D:\ATE_ENV</code> 作为备选</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2">2. 交付物</h2>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ATE_Setup-&lt;版本&gt;.exe</code></td>
+<td><strong>安装向导（推荐）</strong>：自解压安装器，双击 → 选目录 → 完成，自动创建桌面/开始菜单快捷方式与卸载项</td>
+</tr>
+<tr>
+<td><code>ATERunner-portable-&lt;版本&gt;.zip</code></td>
+<td><strong>绿色便携包</strong>：解压即用，双击 <code>start-ate.bat</code> 启动；也可运行 <code>install.bat</code> 一键部署到 <code>C:\ATERunner</code></td>
+</tr>
+<tr>
+<td><code>VERSION.txt</code></td>
+<td>包内版本与构成说明（构建时生成）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>两个包内容完全一致（<code>app/</code> 后端 + <code>web/</code> 前端 + <code>runtime/</code> 嵌入式 Python + 启动器），差别只是部署方式。</p>
+</blockquote>
+<hr />
+<h2 id="3-a">3. 方式 A：安装向导（推荐）</h2>
+<ol>
+<li>把 <code>ATE_Setup-&lt;版本&gt;.exe</code> 拷到目标机（U 盘 / 共享目录均可，无需联网）。</li>
+<li>双击运行；出现 UAC 提示时选择“是”。</li>
+<li>选择安装目录，默认 <code>C:\ATERunner</code>。
+   ⚠️ <strong>不要装到 <code>C:\Program Files</code> 或 <code>C:\Program Files (x86)</code></strong>：测试数据（<code>logs\</code>、<code>workspace\</code>、<code>app\ate.db</code>）保存在安装目录内，系统保护目录会导致非管理员运行时无法写数据。</li>
+<li>等待解压完成（约 2100 个文件、70 MB，通常几秒到半分钟），窗口内会打印进度。</li>
+<li>勾选/确认完成后点击“完成”，桌面出现 <strong>ATE Runner</strong> 快捷方式；勾选“立即启动”时会自动打开浏览器。</li>
+</ol>
+<p><strong>批量/静默安装</strong>（多台工控机统一部署时）：</p>
+<pre><code>ATE_Setup-1.0.250912.exe /S /DIR=D:\ATERunner /NODESKTOP /NOFIREWALL /NOLAUNCH
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/S</code></td>
+<td>静默模式（无界面，成功返回 0）</td>
+</tr>
+<tr>
+<td><code>/DIR=&lt;路径&gt;</code></td>
+<td>指定安装目录（默认 <code>C:\ATERunner</code>）</td>
+</tr>
+<tr>
+<td><code>/NODESKTOP</code></td>
+<td>不创建开始菜单/桌面快捷方式</td>
+</tr>
+<tr>
+<td><code>/NOFIREWALL</code></td>
+<td>不添加防火墙规则（默认会尝试放行 TCP 8000，需管理员）</td>
+</tr>
+<tr>
+<td><code>/NOLAUNCH</code></td>
+<td>安装完不自动启动</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-b">4. 方式 B：绿色便携包</h2>
+<ol>
+<li>把 <code>ATERunner-portable-&lt;版本&gt;.zip</code> 解压到目标盘，例如 <code>D:\ATERunner</code>（<strong>路径不要含中文以外的特殊字符</strong>，也不要放在只读介质上）。</li>
+<li>直接双击 <code>start-ate.bat</code>（或同目录的 <code>ATE_Launcher.exe</code>）启动。</li>
+<li>需要固定安装时，双击 <code>install.bat</code>：
+   - 复制到 <code>C:\ATERunner</code>（可传参指定，如 <code>install.bat D:\ATERunner</code>）
+   - 创建桌面 + 开始菜单「ATE Runner」快捷方式
+   - 注册“控制面板 → 程序和功能”里的卸载项（HKCU，无需管理员）</li>
+<li>卸载：双击 <code>uninstall.bat</code>（或控制面板卸载）。默认<strong>保留</strong>测试数据，回答 <code>y</code> 才连应用目录一起删除。</li>
+</ol>
+<hr />
+<h2 id="5">5. 安装目录结构</h2>
+<pre><code>ATERunner\
+├── ATE_Launcher.exe        启动器（双击入口：自检 → 起后端 → 开浏览器）
+├── start-ate.bat           命令行启动入口（无 exe 时兜底）
+├── install.bat            便携包一键部署脚本
+├── uninstall.bat          卸载脚本（可选保留数据）
+├── VERSION.txt            版本说明
+├── app\                   后端程序（FastAPI + pytest + 驱动/运行环境模块）
+│   ├── main.py            服务入口（同时托管 web\ 前端静态资源）
+│   ├── testresource\      测试资源：预设、注册库 testbenches.json、TPS 包
+│   ├── drivers\           仪器驱动（工厂 + 传输层）
+│   ├── tps_runtime\       TPS 运行环境（临时副本、公共 conftest 模板）
+│   └── ate.db             SQLite 投影（装备/驱动配置，可由注册库重建）
+├── web\                   前端构建产物（index.html + assets\）
+├── runtime\               嵌入式 Python 3.13 + 全部依赖（离线）
+├── logs\                  运行日志、测试报告、硬件自检报告、导出清单
+└── workspace\             TPS 实际运行环境（按 TPS 名建目录，内含临时副本）
+</code></pre>
+<p><strong>需要备份/迁移的内容</strong>：<code>app\testresource\testbenches.json</code>（测试台注册库）+ <code>app\ate.db</code> + <code>logs\</code> + <code>workspace\</code>。</p>
+<hr />
+<h2 id="6">6. 首次启动自检</h2>
+<p>启动器会按顺序检查并打印到控制台与 <code>logs\launcher.log</code>：</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>失败表现</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>安装目录可写</td>
+<td>“安装目录不可写”并中止</td>
+<td>换到非系统保护目录，或以管理员身份运行</td>
+</tr>
+<tr>
+<td><code>app\main.py</code> 存在</td>
+<td>“缺少后端程序”</td>
+<td>包不完整，重新解包</td>
+</tr>
+<tr>
+<td><code>web\index.html</code> 存在</td>
+<td>“缺少前端页面”</td>
+<td>包不完整，重新解包</td>
+</tr>
+<tr>
+<td><code>runtime\python.exe</code></td>
+<td>自动回退到系统 Python</td>
+<td>建议重新解包以恢复离线运行时</td>
+</tr>
+<tr>
+<td>端口可用</td>
+<td>自动顺延 8001–8010</td>
+<td>或用 <code>ATE_PORT=8010</code> 指定</td>
+</tr>
+<tr>
+<td>已有实例在跑</td>
+<td>直接打开界面（不重复启动）</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>启动成功后浏览器会自动打开 <code>http://127.0.0.1:8000</code>。手工核对可访问 <code>http://127.0.0.1:8000/api/health</code>，正常返回：</p>
+<pre><code class="language-json">{&quot;success&quot;:true,&quot;service&quot;:&quot;ATE-Backend&quot;,&quot;status&quot;:&quot;running&quot;,
+ &quot;web_enabled&quot;:true,&quot;web_dir&quot;:&quot;C:\\ATERunner\\web&quot;,
+ &quot;base_dir&quot;:&quot;C:\\ATERunner\\app&quot;,&quot;python&quot;:&quot;C:\\ATERunner\\runtime\\python.exe&quot;}
+</code></pre>
+<p><code>base_dir</code> / <code>python</code> 指向安装目录内部 → 说明用的是包内运行时，与目标机环境无关。</p>
+<hr />
+<h2 id="7-license">7. 授权（License）</h2>
+<ol>
+<li>首次打开界面 → 登录页。</li>
+<li>本机无 lic 时进入注册页，按提示<strong>选择文件夹导入 lic</strong>（选中包含 lic 文件的目录即可）。</li>
+<li>预置 lic 备选路径：<code>D:\ATE_ENV</code>（也可以在安装目录旁放一份 <code>ATE_ENV</code>）。</li>
+<li>导入成功后返回登录页登录即可；lic 与机器绑定，更换工控机需重新申请。</li>
+</ol>
+<hr />
+<h2 id="8-5">8. 验收清单（约 5 分钟）</h2>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>期望结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 双击桌面「ATE Runner」</td>
+<td>黑窗口打印启动日志，浏览器自动打开界面</td>
+</tr>
+<tr>
+<td>2. 登录进入系统</td>
+<td>左侧导航显示各页面（测试台导航 / 测试台注册 / 装备属性配置 / 装备助手 / 执行 / 记录 等）</td>
+</tr>
+<tr>
+<td>3. 装备属性配置</td>
+<td>能看到默认测试台「SPM 读头动态测试台」与 7 台设备（含 6 台可编程）</td>
+</tr>
+<tr>
+<td>4. TPS 运行环境面板</td>
+<td>workspace 路径在安装目录内、公共 conftest 已部署 v2、driver 配置已同步</td>
+</tr>
+<tr>
+<td>5. 执行页</td>
+<td>选 TPS → 输入 12 位 UUT（示例 <code>DEMOUUT00001</code>）→ 开始测试 → 步骤 7/7 通过</td>
+</tr>
+<tr>
+<td>6. TPS 运行目录面板</td>
+<td>出现 <code>run_&lt;任务号&gt;</code> 临时副本，结果徽标显示通过</td>
+</tr>
+<tr>
+<td>7. 装备报告中心</td>
+<td>能看到本次测试报告与硬件自检报告；“打开本地资源管理器”能定位到报告目录</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9">9. 常见问题</h2>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>原因 / 处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>双击没反应、界面没起来</td>
+<td>看 <code>logs\launcher.log</code>；被安全软件拦截时加入白名单后重试</td>
+</tr>
+<tr>
+<td>提示端口被占用</td>
+<td>启动器自动换端口（日志会写明最终端口）；也可 <code>set ATE_PORT=8020</code> 后启动</td>
+</tr>
+<tr>
+<td>浏览器打不开 / 显示旧页面</td>
+<td>手动访问 <code>http://127.0.0.1:&lt;端口&gt;</code>；用 <code>Ctrl+F5</code> 强刷</td>
+</tr>
+<tr>
+<td>车间其他电脑打不开界面</td>
+<td>放行防火墙 TCP 8000；确认用本机 IP（<code>ipconfig</code>）访问；服务默认监听 <code>0.0.0.0</code></td>
+</tr>
+<tr>
+<td>只允许本机访问</td>
+<td>用 <code>start-ate.bat --host 127.0.0.1</code> 启动</td>
+</tr>
+<tr>
+<td>提示安装目录不可写</td>
+<td>换到 <code>D:\</code> 或用户目录；或右键以管理员身份运行</td>
+</tr>
+<tr>
+<td>控制台中文乱码</td>
+<td>仅显示编码问题，数据与界面不受影响</td>
+</tr>
+<tr>
+<td>界面在但接口 404</td>
+<td>后端未启动或被旧进程占用，确认 <code>logs\launcher.log</code> 里的启动端口</td>
+</tr>
+<tr>
+<td>TPS 运行报 pytest 相关错误</td>
+<td>确认是用包内 <code>runtime\python.exe</code> 运行（勿在系统 Python 里跑后端）</td>
+</tr>
+<tr>
+<td>换机后登录失败</td>
+<td>lic 与机器绑定，重新导入对应机器的 lic</td>
+</tr>
+<tr>
+<td>磁盘占用越来越大</td>
+<td><code>workspace\</code> 里的运行副本默认保留最近 5 次，可在「TPS 运行目录」面板点“清理旧运行目录”</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10">10. 升级与卸载</h2>
+<p><strong>升级</strong>（保留测试数据）</p>
+<ol>
+<li>关闭正在运行的程序（关掉启动器黑窗口）。</li>
+<li>用新版安装包安装到<strong>同一目录</strong>（<code>/S /DIR=...</code> 亦可），或把新版便携包的 <code>app\</code>、<code>web\</code>、<code>runtime\</code> 解压覆盖进去。</li>
+<li><code>logs\</code>、<code>workspace\</code>、<code>app\ate.db</code>、<code>app\testresource\testbenches.json</code> 都会保留。</li>
+</ol>
+<p><strong>卸载</strong></p>
+<ul>
+<li>控制面板 → 程序和功能 → ATE Runner → 卸载（或运行 <code>uninstall.bat</code>）。</li>
+<li>被询问“是否同时删除测试数据”时：选<strong>否</strong>保留历史记录与报告；选<strong>是</strong>则连 <code>logs\</code>、<code>workspace\</code>、<code>ate.db</code> 一起删除。</li>
+</ul>
+<hr />
+<h2 id="11">11. 从源码重新打包（开发/交付侧）</h2>
+<pre><code class="language-powershell"># 在构建机上（需 Node.js + Python 3.13 + 网络；只需一台）
+powershell -ExecutionPolicy Bypass -File packaging\build_package.ps1 -Version 1.1.0
+# 只改后端、前端没动时加速：
+powershell -ExecutionPolicy Bypass -File packaging\build_package.ps1 -Version 1.1.0 -SkipFrontend -ReuseRuntime
+</code></pre>
+<p>构建脚本会依次：构建前端 → 组装 <code>app/</code>、<code>web/</code> → 下载并配置嵌入式 Python + 安装依赖到 <code>runtime/</code> → 生成启动器 exe（需 PyInstaller）→ 清理构建机残留 → 产出便携 zip → 编译安装向导 exe（优先 Inno Setup，没装则用 Windows 自带 csc 编译自带 payload 的单文件安装器）。</p>
+<p>产物默认输出到 <code>D:\ATE_DIST\</code>：</p>
+<table>
+<thead>
+<tr>
+<th>产物</th>
+<th>大小（参考）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ATERunner-portable-&lt;版本&gt;.zip</code></td>
+<td>≈ 33 MB</td>
+</tr>
+<tr>
+<td><code>ATE_Setup-&lt;版本&gt;.exe</code></td>
+<td>≈ 33 MB（自包含，可单独分发）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12">12. 本项目已实测过的部署路径</h2>
+<table>
+<thead>
+<tr>
+<th>验证</th>
+<th>内容</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>嵌入式运行时</td>
+<td><code>runtime\python.exe</code> 可 <code>import fastapi/uvicorn/pytest/cryptography</code></td>
+<td>通过</td>
+</tr>
+<tr>
+<td>便携目录直接运行</td>
+<td>启动器 → 后端起在安装目录内 → 前端同端口托管 → <code>/api/health</code>、<code>/</code>、<code>/assets/*</code>、SPA 兜底、<code>/api</code> 未知路径 404</td>
+<td>27 项断言全部通过</td>
+</tr>
+<tr>
+<td>安装向导</td>
+<td><code>/S /DIR=...</code> 静默安装 → 2134 个文件落盘、快捷方式与卸载项写入</td>
+<td>exit 0</td>
+</tr>
+<tr>
+<td>安装后运行</td>
+<td>从安装目录启动 → 默认测试台 7 台设备就绪 → 完整跑通示例 TPS（7/7 通过，2.3 s）→ 报告与运行目录产物齐全</td>
+<td>27 项断言全部通过</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>说明：安装后首次启动会自动创建 <code>workspace\</code>、部署公共 <code>conftest.py</code>、把注册库投影到 <code>ate.db</code>、并种子写入默认测试台，因此新环境开箱即可跑示例 TPS。</p>
+</blockquote>
+  <footer>ATE Runner 安装指导 · 由 packaging/build_package.ps1 产出的安装包配套文档</footer>
+</div>
+</body>
+</html>

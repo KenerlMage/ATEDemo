@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>ATE Runner 仪器驱动库 · 设计说明</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Driver SDK · Design</div>
+<h1>ATE Runner 仪器驱动库 · 设计说明</h1>
+<p class='sub'>这套库为什么长这样：六层结构、依赖方向、数据模型、返回协议、错误模型、型号派发、连接方式与传输后端解析（网口 / 串口 × 原生栈 / VISA）、版本兼容与 19 项上架门禁。</p>
+<div class='meta'><span><b>库版本</b>ate_drivers 1.2.0</span><span><b>契约</b>ate.driver.api 1.2</span><span><b>上架门禁</b>19 项一致性检查</span><span><b>本机实测</b>pytest 47 passed · 各包 19/19</span><span><b>库位置</b>D:/ATE/sdk</span></div></header>
+<div class='doc'><aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>1. 定位与范围</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>2. 六层结构与依赖方向</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>3. 数据模型</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>4. 返回协议</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>5. 错误模型</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>6. 型号派发</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>7. 连接方式与传输后端</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>8. 版本与兼容</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>9. 上架门禁（19 项）</span></a></li>
+<li><a href='#s10'><span class='num'>10</span><span>10. 与平台侧的关系</span></a></li>
+<li><a href='#s11'><span class='num'>11</span><span>11. 设计取舍</span></a></li>
+</ol></aside><main>
+<p class='lede'><blockquote>
+适用版本：<code>ate_drivers</code> 1.2.0 · 契约 <code>ate.driver.api</code> <strong>1.2</strong> · 门禁 19 项
+读者：平台开发人员、驱动作者、测试系统集成者
+本文回答「这套库为什么长这样」；「怎么用」见《使用手册》，「写新驱动时要守什么」见《设计准则》，「新设备家族怎么落地」见《新设备家族接入指南》。
+</blockquote></p>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>1. 定位与范围</h2></div>
+<p>这套库要解决的是<strong>测试程序（TPS）与仪器之间那一层</strong>的问题：一台设备换个品牌、换条链路、换份固件，测试用例不该跟着改。</p>
+<p>它提供三样东西：</p>
+<table>
+<thead>
+<tr>
+<th>提供</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>契约层</strong></td>
+<td>动作名、参数名、单位、返回结构、错误码。上层按契约写代码，不按仪器写代码</td>
+</tr>
+<tr>
+<td><strong>家族层</strong></td>
+<td>一类设备的通用语义。示波器家族把「设时基 / 设通道 / 采波形 / 测量」定义成固定动作与算法</td>
+</tr>
+<tr>
+<td><strong>型号注册表</strong></td>
+<td>设备档案里的 <code>model</code> 字段 → 精确派发到某个驱动类；顺带把「这台设备支持哪些链路」也登记进去</td>
+</tr>
+</tbody>
+</table>
+<p>它<strong>不</strong>负责这些（别往里塞）：</p>
+<ul>
+<li>不做设备发现（不扫网段、不枚举 COM 口）——设备档案是唯一事实源；</li>
+<li>不做业务判定（测合格不合格是 TPS 的事）；</li>
+<li>不做 UI（工具卡片、报告渲染在平台侧）；</li>
+<li>不碰数据库（平台侧把档案行交给它，它只读字段）。</li>
+</ul>
+</section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>2. 六层结构与依赖方向</h2></div>
+<p>依赖<strong>单向向下</strong>：门面 → 注册表 → 家族 → 链路 → 传输。谁都不许反向 import，厂商包只许依赖家族层与契约层。</p>
+<pre><code>                     ┌─────────────────────────────┐
+   用户/TPS 用例  →  │ api.py        Scope 门面     │  只暴露业务方法
+                     ├─────────────────────────────┤
+   平台侧接入     →  │ factory.py    型号注册表      │  按型号精确派发
+                     ├─────────────────────────────┤
+   每类设备一份   →  │ family/&lt;家族&gt;.py  家族契约    │  动作/单位/算法/仿真基线
+                     ├─────────────────────────────┤
+   每个品牌一份   →  │ vendors/&lt;厂商&gt;/   厂商驱动包  │  只填差异面
+                     ├─────────────────────────────┤
+   链路解析       →  │ endpoint.py   连接方式层     │  档案 → 端点 + 校验
+                     ├─────────────────────────────┤
+   真实收发       →  │ transport.py  链路层         │  socket / 串口 / VISA / 仿真
+                     ├─────────────────────────────┤
+   底座           →  │ base.py · contract.py · capabilities.py · errors.py · models.py │
+                     └─────────────────────────────┘
+</code></pre>
+<p>各层职责与「不许做的事」：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>文件</th>
+<th>职责</th>
+<th>不许做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>门面</td>
+<td><code>api.py</code></td>
+<td>校验参数、挑模式（真机/仿真）、核对型号、把结果整理成用户友好的结构</td>
+<td>不许出现任何仪器命令字样</td>
+</tr>
+<tr>
+<td>注册表</td>
+<td><code>factory.py</code></td>
+<td>型号归一化、登记、精确派发、别名、注册表自检、<code>open_scope()</code></td>
+<td>不许打分、不许模糊匹配、不许兜底驱动</td>
+</tr>
+<tr>
+<td>家族</td>
+<td><code>family/&lt;家族&gt;.py</code></td>
+<td>动作定义、参数单位、测量算法、仿真基线、命令表契约、安全退出</td>
+<td>不许出现具体品牌的命令拼写</td>
+</tr>
+<tr>
+<td>厂商包</td>
+<td><code>vendors/&lt;厂商&gt;/</code></td>
+<td>命令表、应答前导解析、量纲缩放、枚举映射、仿真模型</td>
+<td>不许改动作名、不许改返回结构、不许 import 其它厂商包</td>
+</tr>
+<tr>
+<td>连接方式</td>
+<td><code>endpoint.py</code></td>
+<td>档案 → <code>Endpoint</code>（LAN / SERIAL）、传输后端解析（<code>native</code> / <code>visa</code>）、参数校验、转 <code>DeviceConfig</code>、规范 VISA 资源名</td>
+<td>不许猜链路、不许猜后端、不许静默降级</td>
+</tr>
+<tr>
+<td>链路</td>
+<td><code>transport.py</code></td>
+<td><code>SocketTransport</code> / <code>SerialTransport</code> / <code>VisaTransport</code> / <code>SimulateTransport</code>，同一套 open/close/write/read/query；<code>backend</code> 决定用原生栈还是 PyVISA</td>
+<td>不许把第三方库变成硬依赖（pyserial / pyvisa 一律惰性导入 + 可注入）</td>
+</tr>
+<tr>
+<td>底座</td>
+<td><code>base.py</code> 等</td>
+<td>会话生命周期、动作分发、能力校验、统一返回结构、错误码、数据模型</td>
+<td>不许依赖家族以上任何东西</td>
+</tr>
+<tr>
+<td>工具链</td>
+<td><code>kit/</code></td>
+<td>脚手架、清单校验、19 项门禁、CLI</td>
+<td>不进运行时依赖（生产环境可以不装）</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>3. 数据模型</h2></div>
+<h3 id="31-deviceconfig">3.1 <code>DeviceConfig</code> —— 设备档案在库里的投影</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bench_id</code> / <code>device_id</code> / <code>name</code></td>
+<td><code>""</code></td>
+<td>台位、设备编号、显示名</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>""</code></td>
+<td><strong>派发依据</strong>，唯一不能省</td>
+</tr>
+<tr>
+<td><code>vendor</code> / <code>category</code> / <code>role</code></td>
+<td><code>""</code></td>
+<td>展示与报表用，不参与派发</td>
+</tr>
+<tr>
+<td><code>interface</code></td>
+<td><code>"NONE"</code></td>
+<td><code>LAN</code> / <code>SERIAL</code> / <code>NONE</code>（无链路）</td>
+</tr>
+<tr>
+<td><code>host</code> / <code>port</code></td>
+<td><code>""</code> / <code>None</code></td>
+<td>网口端点，必须成对</td>
+</tr>
+<tr>
+<td><code>serial_port</code> / <code>baudrate</code></td>
+<td><code>""</code> / <code>None</code></td>
+<td>串口端点</td>
+</tr>
+<tr>
+<td><code>address</code> / <code>channel</code> / <code>protocol</code></td>
+<td><code>""</code></td>
+<td>老式总线地址、通道、协议备注</td>
+</tr>
+<tr>
+<td><code>programmable</code> / <code>required</code> / <code>configured</code></td>
+<td><code>False</code> / <code>True</code> / <code>False</code></td>
+<td>是否可编程、是否必需、连接参数是否已配齐</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td><code>2.0</code></td>
+<td>单次读写超时（秒）</td>
+</tr>
+<tr>
+<td><code>note</code> / <code>extra</code></td>
+<td><code>""</code> / <code>{}</code></td>
+<td>备注与未登记字段（保留原始档案信息）</td>
+</tr>
+</tbody>
+</table>
+<p>配套属性：<code>backend</code>（档案 <code>extra.backend</code>，未写即 <code>native</code>）/ <code>visa_resource</code>（规范 VISA 资源名）。配套方法：<code>from_dict()</code> / <code>from_row()</code>（吃数据库行或 dict）/ <code>describe()</code> / <code>is_net()</code> / <code>is_serial()</code> / <code>transport_kind()</code>（<code>socket</code> / <code>serial</code> / <code>none</code>）/ <code>resource</code>（VISA 风格资源名）。</p>
+<h3 id="32-endpoint">3.2 <code>Endpoint</code> —— 解析后的连接方式</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>""</code></td>
+<td><code>LAN</code> / <code>SERIAL</code></td>
+</tr>
+<tr>
+<td><code>host</code> / <code>port</code> / <code>protocol</code></td>
+<td><code>""</code> / <code>None</code> / <code>""</code></td>
+<td>网口</td>
+</tr>
+<tr>
+<td><code>port_name</code> / <code>baudrate</code> / <code>bytesize</code> / <code>parity</code> / <code>stopbits</code></td>
+<td><code>""</code> / <code>None</code> / <code>8</code> / <code>"N"</code> / <code>1</code></td>
+<td>串口</td>
+</tr>
+<tr>
+<td><code>device_id</code> / <code>timeout</code> / <code>extra</code></td>
+<td><code>""</code> / <code>2.0</code> / <code>{}</code></td>
+<td>归属与超时</td>
+</tr>
+</tbody>
+</table>
+<p><code>describe()</code> 产出人话标签：网口 <code>192.168.10.41:4000</code>，串口 <code>COM6@115200,8N1</code>；<code>visa_resource</code> 产出规范 VISA 资源名（<code>TCPIP0::192.168.10.41::4000::SOCKET</code> / <code>ASRL6::INSTR</code>），只有 <code>backend="visa"</code> 时才参与连接。</p>
+<h3 id="33">3.3 家族数据模型（示波器）</h3>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>字段</th>
+<th>单位约定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TimebaseSetup</code></td>
+<td><code>scale_s_per_div</code>、<code>divisions=10</code>、<code>offset_s=0.0</code></td>
+<td>秒/格、秒</td>
+</tr>
+<tr>
+<td><code>ChannelSetup</code></td>
+<td><code>name</code>、<code>enabled</code>、<code>scale_v_per_div=0.5</code>、<code>coupling</code>、<code>offset_v</code>、<code>probe_ratio</code></td>
+<td><strong>伏</strong>/格、伏</td>
+</tr>
+<tr>
+<td><code>Waveform</code></td>
+<td><code>channel</code>、<code>samples</code>、<code>x_incr_s</code>、<code>x_start_s=0.0</code>、<code>unit="V"</code>、<code>source</code></td>
+<td>采样值恒为<strong>伏</strong>，时间恒为<strong>秒</strong></td>
+</tr>
+<tr>
+<td><code>Measurement</code></td>
+<td><code>kind</code>、<code>value</code>、<code>unit</code>、<code>quality="good"</code></td>
+<td>每项测量自带单位与质量</td>
+</tr>
+</tbody>
+</table>
+<p><strong>铁律</strong>：数据模型里的量纲是<strong>物理单位</strong>，不是「仪器当前档位的格数」「ADC 计数」。缩放发生在厂商包内部，出口必须是伏 / 秒 / 赫兹。</p>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>4. 返回协议</h2></div>
+<p>返回结构分两种粒度，<strong>不要混用</strong>：</p>
+<p><strong>① 门面（<code>Scope</code>）——给人看的精简结构</strong></p>
+<table>
+<thead>
+<tr>
+<th>方法类型</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动作类（<code>auto_setup</code> / <code>set_timebase</code> / <code>set_channel</code> / <code>configure</code>）</td>
+<td><code>{ok, action, simulated, value, source}</code></td>
+</tr>
+<tr>
+<td>采集类（<code>capture</code>）</td>
+<td><code>{ok, simulated, channel, points, volts, seconds_per_sample, first_sample_seconds, unit, source}</code></td>
+</tr>
+<tr>
+<td>测量类（<code>measure</code>）</td>
+<td><code>{KIND: {value, unit, quality, source}, ...}</code></td>
+</tr>
+<tr>
+<td>状态类（<code>status</code> / <code>metadata</code> / <code>identity</code>）</td>
+<td>会话与身份明细（含 <code>mode</code> / <code>interface_kind</code> / <code>resource</code> / <code>endpoint_detail</code>）</td>
+</tr>
+<tr>
+<td>自检（<code>self_test</code>）</td>
+<td><code>{ok, model, vendor, endpoint, simulated, checks[], identity{}}</code>，<code>checks</code> 是逐项清单</td>
+</tr>
+<tr>
+<td>关闭（<code>close</code>）</td>
+<td><code>{ok, device_id, commands}</code>（<code>commands</code> = 本次会话发出的命令条数）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>② 契约层（<code>driver.do(action, **params)</code>）——给平台与工具看的完整结构，固定 16 键</strong></p>
+<p><code>ok</code> · <code>schema</code> · <code>device_id</code> · <code>alias</code> · <code>driver</code> · <code>driver_version</code> · <code>api</code> · <code>action</code> · <code>requested</code> · <code>value</code> · <code>detail</code> · <code>quality</code> · <code>source</code> · <code>simulated</code> · <code>elapsed_ms</code> · <code>warnings</code></p>
+<p>真实样例（<code>do("identify")</code>）：</p>
+<pre><code class="language-json">{&quot;ok&quot;: true, &quot;schema&quot;: &quot;ate.driver.result.v1&quot;, &quot;device_id&quot;: &quot;&quot;, &quot;alias&quot;: &quot;&quot;,
+ &quot;driver&quot;: &quot;tektronix-mso5&quot;, &quot;driver_version&quot;: &quot;1.5.0&quot;, &quot;api&quot;: &quot;1.2&quot;,
+ &quot;action&quot;: &quot;identify&quot;, &quot;requested&quot;: &quot;identify&quot;,
+ &quot;value&quot;: &quot;TEKTRONIX,MSO54,SIM0001,1.2.3&quot;, &quot;detail&quot;: {}, &quot;quality&quot;: &quot;simulated&quot;,
+ &quot;source&quot;: &quot;simulate&quot;, &quot;simulated&quot;: true, &quot;elapsed_ms&quot;: 0, &quot;warnings&quot;: []}
+</code></pre>
+<p>波形动作的 <code>value</code> 是一个可序列化的波形对象：<code>{schema, channel, samples, x_incr_s, x_start_s, unit, source}</code>——<code>schema</code> 为 <code>ate.driver.waveform.v1</code>。</p>
+</section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>5. 错误模型</h2></div>
+<p>八类异常，九个错误码。<strong>上层只许按 <code>code</code> 分支，不许解析中文消息文本</strong>（文案会改，码不会）。</p>
+<table>
+<thead>
+<tr>
+<th>异常类</th>
+<th>码</th>
+<th>触发场景</th>
+<th>处置建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DriverError</code></td>
+<td><code>E_DRIVER</code></td>
+<td>基类；参数越界等通用失败</td>
+<td>修参数或报缺陷</td>
+</tr>
+<tr>
+<td><code>ConfigurationError</code></td>
+<td><code>E_CONFIG</code></td>
+<td>连接参数不完整/非法（缺 IP、缺端口、缺串口名、波特率非法、链路歧义、型号不符）</td>
+<td><strong>不重试</strong>，改档案或接线</td>
+</tr>
+<tr>
+<td><code>DriverNotFound</code></td>
+<td><code>E_NOT_FOUND</code></td>
+<td>型号未登记、驱动包缺失</td>
+<td><strong>不重试</strong>，补登记或装包</td>
+</tr>
+<tr>
+<td><code>TransportError</code></td>
+<td><code>E_TRANSPORT</code></td>
+<td>连不上、写失败、串口打不开</td>
+<td>查线/查电源，可重试一次</td>
+</tr>
+<tr>
+<td><code>DriverTimeout</code></td>
+<td><code>E_TIMEOUT</code></td>
+<td>读写超时（继承自 <code>TransportError</code>）</td>
+<td>可重试；仍失败则查链路</td>
+</tr>
+<tr>
+<td><code>ProtocolError</code></td>
+<td><code>E_PROTOCOL</code></td>
+<td>应答无法解析、字段缺失</td>
+<td>查指令方言/固件版本</td>
+</tr>
+<tr>
+<td><code>UnsupportedCapability</code></td>
+<td><code>E_UNSUPPORTED</code></td>
+<td>调了驱动未声明的能力</td>
+<td>先 <code>supports()</code> 判断</td>
+</tr>
+<tr>
+<td><code>ContractMismatch</code></td>
+<td><code>E_CONTRACT</code></td>
+<td>驱动契约版本与平台不兼容</td>
+<td>升级驱动或平台</td>
+</tr>
+<tr>
+<td>（<code>DriverError</code> 带 <code>code="E_PARAM"</code>）</td>
+<td><code>E_PARAM</code></td>
+<td>参数越界或枚举未登记（如耦合写了仪器不支持的值）</td>
+<td>改参数；<strong>库不会静默替换</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>6. 型号派发</h2></div>
+<pre><code>档案 model 字段
+   ↓ normalize_model()        只留字母数字、转大写：mso-54 / MSO 54 / mso54 → MSO54
+   ↓ 注册表精确查表            MSO54 → tektronix-mso5 → TekMsoScope
+   ↓ 别名表（显式登记）        MXO4 → MXO44
+   ↓ 命中 → 驱动类；未命中 → DriverNotFound（列出全部已登记型号）
+</code></pre>
+<ul>
+<li><strong>没有权重打分</strong>：旧版的 <code>model 3.0 / vendor 2.0 / category 2.0 / role 1.5 / interface 1.2 / name 1.0</code> 六项打分与「同分比 priority」「最后兜底 generic-scope」全部删除；</li>
+<li><strong>没有模糊匹配</strong>：不做子串/前缀/相似度；</li>
+<li><strong>同名冲突</strong>报出来（<code>model_conflicts()</code>），不自动挑；</li>
+<li>注册表自检 <code>self_check()</code> 现返回 <code>{"ok": true, "models": 5, "aliases": 1, "problems": []}</code>；</li>
+<li>现已登记 5 个型号：<code>MSO54 / MSO56 / MSO58 / MSO64</code>（泰克 MSO5/MSO6 系列）+ <code>MXO44</code>（R&amp;S MXO 4 系列，别名 <code>MXO4</code>）。</li>
+</ul>
+</section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>7. 连接方式与传输后端</h2></div>
+<p>一台设备网口与串口都能接时，解析顺序固定五步（<code>endpoint_from()</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>步</th>
+<th>依据</th>
+<th>失败行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>显式参数 <code>interface=</code></td>
+<td>值不在 <code>{LAN, SERIAL}</code> → <code>E_CONFIG</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>档案 <code>interface</code> 字段（支持 <code>NET</code> / <code>TCPIP</code> / <code>ETHERNET</code> / <code>SOCKET</code> / <code>COM</code> / <code>RS232</code> / <code>RS485</code> / <code>UART</code> / <code>ASRL</code> 等别名归一化；<code>NONE</code> / <code>PASSIVE</code> / <code>NA</code> / <code>-</code> = 无链路）</td>
+<td>非法值 → <code>E_CONFIG</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>没声明时看端口填充</td>
+<td>网口参数齐 → LAN；串口名有 → SERIAL；<strong>两者都填 → <code>E_CONFIG</code>「连接方式不明确」</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>端点参数校验</td>
+<td>host/port 不成对、串口名缺失、波特率非法 → <code>E_CONFIG</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>型号声明的 <code>INTERFACES</code></td>
+<td>型号不支持该链路 → <code>E_CONFIG</code>（并列出支持哪些）</td>
+</tr>
+</tbody>
+</table>
+<p>链路实现（<code>kind</code> × <code>backend</code> 的组合，全在 <code>transport.py</code> 一处收口）：</p>
+<table>
+<thead>
+<tr>
+<th>链路</th>
+<th>实现类</th>
+<th>依赖</th>
+<th>资源名 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>仿真</td>
+<td><code>SimulateTransport</code></td>
+<td>无</td>
+<td>与后端无关；没有硬件也能跑全流程</td>
+</tr>
+<tr>
+<td>网口 LAN · <code>native</code></td>
+<td><code>SocketTransport</code></td>
+<td>标准库 socket</td>
+<td><code>192.168.10.41:4000</code>（raw socket）</td>
+</tr>
+<tr>
+<td>串口 SERIAL · <code>native</code></td>
+<td><code>SerialTransport</code></td>
+<td>pyserial，<strong>惰性导入</strong></td>
+<td><code>COM6@115200,8N1</code>（帧参数给 pyserial）</td>
+</tr>
+<tr>
+<td>网口 / 串口 · <code>visa</code></td>
+<td><code>VisaTransport</code></td>
+<td>pyvisa，<strong>惰性导入</strong></td>
+<td><code>TCPIP0::192.168.10.41::4000::SOCKET</code> / <code>ASRL6::INSTR</code></td>
+</tr>
+</tbody>
+</table>
+<p>两条链路 + 两套栈是<strong>正交</strong>的：<code>kind</code> 回答"物理怎么接"（给 <code>host/port</code> 还是 <code>serial_port/baudrate</code>），
+<code>backend</code> 回答"用哪套客户端栈收发"。同一台设备四种组合都能跑，业务代码与返回结构完全不变。</p>
+<p><strong>模式语义</strong>：<code>mode="auto"</code>（默认）——给了完整端点走真机，什么都不给走仿真；<code>mode="real"</code> 没有端点直接 <code>E_CONFIG</code>（不给「半残端点悄悄降级成仿真」留缝）；<code>mode="simulate"</code> 强制仿真。连接后默认回读 <code>*IDN?</code> 与档案型号比对，不符报 <code>E_CONFIG</code>（<code>verify_model=False</code> 可关）。</p>
+<h3 id="71-pyvisa">7.1 传输后端：原生栈还是 PyVISA</h3>
+<table>
+<thead>
+<tr>
+<th>后端</th>
+<th>取值</th>
+<th>网口</th>
+<th>串口</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原生栈</td>
+<td><code>native</code>（默认）</td>
+<td>标准库 socket</td>
+<td>pyserial，帧参数直接给 <code>Serial</code></td>
+<td>零硬依赖</td>
+</tr>
+<tr>
+<td>PyVISA</td>
+<td><code>visa</code></td>
+<td>pyvisa 打开 <code>TCPIP0::host::port::SOCKET</code></td>
+<td>pyvisa 打开 <code>ASRL6::INSTR</code>，波特率/帧格式走<strong>会话属性</strong></td>
+<td>pyvisa（NI-VISA / Keysight VISA / pyvisa-py 任一实现）</td>
+</tr>
+<tr>
+<td>自动</td>
+<td><code>auto</code>（仅调用时可写）</td>
+<td>装了 pyvisa 走 VISA，否则走原生</td>
+<td>同左</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>解析顺序（<code>endpoint.resolve_backend()</code>）：<strong>显式 <code>backend=</code> &gt; 档案 <code>extra.backend</code> &gt; 默认 <code>native</code></strong>。</p>
+<ul>
+<li>认不出的写法（<code>usb-tmc</code>）→ <code>E_CONFIG</code>，消息里列出可选项，<strong>不猜也不静默退回原生</strong>；</li>
+<li>显式 <code>visa</code> 但环境没装 pyvisa（真机模式）→ <code>E_CONFIG</code>，<code>detail</code> 给出 <code>pip install pyvisa pyvisa-py</code>；</li>
+<li>型号声明的 <code>BACKENDS</code> 不含所请求后端 → <code>E_CONFIG</code>，消息里列出该型号声明的后端；</li>
+<li><code>auto</code> 是<strong>调用时的选择</strong>，不是可声明的能力：驱动 <code>BACKENDS</code> 里写 <code>auto</code> 会被门禁 C19 挡下；</li>
+<li><strong>实际生效的后端永远可查</strong>：<code>scope.backend</code> / <code>status()["backend"]</code> / <code>metadata()</code> / <code>backend_detail()</code>，
+  会话打开时每条结果都带 <code>transport</code> 与 <code>backend</code>，日志里不会出现"以为走的是 VISA"。</li>
+</ul>
+<p>串口帧参数（<code>baud_rate</code> / <code>data_bits</code> / <code>parity</code> / <code>stop_bits</code>）<strong>不写进资源名</strong>——
+<code>ASRL::COM6::115200::INSTR</code> 那种拼法不是 VISA 规范资源名；规范写法是 <code>ASRL6::INSTR</code>，
+波特率等作为会话属性下发（<code>_apply_visa_attributes()</code> 逐项 setattr，会话不认的属性跳过：网口没有 <code>baud_rate</code>）。</p>
+</section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>8. 版本与兼容</h2></div>
+<table>
+<thead>
+<tr>
+<th>常量</th>
+<th>值</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>API_VERSION</code></td>
+<td><code>1.2</code></td>
+<td>契约版本；驱动清单里的 <code>api</code> 与之比对</td>
+</tr>
+<tr>
+<td><code>CONTRACT_NAME</code></td>
+<td><code>ate.driver.api</code></td>
+<td>契约名</td>
+</tr>
+<tr>
+<td><code>MANIFEST_SCHEMA</code></td>
+<td><code>ate.driver.manifest.v1</code></td>
+<td>驱动清单（<code>driver.json</code>）结构</td>
+</tr>
+<tr>
+<td><code>RESULT_SCHEMA</code></td>
+<td><code>ate.driver.result.v1</code></td>
+<td>单动作返回结构</td>
+</tr>
+<tr>
+<td><code>WAVEFORM_SCHEMA</code></td>
+<td><code>ate.driver.waveform.v1</code></td>
+<td>波形对象结构</td>
+</tr>
+<tr>
+<td><code>FROZEN_ACTIONS</code></td>
+<td><code>{"scope.get_waveform": "scope.acquire_waveform"}</code></td>
+<td>冻结的旧动作仍然可用</td>
+</tr>
+<tr>
+<td><code>DEPRECATIONS</code></td>
+<td><code>{}</code>（当前为空）</td>
+<td>已弃用项 → 替代项</td>
+</tr>
+</tbody>
+</table>
+<p>兼容规则：<strong>动作只增不改</strong>；改语义必须先加新动作并把旧的写进 <code>DEPRECATIONS</code>；<code>min_platform</code> 声明平台最低版本，<code>check_compatible()</code> 在加载阶段就拒绝不兼容的包（报 <code>E_CONTRACT</code>）。</p>
+</section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>9. 上架门禁（19 项）</h2></div>
+<p><code>python -m ate_drivers.kit.cli check &lt;驱动包&gt;</code> 会逐项跑下面 19 条。<strong>门禁不绿，不准上架。</strong></p>
+<table>
+<thead>
+<tr>
+<th>号</th>
+<th>检查</th>
+<th>号</th>
+<th>检查</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C01</td>
+<td>类元数据完整</td>
+<td>C10</td>
+<td>会话可重入</td>
+</tr>
+<tr>
+<td>C02</td>
+<td>契约版本兼容</td>
+<td>C11</td>
+<td>安全退出</td>
+</tr>
+<tr>
+<td>C03</td>
+<td>能力声明合法</td>
+<td>C12</td>
+<td>仿真可复现</td>
+</tr>
+<tr>
+<td>C04</td>
+<td>能力均有实现</td>
+<td>C13</td>
+<td>实例互不干扰</td>
+</tr>
+<tr>
+<td>C05</td>
+<td>命令表完整</td>
+<td>C14</td>
+<td>旧动作别名有效</td>
+</tr>
+<tr>
+<td>C06</td>
+<td>仿真可执行全部能力</td>
+<td>C15</td>
+<td>零第三方依赖（可选依赖须惰性导入）</td>
+</tr>
+<tr>
+<td>C07</td>
+<td>返回结构可序列化</td>
+<td>C16</td>
+<td>弃用项有替代</td>
+</tr>
+<tr>
+<td>C08</td>
+<td>测量项带单位</td>
+<td>C17</td>
+<td>型号可派发</td>
+</tr>
+<tr>
+<td>C09</td>
+<td>错误可分类</td>
+<td>C18</td>
+<td>连接方式可声明</td>
+</tr>
+<tr>
+<td>C19</td>
+<td>传输后端可声明（<code>native</code> / <code>visa</code>）</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id='s10'><div class='sechead'><span class='num'>10</span><h2>10. 与平台侧的关系</h2></div>
+<p>平台侧（<code>D:\ATE\backend\drivers/</code>）是<strong>另一套实现</strong>，两者通过「型号 + 清单」对齐：</p>
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>平台侧现状</th>
+<th>SDK 侧</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>规格来源</td>
+<td>内置 <code>DRIVER_SPECS</code> 8 条</td>
+<td>内置 <code>vendors/</code> + 目录扫描 <code>driver.json</code></td>
+</tr>
+<tr>
+<td>选型</td>
+<td><strong>仍按 <code>match</code> 权重打分兜底</strong></td>
+<td><strong>已删除打分</strong>，型号精确派发</td>
+</tr>
+<tr>
+<td>合并方式</td>
+<td><code>merge_specs(builtin_specs, manifests)</code></td>
+<td><code>resolve_spec(model, specs)</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>说明：平台侧仍是打分版，属既定待办（见《设计准则》末节「迁移与统一」）。SDK 侧的口径是目标口径：<strong>型号直连派发、命令不外露、网口与串口平权</strong>。</p>
+</blockquote>
+<p>平台侧接入一段最小代码即可对齐：</p>
+<pre><code class="language-python">from ate_drivers.kit.registry import merge_specs, resolve_spec
+from ate_drivers.kit.cli import scan_dir
+
+specs = merge_specs(platform_builtin_specs, scan_dir(&quot;&lt;ATE&gt;/drivers&quot;))
+spec = resolve_spec(device_model, specs)      # 未登记 → 抛错，不猜
+driver_cls = load_entry(spec[&quot;entry&quot;], spec[&quot;_base_dir&quot;])
+</code></pre>
+</section>
+<section id='s11'><div class='sechead'><span class='num'>11</span><h2>11. 设计取舍</h2></div>
+<table>
+<thead>
+<tr>
+<th>取舍</th>
+<th>选择了</th>
+<th>代价 / 换来什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>打分 vs 精确派发</td>
+<td><strong>精确派发</strong></td>
+<td>未登记型号必须人工登记；换来「不会悄悄套用相似驱动去问仪器」</td>
+</tr>
+<tr>
+<td>门面暴露命令 vs 完全封装</td>
+<td><strong>完全封装</strong></td>
+<td>排障时不能直接敲命令；换来 TPS 用例与品牌解耦（单测扫描 <code>api.py</code> 无命令字样）</td>
+</tr>
+<tr>
+<td>依赖 pyserial / pyvisa vs 零依赖</td>
+<td><strong>零硬依赖 + 惰性导入 + 注入点</strong></td>
+<td>串口与 VISA 各要多装一个包；换来离线工控机也能装、测试可用假串口/假 VISA 会话</td>
+</tr>
+<tr>
+<td>VISA 默认开 vs 默认关</td>
+<td><strong>默认原生栈，<code>visa</code> 显式开（<code>auto</code> 才自动挑）</strong></td>
+<td>想全现场统一走 NI-VISA 要多写一个字段；换来「行为只取决于档案」，不会因为某台机器装了 VISA 就悄悄换栈</td>
+</tr>
+<tr>
+<td>后端放进返回结构 vs 只放进状态</td>
+<td><strong>只进 <code>status()</code> / <code>metadata()</code></strong>，契约层 16 键不动</td>
+<td>单看一次动作的返回看不出后端；换来契约结构与既有报告零改动（契约只增不改）</td>
+</tr>
+<tr>
+<td>静默降级 vs 直接报错</td>
+<td><strong>直接报错</strong></td>
+<td>现场必须把参数填对；换来「接错线不会被当成仿真」</td>
+</tr>
+<tr>
+<td>家族层做多少</td>
+<td><strong>只做通用语义与算法</strong>，命令拼写全下放</td>
+<td>家族层不能替厂商包「顺手兼容」；换来厂商包边界清晰</td>
+</tr>
+<tr>
+<td>仿真是不是一等公民</td>
+<td><strong>是一等公民</strong></td>
+<td>需要维护仿真模型；换来无硬件可开发、可回归、可复现（C12）</td>
+</tr>
+</tbody>
+</table></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 仪器驱动库文档 · 契约 ate.driver.api 1.2</span><span>库位置 D:/ATE/sdk · 上架门禁 19 项一致性检查 · 传输后端 native / visa</span></div>
+</div></body></html>

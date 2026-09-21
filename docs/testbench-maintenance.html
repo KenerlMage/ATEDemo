@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ATE Runner · 测试台装备运维（导出 / 初始化 / 终止 / 自检 / 报告区）</title>
+<style>
+  :root {
+    --accent: #6d28d9; --accent-rgb: 109, 40, 217; --accent-2: #8b5cf6;
+    --bg: #fff; --soft: #faf9ff; --panel: #f5f2fd; --panel-2: #efebfa;
+    --border: #e4def6; --border-strong: #cec3ec;
+    --ink: #241b3f; --muted: #6b6485;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 34px 40px 56px; background: var(--soft); color: var(--ink);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 14px; line-height: 1.7;
+  }
+  header.page {
+    background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--accent);
+    border-radius: 14px; padding: 22px 26px; margin-bottom: 20px;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: .4px; }
+  .lead { color: var(--muted); margin: 0; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+  .metric { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+  .metric b { display: block; font-size: 22px; color: var(--accent); font-family: var(--mono); }
+  .metric span { color: var(--muted); font-size: 12px; }
+  section { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 18px; }
+  h2 { font-size: 16px; margin: 0 0 12px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14px; margin: 18px 0 6px; color: var(--accent); }
+  p { margin: 8px 0; }
+  code { font-family: var(--mono); font-size: 12.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th { text-align: left; background: var(--panel); color: var(--muted); font-weight: 600; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; vertical-align: top; }
+  ul { margin: 8px 0 8px 20px; padding: 0; }
+  li { margin: 4px 0; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+  .tag { display: inline-block; font-size: 11.5px; border-radius: 999px; padding: 1px 9px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); }
+  .tag.ok { color: var(--ok); border-color: rgba(21,128,61,.4); background: rgba(21,128,61,.08); }
+  .tag.warn { color: var(--warn); border-color: rgba(180,83,9,.4); background: rgba(180,83,9,.08); }
+  .tag.acc { color: var(--accent); border-color: rgba(var(--accent-rgb),.4); background: rgba(var(--accent-rgb),.1); }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .btn {
+    font-size: 12.5px; border-radius: 8px; padding: 6px 12px; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--ink);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  pre {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; margin: 10px 0;
+  }
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 12px 0; }
+  .step { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .step b { display: block; color: var(--accent); font-size: 13px; margin-bottom: 4px; }
+  .step span { color: var(--muted); font-size: 12.5px; }
+  footer { color: var(--muted); font-size: 12.5px; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <header class="page">
+    <h1>装备运维页 · 三栏切换（属性配置 / 装备自检 / 报告中心）</h1>
+    <p class="lead">「装备运维页」顶部三栏切换：<b>装备属性配置</b>（设备清单 + 待注册导出）/ <b>测试台装备自检</b>（初始化 / 终止 / 自检 + 报告弹窗）/ <b>装备报告中心</b>（报告目录 + 历史报告 + 本地资源管理器），各自独立成块。</p>
+    <div class="metrics">
+      <div class="metric"><b>3</b><span>栏位（属性 / 自检 / 报告）</span></div>
+      <div class="metric"><b>4</b><span>动作：导出 / 初始化 / 终止 / 自检</span></div>
+      <div class="metric"><b>2</b><span>运行模式：模拟 / 真实</span></div>
+      <div class="metric"><b>10</b><span>新增接口</span></div>
+      <div class="metric"><b>5</b><span>导出范围：待注册 / 已注册 / 全部 / 选中</span></div>
+      <div class="metric"><b>1</b><span>报告区（含资源管理器）</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 界面结构（三栏切换）</h2>
+    <p>页面顶部是一条<b>栏位切换条</b>（<code>⚙ 装备属性配置</code> / <code>✓ 测试台装备自检</code> / <code>▤ 装备报告中心</code>），三栏各自独立成块，切换时地址栏同步（<code>#/equipment?tab=selfcheck</code>、<code>#/equipment?tab=reports</code>），刷新后停留在同一栏，可直接分享链接。</p>
+    <table>
+      <tr><th>栏位</th><th>内容</th><th>代码落点</th></tr>
+      <tr><td><code>⚙</code> 装备属性配置</td><td>测试台切换标签 + 筛选/搜索 + 设备卡片网格（右键可编程设备改属性）；底部四个面板：<b>待注册测试台</b>（草稿清单 + 导出按钮）、<b>已注册测试台</b>（勾选 / 全选 + 导出选中 / 导出全部已注册）、TPS 运行环境、TPS 运行目录</td><td rowspan="3"><code>EquipmentView.vue</code><br><span class="muted">（同一路由内用 <code>v-show</code> 分栏，不新增导航项；右侧导航仅保留一个入口）</span></td></tr>
+      <tr><td><code>✓</code> 测试台装备自检</td><td>目标测试台下拉 + 运行模式下拉（离线模拟 / 真实探测）+ 三个按钮：<b>测试台装备初始化</b>、<b>测试台装备终止</b>、<b>测试台装备自检</b>；执行后直接弹出报告</td></tr>
+      <tr><td><code>▤</code> 装备报告中心</td><td>报告区（目录路径 / 已保存文件数 / 占用空间 / 打开本地资源管理器 / 刷新清单）+ <b>历史报告表</b>（时间 / 类型 / 测试台 / 模式 / 结论 / 大小 / 操作，顶部按「全部 · 硬件自检 · 装备初始化 · 装备终止 · 测试台导出」过滤）</td></tr>
+      <tr><td>报告与导出弹窗</td><td>报告弹窗内 <code>&lt;iframe&gt;</code> 直接渲染完整 HTML 报告，底部可「在资源管理器中定位」或「新窗口打开」；导出弹窗显示条数 / 范围 / 文件名 / 落盘路径，并可重新下载</td><td><code>EquipmentView.vue</code> + <code>api.js</code></td></tr>
+    </table>
+    <p class="muted">分栏状态存在地址栏 hash 查询串里，不落 localStorage：多个页面标签可各自停在不同栏位互不干扰。</p>
+  </section>
+
+  <section>
+    <h2>2. 测试台导出（待注册 / 已注册）</h2>
+    <p>导出把测试台的<b>预设类型 / 工位 / 每台设备型号·接口·连接参数</b>整体导出为 <code>ate.testbench.export.v1</code> JSON，可用于备份现场配置、离线核对，或迁移到其他工控机。两个入口：</p>
+    <table>
+      <tr><th>入口</th><th>位置</th><th>导出内容</th></tr>
+      <tr><td><b>待注册测试台导出</b></td><td>「装备属性配置」栏 · 待注册测试台面板</td><td>草稿状态（<code>status=draft</code>）测试台，按钮「导出待注册测试台」一次全导</td></tr>
+      <tr><td><b>已注册测试台导出</b></td><td>「装备属性配置」栏 · 已注册测试台面板</td><td>已注册（<code>status=registered</code>）测试台：可<b>勾选多台</b>后点「导出选中」，或直接「导出全部已注册」；支持「全选 / 清空选择」</td></tr>
+    </table>
+    <div class="flow">
+      <div class="step"><b>① 组装</b><span>读取注册库中符合范围（待注册 / 已注册 / 指定台 / 全部）的测试台，导出设备清单（型号 / 厂商 / 接口 / IP·端口 / 串口·波特率 / 资源地址 / 是否已配置）</span></div>
+      <div class="step"><b>② 落盘</b><span>写入报告目录 <code>logs/testbench/export_&lt;范围&gt;_&lt;时间戳&gt;.json</code>（如 <code>export_registered_…</code> / <code>export_selected_…</code>），并登记报告清单</span></div>
+      <div class="step"><b>③ 下载与复核</b><span>浏览器同时下载同一份 JSON；弹窗显示导出条数、<b>状态构成</b>（已注册 / 草稿）、作用范围、文件名与落盘路径，可「在资源管理器中定位」或「重新下载」</span></div>
+    </div>
+    <p class="muted">作用范围写在 <code>scope</code> 字段：<code>pending</code>（待注册）/ <code>registered</code>（已注册）/ <code>all</code>（全部含草稿）/ <code>selected</code>（指定台）；接口参数 <code>status</code>（<code>registered</code> / <code>draft</code> / <code>all</code>，缺省 = 待注册，兼容旧行为）与 <code>bench_ids</code>（指定台）。没匹配到测试台时也允许导出<b>空清单</b>（同样带 schema，便于线下按模板填写）；历史报告里的导出记录类型标签统一显示为「测试台导出」（旧记录无需数据迁移）。</p>
+    <pre>{
+  "schema": "ate.testbench.export.v1",
+  "exported_at": "2026-09-12 23:17:27",
+  "scope": "registered",
+  "scope_label": "已注册",
+  "status_filter": "registered",
+  "count": 1,
+  "by_status": { "registered": 1, "draft": 0 },
+  "purpose": "已注册测试台导出：备份现场注册配置与设备连接参数，可跨工控机迁移或作为注册基线比对",
+  "testbenches": [
+    { "id": "tb_xxx", "title": "SPM读头动态测试台", "serial": "SPMTS202609120001", "status": "registered",
+      "preset_id": "SPM-RH-DYN-01", "station": { "line": "…", "station": "…" },
+      "device_count": 7, "programmable_count": 6, "configured_count": 6,
+      "devices": [ { "id": "rh-dmm", "name": "数字万用表", "model": "Fluke 8846A",
+                     "interface": "LAN", "host": "192.168.10.42", "port": 3490, "configured": true } ] }
+  ]
+}</pre>
+  </section>
+
+  <section>
+    <h2>3. 装备初始化 / 终止 / 自检</h2>
+    <p>三个按钮都作用于<b>所选测试台的全部设备</b>，逐台按类别取标准动作序列并记录每条指令的执行结果。</p>
+    <table>
+      <tr><th>设备类别</th><th>初始化动作（示例）</th><th>终止动作（示例）</th></tr>
+      <tr><td>示波器</td><td><code>*RST</code> → <code>*CLS</code> → 默认时基 <code>TIM:SCAL</code> → <code>*IDN?</code></td><td><code>STOP</code> → <code>SYST:LOC</code></td></tr>
+      <tr><td>数字万用表</td><td>复位 → <code>FUNC "VOLT:DC"</code> → <code>VOLT:DC:RANG:AUTO ON</code> → <code>*IDN?</code></td><td><code>ABOR</code> → <code>SYST:LOC</code></td></tr>
+      <tr><td>可编程电源</td><td><code>OUTP OFF</code> → <code>VOLT 0</code> → <code>CURR 0.1</code>（限流保护）</td><td>输出关闭 → 电压归零 → 退回本地</td></tr>
+      <tr><td>电子负载</td><td><code>INP OFF</code> → <code>FUNC CURR</code></td><td>关闭输入 → 退回本地</td></tr>
+      <tr><td>信号源</td><td><code>OUTP OFF</code> → <code>FUNC SIN</code></td><td>关闭输出 → 退回本地</td></tr>
+      <tr><td>运动 / 转速控制盒</td><td>串口握手 <code>AT</code> → 转速归零 <code>SPD 0</code> → <code>ID?</code></td><td>转速归零 → 撤销使能 → 关闭串口会话</td></tr>
+      <tr><td>夹具 / 探针（非程控）</td><td colspan="2" class="muted">标记为「信息项」并提示人工确认；<b>不参与结论判定</b>，不会把整体结果拉成“待人工确认”</td></tr>
+    </table>
+    <h3>两种运行模式</h3>
+    <ul>
+      <li><span class="tag acc">离线模拟</span> 只生成与真实流程同构的步骤记录，<b>不向仪器发送任何指令</b>；报告中标注“模拟”，测量与执行结果不冒充实测。</li>
+      <li><span class="tag warn">真实探测</span> 真正建链（LAN 建 TCP / 串口开 COM）并逐条下发指令、读回应答；点按钮前会二次确认。现场无仪器时如实记录失败原因（例如 <code>连接失败: timed out</code>），不会伪装成功。</li>
+    </ul>
+    <h3>结论判定</h3>
+    <p>失败项 → <span class="tag" style="color:#dc2626;border-color:rgba(220,38,38,.4)">未通过</span>；程控设备存在跳过项（缺动作模板 / 未装 pyserial）→ <span class="tag warn">待人工确认</span>；其余 → <span class="tag ok">通过</span>。</p>
+  </section>
+
+  <section>
+    <h2>4. 界面显示自检报告</h2>
+    <p>执行任一动作后自动弹出报告弹窗，弹窗内用 <code>iframe</code> 渲染后端生成的完整 HTML 报告（自包含、无外部依赖）：</p>
+    <ul>
+      <li>顶部：结论徽标（通过 / 待人工确认 / 未通过）+ 中文结论与“离线模拟 · 非真机实测”标注（模拟模式）；</li>
+      <li>测试台信息卡：名称 / 编号 / 预设类型 / 状态 / 产线·工位 / 物理位置 / 设备规模；</li>
+      <li>汇总数字：检查项 / 通过 / 失败 / 跳过（初始化与终止额外显示动作总数、成功数与耗时）；</li>
+      <li>明细表：自检为「配置类 + 每设备连通性」逐项清单（含目标地址、状态、失败或跳过原因）；初始化 / 终止为每台设备的「动作 → 指令 → 结果 → 说明」逐条记录。</li>
+    </ul>
+    <p class="muted">自检结果同时写回注册库（<code>verification</code> + 最近 10 次 <code>verify_history</code>），因此「测试台导航」页看到的自检状态与本页报告始终一致；初始化 / 终止的最近 20 次记录保留在 <code>ops_history</code>。</p>
+  </section>
+
+  <section>
+    <h2>5. 报告区与本地资源管理器</h2>
+    <table>
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>落盘目录</td><td><code>backend/logs/testbench/</code>，产物：<code>selfcheck_&lt;编号&gt;_&lt;时间戳&gt;.html</code>、<code>init_*.html</code>、<code>teardown_*.html</code>、<code>export_*.json</code>，外加清单 <code>index.json</code></td></tr>
+      <tr><td>清单登记</td><td>每条含类型 / 测试台 / 模式 / 结论 / 汇总 / 大小 / <b>绝对路径</b> / 访问 URL；读取时自动剔除已被手工删除的文件</td></tr>
+      <tr><td>界面"空间"</td><td>运维面板的「报告区」显示目录路径、文件数与占用空间；下方历史报告表按时间倒序展示并可按类型过滤</td></tr>
+      <tr><td>打开资源管理器</td><td>「打开本地资源管理器」→ 后端调系统文件管理器打开报告目录（Windows <code>explorer</code>）；每行「资源管理器」→ 直接<b>选中该报告文件</b>；报告弹窗底部同样提供定位入口</td></tr>
+      <tr><td>安全约束</td><td>只允许打开固定的报告目录，文件名经白名单正则与 <code>relative_to</code> 双重校验，<code>../../main.py</code> 之类路径穿越请求被直接拒绝</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>6. 接口</h2>
+    <table>
+      <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+      <tr><td>GET</td><td><code>/api/testbench/pending</code></td><td>待注册（草稿）测试台清单 + 已注册台数</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/export</code></td><td>导出待注册测试台（<code>bench_ids</code> / <code>include_registered</code>），落盘 + 回传内容</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/{id}/init</code></td><td>装备初始化（<code>{mode, timeout, note}</code>）→ 结果 + 报告条目</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/{id}/teardown</code></td><td>装备终止 → 结果 + 报告条目</td></tr>
+      <tr><td>POST</td><td><code>/api/testbenches/{id}/selfcheck</code></td><td>硬件自检 → 结果写回注册库 + 报告条目</td></tr>
+      <tr><td>GET</td><td><code>/api/testbench/reports</code></td><td>报告清单（<code>kind</code> / <code>bench_id</code> / <code>limit</code>）</td></tr>
+      <tr><td>GET</td><td><code>/api/testbench/reports/dir</code></td><td>目录信息：路径 / 文件数 / 占用空间</td></tr>
+      <tr><td>GET</td><td><code>/api/testbench/reports/{file}</code></td><td>报告内容（HTML）</td></tr>
+      <tr><td>POST</td><td><code>/api/testbench/reports/open</code></td><td>打开报告目录，或 <code>{filename}</code> 定位到具体报告</td></tr>
+    </table>
+    <p class="muted">统一返回体：<code>{success, message, result, report, testbench}</code>；失败时 <code>success=false</code> 并带中文原因，界面以轻提示呈现，不白屏。</p>
+  </section>
+
+  <section>
+    <h2>7. 代码落点</h2>
+    <table>
+      <tr><th>文件</th><th>职责</th></tr>
+      <tr><td class="mono">backend/testbench_lifecycle.py</td><td>新增运维模块：动作模板（<code>INIT_SEQUENCE</code> / <code>TEARDOWN_SEQUENCE</code>）、链路会话 <code>_Link</code>、报告渲染 <code>render_report_html</code>、报告清单 <code>index.json</code>、十一个路由</td></tr>
+      <tr><td class="mono">backend/main.py</td><td>末尾挂载 <code>testbench_lifecycle.register_routes(app, TPS_DIR)</code>（与注册、装备助手模块同级）</td></tr>
+      <tr><td class="mono">frontend/src/views/EquipmentView.vue</td><td>顶部栏位切换（<code>TABS</code> / <code>activeTab</code> / <code>setTab</code>，hash 同步）、装备属性配置栏（设备卡片 + 待注册面板）、测试台装备自检栏、装备报告中心栏（报告区 + 历史报告表）、报告与导出弹窗</td></tr>
+      <tr><td class="mono">frontend/src/api.js</td><td>新增 9 个接口函数（含 <code>testbenchReportUrl()</code> 用于报告 iframe）</td></tr>
+      <tr><td class="mono">backend/logs/testbench/</td><td>运行期产物目录（报告 + 导出清单 + index.json）</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>8. 验证记录（2026-09-12）</h2>
+    <ul>
+      <li>接口联调 <code>test_lifecycle.py</code>：<b>47 条断言全部通过</b>——草稿创建与待注册清单、导出（条数 / schema / scope / 落盘 / 文件名）、初始化（7 台设备 21 个动作全成功、万用表 4 个动作、夹具标信息项、报告 HTML 校验）、终止（电源 <code>OUTP OFF</code> 等动作核验）、自检（13/13 通过、结果写回注册库、<code>verify_history</code> / <code>ops_history</code> 留痕）、报告清单与目录、过滤、资源管理器打开与路径穿越拦截、真实模式失败如实记录、既有接口回归、清理草稿。</li>
+      <li>前端 <code>npm run build</code> 通过：43 modules transformed（分栏改造后 CSS 71.21 kB / JS 197.23 kB）。</li>
+      <li>分栏改造校验：模板标签平衡（div 107/107、section 4/4、button 34/34、span 69/69）；栏位 hash 逻辑 5 组用例全通过（含非法 <code>tab</code> 值兜底回属性配置栏）。</li>
+      <li><b>已注册导出</b>联调 <code>test_export_registered.py</code>：<b>40 条断言全部通过</b>——已注册范围（计数 / scope / scope_label / 分状态计数 / purpose / 文件名 / 落盘结构 / 报告条目与标题）、设备清单与连接参数（7 台 / 可编程 6 台 / 串口设备）、指定台导出（<code>selected</code>）、全部导出（<code>all</code>）、旧参数与缺省行为兼容（<code>include_registered</code> / <code>status=draft</code> / 不传参）、报告区按类型过滤与范围统计、草稿创建-删除自清理。</li>
+      <li>报告目录实测产物：<code>init_*.html</code>、<code>teardown_*.html</code>、<code>selfcheck_*.html</code>、<code>export_pending_*.json</code>、<code>export_registered_*.json</code>、<code>export_selected_*.json</code> + <code>index.json</code>。</li>
+    </ul>
+    <pre>后端：cd D:\ATE\backend  →  .venv\Scripts\python.exe -m uvicorn main:app --port 8000
+前端：cd D:\ATE\frontend →  npm run dev  →  http://127.0.0.1:5173 → 登录 → 左侧「装备属性配置」
+试一遍：选运行模式「离线模拟」→ 点三个按钮（会直接弹出报告）→ 点「打开本地资源管理器」</pre>
+  </section>
+
+  <footer>ATE Runner · 装备运维说明（三栏切换） · 报告目录 backend/logs/testbench</footer>
+</body>
+</html>

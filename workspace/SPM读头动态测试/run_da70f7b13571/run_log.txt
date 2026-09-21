@@ -1,0 +1,87 @@
+[2026-09-12 23:19:53] ▶ [init] SETUP01 环境初始化 -> testcase.env_setup::init_environment
+[2026-09-12 23:19:53] 环境初始化: 读头供电 3.3 V
+[2026-09-12 23:19:53] 驱动就绪 psu: generic-psu @ TCPIP0::192.168.10.43::30000::SOCKET [仿真] idn=ITECH,IT6332A,SIM-PSU,1.0
+[2026-09-12 23:19:53] psu.set_voltage -> 3.3
+[2026-09-12 23:19:53] psu.set_current -> 0.5
+[2026-09-12 23:19:53] psu.output_on -> ON
+[2026-09-12 23:19:53] 环境初始化: 回放激励 1 kHz / 2.4 Vpp 正弦
+[2026-09-12 23:19:53] 驱动就绪 awg: generic-awg @ TCPIP0::192.168.10.45::5025::SOCKET [仿真] idn=Keysight,33500B,SIM-AWG,1.0
+[2026-09-12 23:19:53] awg.set_waveform -> {"kind": "SIN", "frequency": 1000.0, "amplitude": 2.4, "offset": 0.0}
+[2026-09-12 23:19:53] awg.output_on -> ON
+[2026-09-12 23:19:53] 环境初始化: 转速控制盒握手并复位
+[2026-09-12 23:19:53] 驱动就绪 spin: serial-motion @ ASRL::COM6::115200::INSTR [仿真] idn=ATEMOTION,SIM-SPIN,COM,1.0
+[2026-09-12 23:19:53] spin.handshake -> OK:ATEMOTION,V1
+[2026-09-12 23:19:53] spin.home -> OK
+[2026-09-12 23:19:53] 环境初始化: 示波器自动设置与时基
+[2026-09-12 23:19:53] 驱动就绪 scope: tektronix-mso5 @ TCPIP0::192.168.10.41::4000::SOCKET [仿真] idn=TEKTRONIX,MSO54,SIM-SCOPE,1.0.0
+[2026-09-12 23:19:53] scope.autoset -> {"timebase": 0.0005, "signal": {"kind": "sine", "freq": 1000.0, "vpp": 2.4, "offset": 0.0, "noise": 0.02, "phase": 0.0}}
+[2026-09-12 23:19:53] scope.timebase -> 0.0005
+[2026-09-12 23:19:53] scope.channel -> {"display": true, "scale": 0.5, "coupling": "DC", "offset": 0.0}
+[2026-09-12 23:19:53] 驱动就绪 fixture: passive-device @ simulate [仿真] idn=ATE,SIM-PASSIVE,0,1.0.0
+[2026-09-12 23:19:53] fixture.describe -> {"device_id": "rh-fixture", "name": "读头装夹夹具与探针组套", "model": "RH-PROBE-KIT-50", "vendor": "ATE-InHouse", "category": "夹具", "interface": "NONE", "resource": "", "
+[2026-09-12 23:19:53] 夹具信息: {'device_id': 'rh-fixture', 'name': '读头装夹夹具与探针组套', 'model': 'RH-PROBE-KIT-50', 'vendor': 'ATE-InHouse', 'category': '夹具', 'interface': 'NONE', 'resource': '', 'programmable': False, 'driver': 'passive-device'}
+[2026-09-12 23:19:53] ✔ [SETUP01] 环境初始化 通过 (0.01s)
+[2026-09-12 23:19:53] 驱动已释放: psu
+[2026-09-12 23:19:53] 驱动已释放: awg
+[2026-09-12 23:19:53] 驱动已释放: spin
+[2026-09-12 23:19:53] 驱动已释放: scope
+[2026-09-12 23:19:53] 驱动已释放: fixture
+[2026-09-12 23:19:53] ▶ [test] TC001 上电电压测试 -> testcase.power::power_on_voltage
+[2026-09-12 23:19:53] 驱动就绪 psu: generic-psu @ TCPIP0::192.168.10.43::30000::SOCKET [仿真] idn=ITECH,IT6332A,SIM-PSU,1.0
+[2026-09-12 23:19:53] psu.set_voltage -> 3.3
+[2026-09-12 23:19:53] psu.output_on -> ON
+[2026-09-12 23:19:53] 驱动就绪 dmm: generic-dmm @ TCPIP0::192.168.10.42::3490::SOCKET [仿真] idn=FLUKE,8846A,SIM-DMM,1.0
+[2026-09-12 23:19:53] dmm.measure_dc_voltage -> 3.312608
+[2026-09-12 23:19:53] 读头上电电压 = 3.312608V 在 [3.135, 3.465] 内 ✓
+[2026-09-12 23:19:53] ✔ [TC001] 上电电压测试 通过 (0.00s)
+[2026-09-12 23:19:53] 驱动已释放: psu
+[2026-09-12 23:19:53] 驱动已释放: dmm
+[2026-09-12 23:19:54] ▶ [test] TC002 读头工作电流测试 -> testcase.power::read_head_current
+[2026-09-12 23:19:54] 驱动就绪 spin: serial-motion @ ASRL::COM6::115200::INSTR [仿真] idn=ATEMOTION,SIM-SPIN,COM,1.0
+[2026-09-12 23:19:54] spin.set_speed -> 3600.0
+[2026-09-12 23:19:54] 驱动就绪 dmm: generic-dmm @ TCPIP0::192.168.10.42::3490::SOCKET [仿真] idn=FLUKE,8846A,SIM-DMM,1.0
+[2026-09-12 23:19:54] dmm.measure_dc_current -> 182.225634
+[2026-09-12 23:19:54] 读头工作电流 = 182.225634mA 在 [150, 250] 内 ✓
+[2026-09-12 23:19:54] ✔ [TC002] 读头工作电流测试 通过 (0.00s)
+[2026-09-12 23:19:54] 驱动已释放: spin
+[2026-09-12 23:19:54] 驱动已释放: dmm
+[2026-09-12 23:19:54] ▶ [test] TC003 转速闭环测试 -> testcase.comm::spin_speed
+[2026-09-12 23:19:54] 驱动就绪 spin: serial-motion @ ASRL::COM6::115200::INSTR [仿真] idn=ATEMOTION,SIM-SPIN,COM,1.0
+[2026-09-12 23:19:54] spin.handshake -> OK:ATEMOTION,V1
+[2026-09-12 23:19:54] 运动控制握手应答: OK:ATEMOTION,V1（0.315 ms）
+[2026-09-12 23:19:54] spin.set_speed -> 3600.0
+[2026-09-12 23:19:54] spin.read_speed -> 3587.545
+[2026-09-12 23:19:54] 读头转速 = 3587.545rpm 在 [3560, 3640] 内 ✓
+[2026-09-12 23:19:54] 运动控制握手响应 = 0.315ms 在 [0, 50] 内 ✓
+[2026-09-12 23:19:54] ✔ [TC003] 转速闭环测试 通过 (0.06s)
+[2026-09-12 23:19:54] 驱动已释放: spin
+[2026-09-12 23:19:54] ▶ [test] TC004 回放信号幅度与频率测试 -> testcase.comm::playback_signal
+[2026-09-12 23:19:54] 驱动就绪 scope: tektronix-mso5 @ TCPIP0::192.168.10.41::4000::SOCKET [仿真] idn=TEKTRONIX,MSO54,SIM-SCOPE,1.0.0
+[2026-09-12 23:19:54] scope.autoset -> {"timebase": 0.0005, "signal": {"kind": "sine", "freq": 1000.0, "vpp": 2.4, "offset": 0.0, "noise": 0.02, "phase": 0.0}}
+[2026-09-12 23:19:54] scope.measure -> [{'type': 'PK2PK', 'value': 2.44667, 'unit': 'V', 'source': 'simulate'}, {'type': 'FREQUENCY', 'value': 1002.005013, 'unit': 'Hz', 'source': 'simulate'}, {'type': 'MEAN', 'value': 0.000134, 'unit': 'V', 'source': 'simulate'}, {'type': 'RMS', 'value': 0.848366, 'unit': 'V', 'source': 'simulate'}]
+[2026-09-12 23:19:54] 示波器测量: {'PK2PK': 2.44667, 'FREQUENCY': 1002.005013, 'MEAN': 0.000134, 'RMS': 0.848366}
+[2026-09-12 23:19:54] 回放信号幅度 = 2.44667V 在 [2.3, 2.5] 内 ✓
+[2026-09-12 23:19:54] 回放信号频率 = 1002.005013Hz 在 [990, 1010] 内 ✓
+[2026-09-12 23:19:54] ✔ [TC004] 回放信号幅度与频率测试 通过 (0.00s)
+[2026-09-12 23:19:54] 驱动已释放: scope
+[2026-09-12 23:19:55] ▶ [test] TC005 负载端电压测试 -> testcase.comm::load_voltage
+[2026-09-12 23:19:55] 驱动就绪 eload: generic-eload @ TCPIP0::192.168.10.44::30000::SOCKET [仿真] idn=ITECH,IT8512A,SIM-ELOAD,1.0
+[2026-09-12 23:19:55] eload.set_mode -> CC
+[2026-09-12 23:19:55] eload.set_current -> 0.5
+[2026-09-12 23:19:55] eload.input_on -> ON
+[2026-09-12 23:19:55] eload.measure_voltage -> 3.2946
+[2026-09-12 23:19:55] 负载端电压 = 3.2946V 在 [3.1, 3.5] 内 ✓
+[2026-09-12 23:19:55] ✔ [TC005] 负载端电压测试 通过 (0.00s)
+[2026-09-12 23:19:55] 驱动已释放: eload
+[2026-09-12 23:19:55] ▶ [teardown] TD01 环境终止 -> testcase.env_setup::teardown_environment
+[2026-09-12 23:19:55] 环境终止: 关闭供电与激励输出
+[2026-09-12 23:19:55] 驱动就绪 psu: generic-psu @ TCPIP0::192.168.10.43::30000::SOCKET [仿真] idn=ITECH,IT6332A,SIM-PSU,1.0
+[2026-09-12 23:19:55] psu.output_off -> OFF
+[2026-09-12 23:19:55] 驱动就绪 awg: generic-awg @ TCPIP0::192.168.10.45::5025::SOCKET [仿真] idn=Keysight,33500B,SIM-AWG,1.0
+[2026-09-12 23:19:55] awg.output_off -> OFF
+[2026-09-12 23:19:55] 驱动就绪 spin: serial-motion @ ASRL::COM6::115200::INSTR [仿真] idn=ATEMOTION,SIM-SPIN,COM,1.0
+[2026-09-12 23:19:55] spin.stop -> OK
+[2026-09-12 23:19:55] ✔ [TD01] 环境终止 通过 (0.00s)
+[2026-09-12 23:19:55] 驱动已释放: psu
+[2026-09-12 23:19:55] 驱动已释放: awg
+[2026-09-12 23:19:55] 驱动已释放: spin

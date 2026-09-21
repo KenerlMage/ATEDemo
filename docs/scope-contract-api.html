@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATE Runner · 示波器契约层接口设计</title>
+<style>
+:root{
+  --bg:#fafafa; --ink:#111111; --ink2:#3d3d3a; --muted:#6b6b66;
+  --rule:#e2e0d9; --rule2:#c9c6bc; --panel:#f4f3ee; --accent:#8B0F1A;
+  --sans:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Mono",Consolas,"SFMono-Regular","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.72;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.cover{padding:86px 0 40px;border-bottom:1px solid var(--rule2)}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-0.01em;margin:0}
+.cover h1{font-size:54px;line-height:1.08;margin:16px 0 14px;letter-spacing:-0.028em}
+.cover .sub{font-size:19px;line-height:1.7;color:var(--ink2);max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:34px;margin-top:32px;font-size:12.5px;
+      letter-spacing:.02em;color:var(--muted);font-family:var(--mono)}
+.meta b{display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.09em;
+        text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.doc{display:grid;grid-template-columns:224px minmax(0,1fr);gap:58px;padding:46px 0 0}
+.toc{position:sticky;top:28px;align-self:start}
+.toc .t{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+        font-weight:600;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin-bottom:9px;font-size:13.5px;line-height:1.5}
+.toc a{color:var(--ink2);text-decoration:none;display:flex;gap:10px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--rule2)}
+.toc .num{font-family:var(--mono);color:var(--muted);font-size:12px}
+main{min-width:0}
+section{padding:0 0 44px;margin-bottom:46px;border-bottom:1px solid var(--rule)}
+section:last-child{border-bottom:0;margin-bottom:0}
+.sechead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+.sechead .num{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.06em}
+.sechead h2{font-size:26px}
+.lede{color:var(--ink2);margin:0 0 24px;max-width:72ch}
+p{margin:0 0 18px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);
+     border:1px solid var(--rule);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+thead th{border-bottom:1px solid var(--rule2);font-size:11.5px;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:1px solid var(--rule2)}
+td.f,.f{font-family:var(--mono);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 7px;
+     border:1px solid var(--rule2);border-radius:3px;color:var(--muted);white-space:nowrap}
+.tag.req{border-color:var(--ink2);color:var(--ink2);font-weight:600}
+h3{font-size:17.5px;margin:32px 0 8px}
+.glede{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:72ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule2);margin:6px 0 24px}
+.split>div{padding:22px 24px}
+.split>div:first-child{border-right:1px solid var(--rule2)}
+.split h4{margin:0 0 12px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--muted);font-weight:600}
+.split ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.85}
+pre{background:var(--panel);border:1px solid var(--rule2);padding:20px 22px;overflow-x:auto;
+    font-family:var(--mono);font-size:12.8px;line-height:1.62;margin:8px 0 24px;tab-size:4}
+pre .c{color:#8d8a80}
+.colophon{padding:40px 0 72px;color:var(--muted);font-size:12.5px;font-family:var(--mono);
+          display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;border-top:1px solid var(--rule)}
+@media (max-width:900px){
+  .wrap{padding:0 22px}.cover{padding:56px 0 30px}.cover h1{font-size:34px}
+  .doc{grid-template-columns:1fr;gap:0;padding-top:30px}
+  .toc{position:static;padding-bottom:22px;margin-bottom:34px;border-bottom:1px solid var(--rule)}
+  .split{grid-template-columns:1fr}
+  .split>div:first-child{border-right:0;border-bottom:1px solid var(--rule2)}
+  table{font-size:13px}th,td{padding:9px 11px}
+}
+</style></head><body><div class='wrap'>
+<header class='cover'>
+<div class='kicker'>ATE Runner · Scope Contract API</div>
+<h1>示波器契约层接口设计</h1>
+<p class='sub'>每个接口一个签名：参数、返回结构、单位、错误码逐条列清。型号驱动继承这份契约只填三处差异，TPS 用例与装备助手只依赖这张表——所以换品牌时用例零改动。表中签名与返回值由反射与仿真实跑导出。</p>
+<div class='meta'><span><b>契约</b>ate.driver.api 1.2</span><span><b>家族类</b>ate_drivers.family.scope.ScopeDriver</span><span><b>核心动作</b>11 个（3 核心 + 8 家族）</span><span><b>统一返回</b>ate.driver.result.v1 · 16 键</span><span><b>错误码</b>9 个 E_*</span></div></header>
+<div class='doc'>
+<aside class='toc'><div class='t'>目录</div><ol>
+<li><a href='#s1'><span class='num'>01</span><span>契约常量</span></a></li>
+<li><a href='#s2'><span class='num'>02</span><span>能力与家族基线</span></a></li>
+<li><a href='#s3'><span class='num'>03</span><span>接口签名总表（核心动作）</span></a></li>
+<li><a href='#s4'><span class='num'>04</span><span>数据模型</span></a></li>
+<li><a href='#s5'><span class='num'>05</span><span>基类通用接口</span></a></li>
+<li><a href='#s6'><span class='num'>06</span><span>家族算法与枚举常量</span></a></li>
+<li><a href='#s7'><span class='num'>07</span><span>型号驱动可覆盖点</span></a></li>
+<li><a href='#s8'><span class='num'>08</span><span>统一返回结构（16 键）</span></a></li>
+<li><a href='#s9'><span class='num'>09</span><span>错误码</span></a></li>
+<li><a href='#s10'><span class='num'>10</span><span>实测返回样例</span></a></li>
+<li><a href='#s11'><span class='num'>11</span><span>设计取舍（明确不做的事）</span></a></li>
+</ol></aside><main>
+<section id='s1'><div class='sechead'><span class='num'>01</span><h2>契约常量</h2></div>
+<p class='lede'>版本协商的判据全在这几个常量里：`API_VERSION` 的 major 必须与平台相等，`FROZEN_ACTIONS` 与 `DEPRECATIONS` 是旧动作名的兼容账本。</p>
+<div class='tw'><table><thead><tr><th>常量</th><th>类型</th><th>值</th><th>作用</th></tr></thead><tbody>
+<tr><td class='f'>CONTRACT_NAME</td><td>str</td><td class='f'>"ate.driver.api"</td><td>契约名（写进驱动清单与运行记录）</td></tr>
+<tr><td class='f'>API_VERSION</td><td>str</td><td class='f'>"1.2"</td><td>契约版本；驱动声明的 major 必须与平台相等</td></tr>
+<tr><td class='f'>RESULT_SCHEMA</td><td>str</td><td class='f'>"ate.driver.result.v1"</td><td>统一返回结构的 schema</td></tr>
+<tr><td class='f'>WAVEFORM_SCHEMA</td><td>str</td><td class='f'>"ate.driver.waveform.v1"</td><td>波形对象的 schema（`value.schema`）</td></tr>
+<tr><td class='f'>MANIFEST_SCHEMA</td><td>str</td><td class='f'>"ate.driver.manifest.v1"</td><td>驱动清单 schema（`meta()` 输出同形）</td></tr>
+<tr><td class='f'>FROZEN_ACTIONS</td><td>dict</td><td class='f'>{"scope.get_waveform": "scope.acquire_waveform"}</td><td>已冻结的旧动作名映射（不可再改）</td></tr>
+<tr><td class='f'>DEPRECATIONS</td><td>dict</td><td class='f'>{}</td><td>弃用登记：动作 → 替代动作/移除版本（当前为空）</td></tr>
+</tbody></table></div></section>
+<section id='s2'><div class='sechead'><span class='num'>02</span><h2>能力与家族基线</h2></div>
+<p class='lede'>能力名 = <code>&lt;家族&gt;.&lt;动词&gt;</code>。核心能力所有驱动都要有；示波器家族的必选能力是 <code>scope.acquire_waveform</code> 与 <code>scope.measure</code>。</p>
+<div class='tw'><table><thead><tr><th>能力</th><th>处理方法</th><th>要求</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>identify</td><td class='f'>identify</td><td>核心·必选</td><td>读仪器标识串（`*IDN?`）</td></tr>
+<tr><td class='f'>reset</td><td class='f'>reset</td><td>核心·必选</td><td>复位到已知状态（`*RST` + `*OPC?` 等同步）</td></tr>
+<tr><td class='f'>state</td><td class='f'>state</td><td>核心·必选</td><td>取当前状态快照（设备/链路/时基/通道/仿真信号）</td></tr>
+<tr><td class='f'>scope.acquire_waveform</td><td class='f'>acquire_waveform</td><td>家族·必选</td><td>取一段波形：采样点 + 时间轴 + 单位</td></tr>
+<tr><td class='f'>scope.measure</td><td class='f'>measure</td><td>家族·必选</td><td>测量项（8 项，单位固定）</td></tr>
+<tr><td class='f'>scope.timebase</td><td class='f'>timebase</td><td>家族·可选</td><td>时基档位 / 屏内格数 / 水平偏移，读改同一接口</td></tr>
+<tr><td class='f'>scope.channel</td><td class='f'>channel</td><td>家族·可选</td><td>通道开关 / 垂直档位 / 耦合 / 偏置 / 探头比</td></tr>
+<tr><td class='f'>scope.autoset</td><td class='f'>autoset</td><td>家族·可选</td><td>自动设置（按已知信号参数的确定性档位）</td></tr>
+<tr><td class='f'>scope.run</td><td class='f'>run</td><td>家族·可选</td><td>持续采集</td></tr>
+<tr><td class='f'>scope.stop</td><td class='f'>stop</td><td>家族·可选</td><td>停止采集</td></tr>
+<tr><td class='f'>scope.single</td><td class='f'>single</td><td>家族·可选</td><td>单次采集</td></tr>
+<tr><td class='f'>vendor.<厂商>.<动作></td><td class='f'>型号自定义</td><td>扩展·可选</td><td>厂商私有能力，必须带 `vendor.` 前缀（平台不解释）</td></tr>
+</tbody></table></div></section>
+<section id='s3'><div class='sechead'><span class='num'>03</span><h2>接口签名总表（核心动作）</h2></div>
+<p class='lede'>每个动作一个签名。参数一律可选：<b>不传即读，传了即改</b>。返回统一进 <code>value</code>，单位写进结构。</p>
+<h3>identify</h3>
+<pre>def identify(self) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`str` — 标识串（仿真返回 `sim_idn`）</td></tr><tr><th>单位</th><td>—</td></tr><tr><th>可能错误</th><td class='f'>E_TRANSPORT E_TIMEOUT</td></tr></tbody></table></div>
+<h3>reset</h3>
+<pre>def reset(self) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`"OK"`（真机为 `*OPC?` 应答）</td></tr><tr><th>单位</th><td>—</td></tr><tr><th>可能错误</th><td class='f'>E_TRANSPORT E_TIMEOUT</td></tr></tbody></table></div>
+<h3>state</h3>
+<pre>def state(self) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`dict` — `device_id` / `resource` / `driver*` / `connected` / `idn` / `commands` / `capabilities` / `transport` / `timebase` / `channels` / `running` / `single` / `sim_signal` / `missing_commands`</td></tr><tr><th>单位</th><td>内含 s/div、V/div</td></tr><tr><th>可能错误</th><td class='f'>—</td></tr></tbody></table></div>
+<h3>scope.timebase</h3>
+<pre>def timebase(self, scale_s_per_div: float | None = None,
+             divisions: int | None = None,
+             offset_s: float | None = None, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>三个参数**都可选**，只传要改的；不传即读</td></tr><tr><th>返回 value</th><td>`TimebaseSetup.to_dict()` → `{scale_s_per_div, divisions, offset_s, window_s, unit}`</td></tr><tr><th>单位</th><td>s/div、s</td></tr><tr><th>可能错误</th><td class='f'>E_PARAM（≤0、格数 <2）</td></tr></tbody></table></div>
+<h3>scope.channel</h3>
+<pre>def channel(self, name: str = &quot;CH1&quot;,
+            enabled: bool | None = None,
+            scale_v_per_div: float | None = None,
+            coupling: str | None = None,
+            offset_v: float | None = None,
+            probe_ratio: float | None = None, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>`coupling` ∈ `DC|AC|GND`；`scale_v_per_div` > 0</td></tr><tr><th>返回 value</th><td>`ChannelSetup.to_dict()` → `{name, enabled, scale_v_per_div, coupling, offset_v, probe_ratio, unit}`</td></tr><tr><th>单位</th><td>V/div、V</td></tr><tr><th>可能错误</th><td class='f'>E_PARAM</td></tr></tbody></table></div>
+<h3>scope.autoset</h3>
+<pre>def autoset(self, kind: str | None = None,
+            freq_hz: float | None = None,
+            vpp_v: float | None = None, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>`kind` ∈ `sine|square|triangle|sawtooth|dc|noise`；`freq_hz` > 0；`vpp_v` > 0</td></tr><tr><th>返回 value</th><td>`{timebase: {...}, sim_signal: {...}}`</td></tr><tr><th>单位</th><td>s/div、Hz、V</td></tr><tr><th>可能错误</th><td class='f'>E_PARAM</td></tr></tbody></table></div>
+<h3>scope.acquire_waveform</h3>
+<pre>def acquire_waveform(self, points: int = 1000,
+                     channel: str = &quot;CH1&quot;, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>`points` 采样点数（按当前时基换算时间轴）</td></tr><tr><th>返回 value</th><td>`Waveform.to_dict()` → `{schema, channel, points, samples, x_start_s, x_incr_s, unit, source}`</td></tr><tr><th>单位</th><td>V（采样值）、s（时间轴）</td></tr><tr><th>可能错误</th><td class='f'>E_PROTOCOL E_TRANSPORT E_TIMEOUT</td></tr></tbody></table></div>
+<h3>scope.measure</h3>
+<pre>def measure(self, items: Optional[list] = None,
+            channel: str = &quot;CH1&quot;,
+            points: int = 2000, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>`items` ⊆ `MEASURE_ITEMS`；默认 `(PK2PK, FREQUENCY, MEAN, RMS)`</td></tr><tr><th>返回 value</th><td>`list[Measurement.to_dict()]` → `[{type, value, unit, source}, …]`</td></tr><tr><th>单位</th><td>V / Hz / s</td></tr><tr><th>可能错误</th><td class='f'>E_PARAM（未知测量项）</td></tr></tbody></table></div>
+<h3>scope.run</h3>
+<pre>def run(self, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`True`（运行中）</td></tr><tr><th>单位</th><td>—</td></tr><tr><th>可能错误</th><td class='f'>—</td></tr></tbody></table></div>
+<h3>scope.stop</h3>
+<pre>def stop(self, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`False`（已停止）</td></tr><tr><th>单位</th><td>—</td></tr><tr><th>可能错误</th><td class='f'>—</td></tr></tbody></table></div>
+<h3>scope.single</h3>
+<pre>def single(self, **_) -&gt; dict</pre>
+<div class='tw'><table><tbody><tr><th>参数</th><td>无</td></tr><tr><th>返回 value</th><td>`True`；`detail = {"single": true}`</td></tr><tr><th>单位</th><td>—</td></tr><tr><th>可能错误</th><td class='f'>—</td></tr></tbody></table></div>
+</section>
+<section id='s4'><div class='sechead'><span class='num'>04</span><h2>数据模型</h2></div>
+<p class='lede'>冻结 dataclass：字段名与单位是契约的一部分，<code>to_dict()</code> 直接把单位一起带出去。</p>
+<div class='tw'><table><thead><tr><th>模型</th><th>签名</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>TimebaseSetup</td><td class='f'>`(scale_s_per_div: float, divisions: int = 10, offset_s: float = 0.0)`</td><td>`window_s` 属性 = 格数 × 档位；`to_dict()` 附 `unit="s/div"`</td></tr>
+<tr><td class='f'>ChannelSetup</td><td class='f'>`(name: str = "CH1", enabled: bool = True, scale_v_per_div: float = 0.5, coupling: str = "DC", offset_v: float = 0.0, probe_ratio: float = 1.0)`</td><td>`to_dict()` 附 `unit="V/div"`</td></tr>
+<tr><td class='f'>Waveform</td><td class='f'>`(channel: str, samples: tuple[float, ...], x_incr_s: float, x_start_s: float = 0.0, unit: str = "V", source: str = "simulate")`</td><td>`points` = 采样点数；`to_dict()` 附 `schema="ate.driver.waveform.v1"`</td></tr>
+<tr><td class='f'>Measurement</td><td class='f'>`(kind: str, value: Optional[float], unit: str, quality: str = "good")`</td><td>`to_dict()` 序列化成 `{"type": kind, "value", "unit", "source"}`（报告里字段名是 `type`）</td></tr>
+<tr><td class='f'>DeviceConfig</td><td class='f'>`(bench_id="", device_id="", name="", model="", vendor="", category="", role="", interface="NONE", protocol="", host="", port=None, serial_port="", baudrate=None, address="", channel="", programmable=False, required=True, configured=False, timeout=2.0, note="", extra=<factory>)`</td><td>与平台注册库字段一对一；`timeout` 是默认读写超时（秒）</td></tr>
+</tbody></table></div></section>
+<section id='s5'><div class='sechead'><span class='num'>05</span><h2>基类通用接口</h2></div>
+<p class='lede'>会话、分发、能力协商、自省与链路——型号驱动不重写这些，只覆盖命令表与仿真钩子。</p>
+<div class='tw'><table><thead><tr><th>分组</th><th>签名</th><th>说明</th></tr></thead><tbody>
+<tr><td>会话</td><td class='f'>def open(self) -> dict</td><td>建立链路并取 IDN；返回 `{ok, device_id, alias, driver, driver_version, api, mode, transport, resource, idn, simulated}`</td></tr>
+<tr><td>会话</td><td class='f'>def close(self) -> dict</td><td>**先下发安全退出命令**（`protect_on_close` 登记的），再关链路；返回 `{ok, device_id, commands}`</td></tr>
+<tr><td>会话</td><td class='f'>def ensure_open(self) -> InstrumentDriver</td><td>未开则开，返回 `self`（可链式：`dev.ensure_open().do(...)`）</td></tr>
+<tr><td>会话</td><td class='f'>def protect_on_close(self, command: str) -> None</td><td>登记会话结束时要下发的命令（如 `:OUTP OFF`、停止采集）；重复登记自动去重</td></tr>
+<tr><td>分发</td><td class='f'>def do(self, action: str, **params) -> dict</td><td>执行动作 → 统一返回结构；失败抛 `DriverError` 子类</td></tr>
+<tr><td>分发</td><td class='f'>def resolve(self, action: str) -> str</td><td>动作名 → 处理方法名；未登记抛 `E_UNSUPPORTED`（detail 列出可用动作）</td></tr>
+<tr><td>分发</td><td class='f'>def normalize_action(self, action: str) -> str</td><td>旧名/别名 → 规范能力名（`waveform` → `scope.acquire_waveform`）</td></tr>
+<tr><td>能力</td><td class='f'>def supports(self, capability: str) -> bool</td><td>支持 `scope.*` 通配（新能力加入时通配调用不失效）</td></tr>
+<tr><td>能力</td><td class='f'>def require(self, capability: str) -> None</td><td>不支持则抛 `E_UNSUPPORTED`（detail 列出已声明能力）</td></tr>
+<tr><td>能力</td><td class='f'>def capabilities(self) -> list[str]</td><td>已声明能力（排序后）</td></tr>
+<tr><td>能力</td><td class='f'>def actions(self) -> list[str]</td><td>全部可调用动作名（规范名 + 别名）</td></tr>
+<tr><td>自省</td><td class='f'>def meta(self) -> dict</td><td>驱动自描述，形如清单：`schema/key/version/api/family/label/capabilities/actions/simulate/class`</td></tr>
+<tr><td>自省</td><td class='f'>def contract_report(self) -> dict</td><td>契约快照：`missing_required` / `unknown` / `vendor_extensions` / `known_capabilities`</td></tr>
+<tr><td>自省</td><td class='f'>def validate_declaration(self) -> tuple[list, list, list]</td><td>`(缺失的家族基线能力, 平台不认识的能力, 厂商扩展能力)`</td></tr>
+<tr><td>自省</td><td class='f'>def missing_commands(self) -> list[str]</td><td>未覆盖的**必需命令键**（型号驱动漏填在这里暴露）</td></tr>
+<tr><td>自省</td><td class='f'>def log_lines(self) -> list[str]</td><td>本次会话实际下发的命令序列（排查用）</td></tr>
+<tr><td>链路</td><td class='f'>def write(self, command: str) -> None</td><td>写命令；链路异常统一包装成 `DriverError` 并带 `[alias]` 前缀</td></tr>
+<tr><td>链路</td><td class='f'>def query(self, command: str, timeout: Optional[float] = None) -> str</td><td>写 + 读，返回去空白后的应答</td></tr>
+<tr><td>链路</td><td class='f'>def read(self, timeout: Optional[float] = None) -> str</td><td>只读</td></tr>
+<tr><td>链路</td><td class='f'>def cmd(self, key: str, **params) -> str</td><td>按 `COMMANDS` 表渲染命令（型号驱动只改表，动作代码不动）</td></tr>
+<tr><td>仿真</td><td class='f'>def simulate_command(self, command: str) -> str</td><td>仿真模式下对任意命令的应答；型号驱动按自己协议覆盖</td></tr>
+<tr><td>换算</td><td class='f'>@staticmethod auto_v_per_div(vpp_v: float) -> float</td><td>从 `V_DIV_STEPS` 选不溢出的最接近档位（家族级，跨品牌同口径）</td></tr>
+</tbody></table></div></section>
+<section id='s6'><div class='sechead'><span class='num'>06</span><h2>家族算法与枚举常量</h2></div>
+<p class='lede'>测量算法放在家族层（而不是各家门面），是「跨品牌判定一致」的技术前提。</p>
+<div class='tw'><table><thead><tr><th>函数</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>sim_samples(kind, freq_hz, vpp_v, offset_v, points, window_s, noise, phase=0.0) -> list[float]</td><td>家族默认仿真模型：按信号参数生成确定性采样（同参数同结果）；`noise` 用参数派生种子</td></tr>
+<tr><td class='f'>measure_samples(samples, x_incr_s, freq_hint_hz=0.0) -> dict</td><td>家族测量算法：对采样点自算全部 8 项（不依赖仪器 `:MEASure`），跨品牌口径一致</td></tr>
+<tr><td class='f'>ScopeDriver.auto_v_per_div(vpp_v) -> float</td><td>垂直档位优选：从 `V_DIV_STEPS` 里选档</td></tr>
+</tbody></table></div>
+<div class='tw'><table><thead><tr><th>常量</th><th>值</th></tr></thead><tbody>
+<tr><td class='f'>MEASURE_ITEMS</td><td class='f'>(&quot;PK2PK&quot;, &quot;AMPLITUDE&quot;, &quot;FREQUENCY&quot;, &quot;PERIOD&quot;, &quot;MEAN&quot;, &quot;RMS&quot;, &quot;RISE&quot;, &quot;FALL&quot;)</td></tr>
+<tr><td class='f'>COUPLINGS</td><td class='f'>(&quot;DC&quot;, &quot;AC&quot;, &quot;GND&quot;)</td></tr>
+<tr><td class='f'>WAVEFORM_KINDS</td><td class='f'>(&quot;sine&quot;, &quot;square&quot;, &quot;triangle&quot;, &quot;sawtooth&quot;, &quot;dc&quot;, &quot;noise&quot;)</td></tr>
+<tr><td class='f'>V_DIV_STEPS</td><td class='f'>(0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)</td></tr>
+<tr><td class='f'>DEFAULT_PREAMBLE</td><td class='f'>&quot;0;2;1;0;0;0;0;1.0E-3;0.0;128.0;1&quot;（前导字段的通用兜底顺序）</td></tr>
+<tr><td class='f'>DEFAULT_CHANNEL</td><td class='f'>&quot;CH1&quot;</td></tr>
+</tbody></table></div></section>
+<section id='s7'><div class='sechead'><span class='num'>07</span><h2>型号驱动可覆盖点</h2></div>
+<p class='lede'>契约层的「可变面」就这七项；其余全部冻结，改它们即破坏契约。</p>
+<div class='tw'><table><thead><tr><th>覆盖点</th><th>类型</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>COMMANDS</td><td>dict</td><td>命令表：只覆盖与家族不同的键（**键名固定**）；`REQUIRED_COMMANDS` 里的键必须都在</td></tr>
+<tr><td class='f'>PREAMBLE_FIELDS</td><td>tuple</td><td>波形前导字段名顺序；**填了就按名取值**，留空则退化为 `DEFAULT_PREAMBLE` 位置启发式</td></tr>
+<tr><td class='f'>_sim_signal()</td><td>方法</td><td>仿真模型：通常在 `super()._sim_signal()` 上叠加厂商特征（量化位宽、噪声底）</td></tr>
+<tr><td class='f'>simulate_command()</td><td>方法</td><td>仿真模式下对任意命令的应答（型号私有命令必须实现，否则仿真跑不通）</td></tr>
+<tr><td class='f'>driver_key / label / driver_version / sim_idn</td><td>str</td><td>驱动标识与自描述（写进清单、报告与运行记录）</td></tr>
+<tr><td class='f'>ALIASES</td><td>dict</td><td>额外动作别名（家族已有 9 个：`idn/autoset/timebase/channel/waveform/measure/run/stop/single`）</td></tr>
+<tr><td class='f'>CAPABILITIES</td><td>tuple</td><td>追加厂商能力时用 `vendor.` 前缀；**不得删掉家族基线能力**</td></tr>
+</tbody></table></div></section>
+<section id='s8'><div class='sechead'><span class='num'>08</span><h2>统一返回结构（16 键）</h2></div>
+<p class='lede'>每个动作返回同一结构；<code>driver</code> + <code>driver_version</code> + <code>api</code> 必须落进运行记录，否则出问题无法定位到具体驱动版本。</p>
+<div class='tw'><table><thead><tr><th>键</th><th>类型</th><th>说明</th></tr></thead><tbody>
+<tr><td class='f'>ok</td><td>bool</td><td>恒为 `true`（失败抛异常，不返回 `ok=false`）</td></tr>
+<tr><td class='f'>schema</td><td>str</td><td>`ate.driver.result.v1`，上层按它判兼容</td></tr>
+<tr><td class='f'>device_id / alias</td><td>str</td><td>设备标识与报告里用的别名</td></tr>
+<tr><td class='f'>driver / driver_version / api</td><td>str</td><td>**必须落进运行记录**（可复现）</td></tr>
+<tr><td class='f'>action / requested</td><td>str</td><td>规范能力名 / 调用方原名</td></tr>
+<tr><td class='f'>value</td><td>any</td><td>动作主结果（必须可 JSON 序列化）</td></tr>
+<tr><td class='f'>detail</td><td>dict</td><td>附加信息，只增键</td></tr>
+<tr><td class='f'>quality</td><td>str</td><td>`good` / `approximate` / `simulated`</td></tr>
+<tr><td class='f'>source / simulated</td><td>str / bool</td><td>`instrument` / `simulate`</td></tr>
+<tr><td class='f'>elapsed_ms / warnings</td><td>int / list</td><td>耗时与告警</td></tr>
+</tbody></table></div></section>
+<section id='s9'><div class='sechead'><span class='num'>09</span><h2>错误码</h2></div>
+<p class='lede'>失败一律抛异常，不返回 <code>ok=false</code>；上层按错误码分支，不解析中文文案。</p>
+<div class='tw'><table><thead><tr><th>错误码</th><th>异常类</th><th>触发场景</th></tr></thead><tbody>
+<tr><td class='f'>E_DRIVER</td><td class='f'>DriverError</td><td>驱动通用错误（基类）；`to_dict()` 给结构化输出</td></tr>
+<tr><td class='f'>E_PARAM</td><td class='f'>DriverError(code="E_PARAM")</td><td>参数非法：枚举越界、≤0、未知测量项；`detail` 列出可选值</td></tr>
+<tr><td class='f'>E_CONFIG</td><td class='f'>ConfigurationError</td><td>连接参数缺失或非法（缺 IP / 端口 / 串口）</td></tr>
+<tr><td class='f'>E_NOT_FOUND</td><td class='f'>DriverNotFound</td><td>注册库里找不到驱动实现，或设备未登记</td></tr>
+<tr><td class='f'>E_TRANSPORT</td><td class='f'>TransportError</td><td>链路错误：连不上、写失败、串口打不开</td></tr>
+<tr><td class='f'>E_TIMEOUT</td><td class='f'>DriverTimeout</td><td>读写超时（继承 `TransportError`，因为可重试）</td></tr>
+<tr><td class='f'>E_PROTOCOL</td><td class='f'>ProtocolError</td><td>应答不符合协议（前导解析不出、曲线为空）</td></tr>
+<tr><td class='f'>E_UNSUPPORTED</td><td class='f'>UnsupportedCapability</td><td>动作未登记或能力未声明；`detail` 列出可用动作 / 已声明能力</td></tr>
+<tr><td class='f'>E_CONTRACT</td><td class='f'>ContractMismatch</td><td>契约版本不兼容（加载阶段即拒绝）</td></tr>
+</tbody></table></div></section>
+<section id='s10'><div class='sechead'><span class='num'>10</span><h2>实测返回样例</h2></div>
+<p class='lede'>下面全部是仿真实例实跑的输出（泰克 MSO5 参数：1 kHz / 2.4 Vpp / 200 点）。</p>
+<h3>scope.timebase（只读）</h3>
+<pre>{
+  &quot;ok&quot;: true, &quot;schema&quot;: &quot;ate.driver.result.v1&quot;,
+  &quot;driver&quot;: &quot;generic-scope&quot;, &quot;driver_version&quot;: &quot;1.0.0&quot;, &quot;api&quot;: &quot;1.2&quot;,
+  &quot;action&quot;: &quot;scope.timebase&quot;, &quot;requested&quot;: &quot;scope.timebase&quot;,
+  &quot;value&quot;: {&quot;scale_s_per_div&quot;: 0.0005, &quot;divisions&quot;: 10, &quot;offset_s&quot;: 0.0,
+            &quot;window_s&quot;: 0.005, &quot;unit&quot;: &quot;s/div&quot;},
+  &quot;detail&quot;: {}, &quot;quality&quot;: &quot;simulated&quot;, &quot;source&quot;: &quot;simulate&quot;, &quot;simulated&quot;: true,
+  &quot;elapsed_ms&quot;: 0, &quot;warnings&quot;: []
+}</pre>
+<h3>scope.acquire_waveform（value 只摘录前 3 点）</h3>
+<pre>{
+  &quot;value&quot;: {
+    &quot;schema&quot;: &quot;ate.driver.waveform.v1&quot;, &quot;channel&quot;: &quot;CH1&quot;, &quot;points&quot;: 200,
+    &quot;samples&quot;: [0.022949, 0.208294, 0.379139, &quot;… 共 200 项&quot;],
+    &quot;x_start_s&quot;: 0.0, &quot;x_incr_s&quot;: 2.5125628140703518e-05,
+    &quot;unit&quot;: &quot;V&quot;, &quot;source&quot;: &quot;simulate&quot;
+  },
+  &quot;detail&quot;: {&quot;channel&quot;: &quot;CH1&quot;, &quot;unit&quot;: &quot;V&quot;, &quot;timebase&quot;: {...}, &quot;sim_signal&quot;: {...}}
+}</pre>
+<h3>scope.measure（8 项）</h3>
+<pre>{
+  &quot;value&quot;: [
+    {&quot;type&quot;: &quot;PK2PK&quot;,     &quot;value&quot;: 2.44667,      &quot;unit&quot;: &quot;V&quot;,  &quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;AMPLITUDE&quot;, &quot;value&quot;: 2.398504,     &quot;unit&quot;: &quot;V&quot;,  &quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;MEAN&quot;,      &quot;value&quot;: 0.000134,     &quot;unit&quot;: &quot;V&quot;,  &quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;RMS&quot;,       &quot;value&quot;: 0.848366,     &quot;unit&quot;: &quot;V&quot;,  &quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;FREQUENCY&quot;, &quot;value&quot;: 1002.005013,  &quot;unit&quot;: &quot;Hz&quot;, &quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;PERIOD&quot;,    &quot;value&quot;: 0.000997998999, &quot;unit&quot;: &quot;s&quot;,&quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;RISE&quot;,      &quot;value&quot;: 0.000500250125, &quot;unit&quot;: &quot;s&quot;,&quot;source&quot;: &quot;simulate&quot;},
+    {&quot;type&quot;: &quot;FALL&quot;,      &quot;value&quot;: 0.000500250125, &quot;unit&quot;: &quot;s&quot;,&quot;source&quot;: &quot;simulate&quot;}
+  ],
+  &quot;detail&quot;: {&quot;measurements&quot;: [ &quot;同上 8 项&quot; ], &quot;channel&quot;: &quot;CH1&quot;}
+}</pre>
+<h3>错误对象（`DriverError.to_dict()`）</h3>
+<pre>{
+  &quot;code&quot;: &quot;E_PARAM&quot;,
+  &quot;error&quot;: &quot;不支持的测量项: NOPE&quot;,
+  &quot;device_id&quot;: &quot;rh-scope&quot;,
+  &quot;detail&quot;: &quot;可选: PK2PK, AMPLITUDE, FREQUENCY, PERIOD, MEAN, RMS, RISE, FALL&quot;
+}</pre>
+<h3>旧别名调用 do('waveform')</h3>
+<pre>{
+  &quot;action&quot;: &quot;scope.acquire_waveform&quot;,   // 规范化后的能力名
+  &quot;requested&quot;: &quot;waveform&quot;,             // 调用方写的原名，可追溯
+  &quot;warnings&quot;: []
+}</pre>
+</section>
+<section id='s11'><div class='sechead'><span class='num'>11</span><h2>设计取舍（明确不做的事）</h2></div>
+<p class='lede'>契约层的边界写清楚，比事后争论便宜。<code>scale_s_per_div=1e9</code> 这类越界实测不会被拦，这是有意的。</p>
+<div class='tw'><table><thead><tr><th>取舍</th><th>理由</th><th>需要时怎么办</th></tr></thead><tbody>
+<tr><td>参数只校验合法性，不校验仪器量程</td><td>`scale_s_per_div=1e9` 不会在契约层被拒（只拦 ≤0）。各型号量程不同，契约层不做假校验；超量程由仪器回 NACK 或截断，驱动按 `E_PROTOCOL` 暴露。</td><td>需要提前拦住时：在型号驱动里覆盖 `timebase()` 加上该型号的量程判断，仍抛 `E_PARAM`。</td></tr>
+<tr><td>动作方法带 `**_`，多余参数被静默忽略</td><td>换来的是**向后兼容**：家族新增参数不会让老调用报错；代价是参数名拼错也不报错。</td><td>调用侧统一走 `do(action, **params)`；拼写检查交给 TPS 用例的静态检查或编辑器插件。</td></tr>
+<tr><td>`scope.measure` 一律由采样点自算</td><td>跨品牌口径一致（同一份用例在泰克/是德/普源上判定一致），代价是与仪器内部测量（开了平均/带宽限制）可能有偏差。</td><td>确需仪器口径时新增独立动作（如 `scope.measure_instrument`），**不修改** `scope.measure` 语义。</td></tr>
+<tr><td>仿真模式下 `identify()`/`reset()` 不经过链路</td><td>无实机也能跑通用例（产线多数时间没有仪器）；这两个动作在仿真下直接返回 `sim_idn` / `"OK"`。</td><td>需要验证真机分支时用 `mode="real"` + `FakeTransport`，真实走命令与解析。</td></tr>
+</tbody></table></div></section>
+</main></div>
+<div class='colophon'><span>ATE Runner · 示波器契约层接口设计 · ate.driver.api 1.2</span><span>签名与返回值由反射 + 仿真实跑导出</span></div>
+</div></body></html>

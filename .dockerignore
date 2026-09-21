@@ -1,0 +1,11 @@
+**/node_modules
+**/__pycache__
+**/.venv
+**/dist
+**/*.pyc
+backend/logs
+.git
+.gitignore
+README.md
+docs
+*.bat

@@ -1,0 +1,35 @@
+{
+  "schema": "ate.driver.manifest.v1",
+  "key": "rohde-schwarz-mxo4",
+  "version": "1.6.0",
+  "family": "scope",
+  "api": "1.2",
+  "label": "数字示波器 · 罗德与施瓦茨 MXO44（MXO 4 系列）",
+  "vendor": "Rohde & Schwarz",
+  "entry": "ate_drivers.vendors.rohde_schwarz_mxo.driver:RsMxoScope",
+  "interfaces": ["LAN", "SERIAL"],
+  "backends": ["native", "visa"],
+  "models": [
+    "MXO44"
+  ],
+  "aliases": [
+    "MXO4"
+  ],
+  "capabilities": [
+    "identify",
+    "reset",
+    "state",
+    "scope.autoset",
+    "scope.timebase",
+    "scope.channel",
+    "scope.acquire_waveform",
+    "scope.measure",
+    "scope.run",
+    "scope.stop",
+    "scope.single"
+  ],
+  "simulate": true,
+  "min_platform": "1.0.0",
+  "depends": [],
+  "signature": ""
+}

@@ -1,0 +1,142 @@
+// =============================================================================
+// ATE Runner · 设备注册模版（JSONC）
+// -----------------------------------------------------------------------------
+// 文件性质：JSON with Comments（JSONC）。`//` 后为该字段的备注，程序解析前请去掉注释
+//           （strip 后即为合法 JSON，已在 Python json.loads 下校验通过）。
+// 用途    ：登记一台接入 ATE 测试台的设备；注册后的设备清单是装备属性配置、装备助手
+//           工具卡片、TPS 设备清单校验的唯一事实源。
+// 放置位置：注册库 backend/testresource/testbenches.json 的 testbenches[].devices[] 一条。
+//           新建设备时由「测试台注册 → 类型选型」把预设 BOM（testbench_presets.json）
+//           预填进来，现场只改连接参数。
+// 字段依据：backend/testbench_registry.py（DeviceConfig / _device_configured /
+//           DeviceConfigPatch）、backend/drivers/factory.py（DRIVER_SPECS 驱动自动匹配）
+//          、backend/testresource/testbenches.json（实际注册样本）
+// 维护    ：字段增删须同步 registry / 前端表单 / 本模版三处
+// =============================================================================
+{
+  "schema": "ate.device.registration.v1",   // 模版版本标识：字段结构变更时递增尾号
+  "updated_at": "2026-09-16",               // 本模版最后修订日期（YYYY-MM-DD）
+
+  // ===========================================================================
+  // 一条设备条目：下列字段即注册库 devices[] 的一条记录（扁平结构，无嵌套）
+  // ===========================================================================
+  "device": {
+
+    // ---------- ① 标识：决定这台设备在平台里叫什么、被谁引用 ----------
+    "id": "rh-scope",                       // 【必填·台内唯一】设备别名。TPS 的 device_config 用它引用设备（device_id）；建议小写字母 + 短横线，不含空格
+    "name": "数字示波器",                    // 【必填】中文显示名。装备树、工具卡片、报告里显示的就是它；也参与驱动匹配（权重 1.0）
+    "model": "Tektronix MSO54",             // 【必填】型号全称。驱动自动匹配的第一权重字段（3.0），型号写错会挂到错误的驱动上
+    "vendor": "Tektronix",                  // 【必填】厂商名。驱动匹配权重 2.0
+    "category": "示波器",                    // 【必填】设备类别（示波器/万用表/电源/电子负载/信号源/运动控制/数据采集/被动设备…）。驱动匹配权重 2.0
+    "role": "读头回放信号波形 / 边沿与噪声观测",  // 【必填】这台设备在本测试台上的用途。驱动匹配权重 1.5；同款设备在两条测试台上用途不同时，靠它区分
+
+    // ---------- ② 程控与接口：决定平台怎么连它、能不能程控 ----------
+    "programmable": true,                   // 【必填】是否可编程/可程控。false = 被动设备（夹具、探头、工装），只登记不参与通讯自检
+    "interface": "LAN",                     // 【必填】接口类型，决定"配置完整"的判定方式与自检手段：
+                                            //   LAN / ETHERNET / TCP / IP  → 网络类，必须给 host + port，自检走 TCP 探测
+                                            //   SERIAL / RS232 / RS485 / UART / COM → 串口类，必须给 serial_port，自检走串口探测
+                                            //   USB / GPIB / MANUAL / NONE → 不自动探测，以 address 登记，自检结果记 skip（需人工确认）
+                                            //   取值不区分大小写，平台入库时统一转大写
+
+    // ---------- ③ 连接参数：注册后【唯一允许修改】的一组字段 ----------
+    "host": "192.168.10.41",                // 网络类必填：设备 IP 或主机名。建议为仪器分配固定 IP（DHCP 保留），否则换网后注册库里的地址会失效
+    "port": 4000,                           // 网络类必填：端口 1–65535。常见值 4000=VXI-11、5025=SCPI raw socket、3490=Fluke 万用表、30000=ITECH 电源/负载
+    "protocol": "VXI-11 (SCPI)",            // 可选：协议说明，写给人看。例：VXI-11 (SCPI) / SCPI (raw socket) / SCPI (LAN socket) / Modbus TCP
+    "serial_port": "",                      // 串口类必填：串口号，如 COM6。Windows 下换 USB 口会变号，接入前请确认设备管理器里的实际编号
+    "baudrate": null,                       // 串口可选但建议填：波特率，如 115200。留空时平台按设备默认值尝试
+    "address": "TCPIP0::192.168.10.41::inst0::INSTR",
+                                            // 可选：VISA 资源串。网络设备可填（便于 VISA 通道复用），USB/GPIB 设备必须填，NONE 类留空
+    "channel": "",                          // 可选：通道/端口号，如 CH1、CH2。多路电源、开关单元用它标明默认通道
+
+    // ---------- ④ 管理与约束：决定自检会不会被拦下 ----------
+    "required": true,                       // 【必填】是否必备设备。必备且 programmable 的设备若未配置完整，注册自检会报 fail 并阻断注册
+    "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
+                                            // 可选：备注。建议写固定 IP 要求、量程/带宽、校准周期、负责人等排障时要看的信息
+
+    // ---------- ⑤ 系统回写：由平台计算，请不要手工填写 ----------
+    "configured": true                      // 只读：平台按 interface 判定配置是否完整——网络类看 host+port，串口类看 serial_port，其余看 address
+  },
+
+  // ===========================================================================
+  // 三类接口的填写示例（可直接复制改值；字段含义同上）
+  // ===========================================================================
+  "examples": {
+
+    "LAN": {                                // 网络类：示波器，VXI-11，固定 IP + 4000
+      "id": "rh-scope",
+      "name": "数字示波器",
+      "model": "Tektronix MSO54",
+      "vendor": "Tektronix",
+      "category": "示波器",
+      "role": "读头回放信号波形 / 边沿与噪声观测",
+      "programmable": true,
+      "interface": "LAN",
+      "host": "192.168.10.41",
+      "port": 4000,
+      "protocol": "VXI-11 (SCPI)",
+      "serial_port": "",
+      "baudrate": null,
+      "address": "TCPIP0::192.168.10.41::inst0::INSTR",
+      "channel": "",
+      "required": true,
+      "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口"
+    },
+
+    "SERIAL": {                             // 串口类：转速控制盒，COM + 波特率
+      "id": "rh-spin",
+      "name": "读头转速控制盒",
+      "model": "SPIN-CTRL-01",
+      "vendor": "内部工装",
+      "category": "运动控制",
+      "role": "读头转速闭环控制",
+      "programmable": true,
+      "interface": "SERIAL",
+      "host": "",
+      "port": null,
+      "protocol": "自定义 ASCII 帧",
+      "serial_port": "COM6",
+      "baudrate": 115200,
+      "address": "",
+      "channel": "",
+      "required": true,
+      "note": "换 USB 口会变号；接入前确认设备管理器里的 COM 编号"
+    },
+
+    "PASSIVE": {                            // 被动设备：夹具探头，无程控接口，只登记
+      "id": "rh-fixture",
+      "name": "读头装夹夹具与探针组",
+      "model": "FIX-SPM-RH-01",
+      "vendor": "内部工装",
+      "category": "被动设备",
+      "role": "读头装夹与信号引出",
+      "programmable": false,
+      "interface": "NONE",
+      "host": "",
+      "port": null,
+      "protocol": "",
+      "serial_port": "",
+      "baudrate": null,
+      "address": "",
+      "channel": "",
+      "required": false,
+      "note": "非程控设备，不参与通讯自检"
+    }
+  },
+
+  // ===========================================================================
+  // 上位包封（可选）：设备清单挂在测试台注册里，这是它所在的位置
+  // ===========================================================================
+  "envelope_hint": {
+    "id": "tb_xxxxxxxxxx",                  // 测试台 ID，平台生成，不要手填
+    "preset_id": "SPM-RH-DYN-01",           // 【必填】预设测试台类型：决定预填哪份标准 BOM
+    "title": "SPM读头动态测试台",             // 【必填】测试台名称
+    "serial": "SPMTS202609120001",          // 【必填】测试台编号，格式 SPMTS + 12 位数字
+    "station": {                            // 产线 / 工位信息
+      "line": "SPM 总装线",                  // 【必填】产线
+      "station": "读头动态测试工位",           // 【必填】工位
+      "location": "一号厂房 A 区 3 号工位",     // 可选：物理位置
+      "remark": ""                          // 可选：备注
+    },
+    "devices": []                           // ← 上面 "device" 那种条目就放在这个数组里（一条一台设备）
+  }
+}
