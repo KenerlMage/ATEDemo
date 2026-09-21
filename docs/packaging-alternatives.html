@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyInstaller 替代方案选型 — ATE Runner 打包场景</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #faf9ff; --panel: #ffffff; --panel2: #f5f2fd; --border: #e4def6;
+    --text: #1d1733; --muted: #6e688a; --accent: #6d28d9; --accent2: #8b5cf6;
+    --accent-rgb: 109, 40, 217; --accent-2-rgb: 139, 92, 246;
+    --ok: #15803d; --warn: #b45309; --err: #dc2626;
+    --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 480px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      linear-gradient(rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(var(--accent-rgb), .045) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg-soft);
+    color: var(--text); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 24px 80px; }
+  .hero { border: 1px solid var(--border); border-radius: 16px; padding: 30px 28px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .07), transparent 55%), #fff; }
+  .stripe { height: 4px; background: repeating-linear-gradient(45deg, var(--accent) 0 8px, transparent 8px 16px); opacity: .75; border-radius: 16px 16px 0 0; margin: -30px -28px 22px; }
+  .hero h1 { margin: 0 0 6px; font-size: 25px; letter-spacing: .3px; }
+  .hero p { margin: 0; color: var(--muted); }
+  .hero .meta { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  section { margin-top: 36px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-left: 10px; border-left: 3px solid var(--accent); }
+  h3 { font-size: 14.5px; margin: 22px 0 8px; color: var(--accent2); }
+  p { margin: 8px 0; } .lead { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tbl { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  code { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  pre { background: #f7f5ff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; margin: 12px 0; }
+  ul { padding-left: 20px; } li { margin: 5px 0; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); } .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(21,128,61,.4); background: rgba(21,128,61,.1); }
+  .badge.warn { color: var(--warn); border-color: rgba(180,83,9,.4); background: rgba(180,83,9,.1); }
+  .badge.accent { color: var(--accent); border-color: rgba(var(--accent-rgb),.4); background: rgba(var(--accent-rgb),.1); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .card ul { margin: 0; }
+  .steps { border-left: 2px solid var(--border); margin: 8px 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .step { position: relative; }
+  .step::before { content: ''; position: absolute; left: -27px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15); }
+  .step b { display: block; font-size: 14px; }
+  .step span { color: var(--muted); font-size: 13px; }
+  .note { border-left: 3px solid var(--accent2); background: rgba(var(--accent-2-rgb), .06); padding: 10px 14px; font-size: 13px; margin: 12px 0; }
+  .note.warn { border-left-color: var(--warn); background: rgba(180,83,9,.07); }
+  footer { margin-top: 46px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="stripe"></div>
+    <h1>PyInstaller 替代方案选型 · ATE Runner 打包场景</h1>
+    <p>ATE 当前只用 PyInstaller 打一个「纯标准库启动器」<code>ATE_Launcher.exe</code>；后端是「嵌入式 Python + app/ + web/ + runtime/」整包部署。所以这里比较的不是「把整个应用打成 exe」，而是「怎么得到一个双击即用的入口」。</p>
+    <div class="meta">
+      <span class="badge accent">结论先行</span>
+      <span class="badge">3 条现实路线</span>
+      <span class="badge">8 个打包器对比</span>
+      <span class="badge">工控机现场约束优先</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>一、结论：优先考虑「不打包」</h2>
+    <p class="lead">启动器做的事只有三件：定位目录、起 uvicorn、开浏览器。它没必要背一个打包器的复杂度。</p>
+    <div class="cards">
+      <div class="card">
+        <h4>路线 A · C# 小启动器 <span class="badge ok">最推荐</span></h4>
+        <div class="sub">复用现有 csc 工具链</div>
+        <ul>
+          <li>构建机只要有 Windows 自带的 .NET Framework 4.x（<code>csc.exe</code>），零额外依赖</li>
+          <li>产物约 10–20 KB，双击秒开，**不落 %TEMP% 解包**，AV 误报概率最低</li>
+          <li>和现有 <code>installer\setup.cs</code> 同一套做法，团队已有先例</li>
+          <li>代价：启动逻辑改一次要重编（逻辑本来就很少）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>路线 B · 换 Nuitka 编启动器</h4>
+        <div class="sub">保留 Python 写法</div>
+        <ul>
+          <li>Python → C → 原生 exe，启动比 PyInstaller 快、反编译更难、误报更少</li>
+          <li>命令：<code>--mode=onefile</code>（免费版即可）</li>
+          <li>代价：构建机要装 MSVC/MinGW，首次编译较慢；依赖扫描偶有坑</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>路线 C · 裸文件启动</h4>
+        <div class="sub">零构建成本</div>
+        <ul>
+          <li><code>start-ate.bat</code> + 桌面快捷方式（包里已有）</li>
+          <li>或 Inno Setup 快捷方式直指 <code>runtime\python.exe app\ate_launcher.py</code></li>
+          <li>代价：会出控制台窗口（可设最小化/用 <code>pythonw</code>、VBS 包一层缓解）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note">
+      <strong>判断依据：</strong>工控机现场的两个真实痛点是「离线」和「杀毒软件/白名单」。PyInstaller onefile 每次启动都要把内容解到 <code>%TEMP%</code>，这正是企业级 AV 最敏感的行为；而 C# 或 Nuitka 产物没有这一步。体积和启动速度上，C# 启动器也明显占优（~10 KB vs 7.9 MB）。
+    </div>
+  </section>
+
+  <section>
+    <h2>二、打包器横向对比</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>工具</th><th>原理</th><th>典型产物</th><th>优点</th><th>代价 / 风险</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PyInstaller</strong><br><span class="badge">现状</span></td><td>冻结 + bootloader 运行时解包</td><td>单文件 / 单目录</td><td>零编译链、hook 生态最成熟、资料最多</td><td>启动解包到 <code>%TEMP%</code>、体积大、AV 误报多、新版 Python 的 hook 需跟进</td></tr>
+          <tr><td><strong>Nuitka</strong></td><td>Python → C → 原生编译</td><td>standalone 目录 / onefile exe</td><td>启动快、运行性能更好、反编译难、误报通常更少</td><td>需 C 编译链（MSVC/MinGW）、编译慢、个别 C 扩展/动态导入要额外处理</td></tr>
+          <tr><td><strong>cx_Freeze</strong></td><td>冻结（同 PyInstaller 思路）</td><td>目录为主，可用 <code>bdist_msi</code> 出 MSI</td><td>稳定、跨平台、能直出 MSI 安装包</td><td>不产单 exe；要单文件得自己套 SFX；打包后目录需自己维护</td></tr>
+          <tr><td><strong>py2exe</strong></td><td>冻结（setuptools 集成）</td><td>目录（multifile）</td><td>纯 Windows、和 setuptools 命令行集成</td><td>维护节奏慢；单文件支持在 3.11 之后被弱化，3.12/3.13 以目录模式为主</td></tr>
+          <tr><td><strong>PyOxidizer</strong></td><td>Rust 编译，把解释器静态链进 exe</td><td>真正的单 exe（不含解包）</td><td>无解包、启动快、单文件干净</td><td>配置概念重（Rust/Cargo）、动态导入与数据文件坑多、项目活跃度已下滑</td></tr>
+          <tr><td><strong>PyApp</strong>（ofek）</td><td>Rust 引导器 + <code>pyproject</code> 配置</td><td>单 exe，首次运行准备环境</td><td>配置极小、适合 CLI 工具分发</td><td>依赖联网拉取（或自带 wheels）、Windows 场景资料相对少</td></tr>
+          <tr><td><strong>shiv / pex / zipapp</strong></td><td>打包成 <code>.pyz</code> zipapp</td><td>单文件 zipapp</td><td>构建秒级、体积小</td><td>目标机必须已有 Python —— 与「工控机零依赖」目标冲突</td></tr>
+          <tr><td><strong>Briefcase</strong>（BeeWare）</td><td>面向桌面应用工程化打包</td><td>MSI / 安装包</td><td>GUI 应用流程完整</td><td>面向 App 工程，不适合「自有嵌入式运行时整包 + 目录启动器」的部署形态</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>三、安装器 / 分发层（与打包器搭配，不是替代）</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>工具</th><th>作用</th><th>对你的价值</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Inno Setup</strong> <span class="badge ok">已用</span></td><td>向导式安装包（<code>ate_runner.iss</code>）</td><td>默认 <code>C:\ATERunner</code>、快捷方式、防火墙规则、静默 <code>/S /DIR=</code>；可直接指向 bat 或 exe，省掉启动器</td></tr>
+          <tr><td><strong>csc 自编译 Setup</strong> <span class="badge ok">已用</span></td><td>构建机没有 Inno 时的兜底安装器</td><td>同一套 <code>csc.exe</code> 完全可以顺手编一个 C# 启动器，替代 PyInstaller</td></tr>
+          <tr><td><strong>7-Zip SFX</strong></td><td>自解压 exe</td><td>最省事的「绿色包」入口，可配置解压后自动运行 bat</td></tr>
+          <tr><td><strong>WiX / MSI</strong></td><td>企业级 MSI 安装</td><td>客户 IT 有统一分发/组策略要求时更受认可；学习成本高于 Inno</td></tr>
+          <tr><td><strong>Velopack / Squirrel</strong></td><td>安装 + 自动更新</td><td>将来要做「现场自动升级到新版本」时再引入，现在不需要</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>四、按现场约束怎么选</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>现场约束</th><th>优先选</th><th>避免</th></tr></thead>
+        <tbody>
+          <tr><td>构建机干净、不想装 VS / Rust 工具链</td><td>C# 小启动器（csc）、bat + 快捷方式</td><td>Nuitka、PyOxidizer（都要重工具链）</td></tr>
+          <tr><td>企业 AV 严格、常要求加白名单</td><td>C# 启动器、Nuitka</td><td>PyInstaller onefile（<code>%TEMP%</code> 解包最容易被拦）</td></tr>
+          <tr><td>必须绝对离线、目标机零依赖</td><td>嵌入式 Python 整包（现状）+ 任意启动器</td><td>PyApp 默认联网拉取、pyz（要目标机有 Python）</td></tr>
+          <tr><td>希望启动器仍用 Python 写</td><td>Nuitka <code>--mode=onefile</code></td><td>py2exe（单文件能力弱化）</td></tr>
+          <tr><td>客户 IT 要 MSI 统一下发</td><td>cx_Freeze <code>bdist_msi</code> 或 WiX 包住现有整包</td><td>只交一个裸 exe</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>五、迁移成本对照（从现状切过去要动什么）</h2>
+    <div class="steps">
+      <div class="step"><b>切 C# 启动器</b><span>新增一个 <code>packaging\launcher\ate_launcher.cs</code>（约 100 行：找根目录 → 自检 → 端口探测 → <code>Process.Start</code> 调 <code>runtime\python.exe -m uvicorn</code> → 轮询 <code>/api/health</code> → <code>Process.Start</code> 开浏览器）；<code>build_package.ps1</code> 里把 PyInstaller 那一步换成 <code>csc /target:winexe</code>，其余流程（web/、app/、runtime/、zip、Setup）完全不动。</span></div>
+      <div class="step"><b>切 Nuitka</b><span>把 PyInstaller 那段换成 <code>python -m nuitka --mode=onefile --assume-yes-for-downloads packaging\launcher\ate_launcher.py</code>；构建机需要 C 编译器，首次构建耗时明显变长，其余不变。</span></div>
+      <div class="step"><b>完全不打包</b><span>删掉启动器构建步骤，Inno 的快捷方式指向 <code>{app}\start-ate.bat</code>（或 <code>runtime\python.exe</code> + 参数，并处理控制台窗口）；<code>ATE_Launcher.exe</code> 从产物里消失，安装包体积也少 7.9 MB。</span></div>
+    </div>
+    <div class="note warn">
+      <strong>什么时候该保留 PyInstaller？</strong>只有当启动器逻辑继续膨胀（例如要做托盘图标、服务注册、单实例守护、自动更新检查）时，Python 写法 + PyInstaller 的开发效率才有优势。按目前 7 个函数不到的规模，C# 或 bat 更划算。
+    </div>
+  </section>
+
+  <footer>
+    适用对象：ATE Runner Windows 工控机部署（<span class="mono">packaging\build_package.ps1</span>）。
+    PyInstaller / Nuitka / cx_Freeze / py2exe / PyOxidizer 为打包器；Inno Setup / WiX / 7-Zip SFX / Velopack 为安装与分发层，两者可叠加使用。
+    具体版本支持与商业版功能范围请以各项目官方文档为准。
+  </footer>
+
+</div>
+</body>
+</html>
