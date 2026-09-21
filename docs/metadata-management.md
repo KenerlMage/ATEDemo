@@ -94,6 +94,8 @@ USB / GPIB 等不可自动探测的设备填 `default_address`（自检记 skip�
 
 ## 四、接口清单
 
+共 **14 条路径、17 个接口操作**（部分路径同时支持多个方法，如 `/presets/{id}/bom` 支持 GET / PUT）。
+
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/metadata/overview` | 指标块（产品/子系统/类型/BOM 设备数）+ 存储路径 + 最近更新时间 |
