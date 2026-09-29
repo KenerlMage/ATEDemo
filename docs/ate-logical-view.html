@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ATE 逻辑视图：测试平台 → 测试台(TPS) → 测试用例 → 设备驱动</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --line:#e2e6ec; --line2:#cfd6e0;
+    --ink:#1b2330; --ink2:#5b6675; --ink3:#8a95a5;
+    --blue:#2f5fd0; --blue-bg:#eef3ff;
+    --green:#0f7b55; --green-bg:#ecfaf3;
+    --amber:#9a6516; --amber-bg:#fdf6e8;
+    --violet:#6b4bb5; --violet-bg:#f3efff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 40px}
+  h1{font-size:19px;margin:0 0 4px;letter-spacing:.2px}
+  .sub{color:var(--ink2);font-size:12.5px;margin:0 0 20px}
+  code,.mono{font-family:ui-monospace,Consolas,"SFMono-Regular",monospace;font-size:12px}
+  .mono-b{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--blue);font-weight:600}
+
+  .layer{background:var(--card);border:1px solid var(--line);border-radius:10px;
+         padding:12px 14px 13px;box-shadow:0 1px 2px rgba(20,30,50,.04)}
+  .layer h2{font-size:13px;margin:0 0 9px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .layer h2 .no{color:var(--ink3);font-weight:600;font-size:12px}
+  .layer h2 .role{font-weight:400;color:var(--ink2);font-size:12px}
+  .boxes{display:flex;gap:9px;flex-wrap:wrap}
+  .box{flex:1 1 210px;min-width:190px;border:1px solid var(--line);border-radius:8px;
+       padding:8px 10px;background:#fcfdfe}
+  .box .t{font-size:12px;font-weight:600;margin-bottom:4px}
+  .box .d{font-size:11.5px;color:var(--ink2);line-height:1.45}
+  .box.blue{background:var(--blue-bg);border-color:#cfdcfb}
+  .box.green{background:var(--green-bg);border-color:#c8ecdc}
+  .box.amber{background:var(--amber-bg);border-color:#f0e2bd}
+  .box.violet{background:var(--violet-bg);border-color:#ddd3fb}
+
+  .arrow{position:relative;height:40px;display:flex;align-items:center;justify-content:center}
+  .arrow::before{content:"";position:absolute;left:50%;top:0;bottom:16px;width:2px;
+                  background:linear-gradient(var(--line2),var(--line2));transform:translateX(-1px)}
+  .arrow::after{content:"";position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+                 border-left:5px solid transparent;border-right:5px solid transparent;
+                 border-top:8px solid var(--line2)}
+  .arrow span{position:relative;background:var(--bg);padding:2px 10px;border-radius:20px;
+               border:1px solid var(--line);font-size:11.5px;color:var(--ink2);
+               font-family:ui-monospace,Consolas,monospace}
+
+  .notes{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+  .note{flex:1 1 300px;border:1px dashed var(--line2);border-radius:8px;padding:9px 11px;
+        background:#fbfcfd;font-size:12px;color:var(--ink2)}
+  .note b{color:var(--ink);font-size:12px}
+  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:12px;background:var(--card);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f2f4f8;font-size:11.5px;color:var(--ink2);font-weight:600;letter-spacing:.3px}
+  tr:last-child td{border-bottom:0}
+  td.k{font-weight:600;white-space:nowrap}
+  .foot{margin-top:14px;font-size:11.5px;color:var(--ink3)}
+  .tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;
+       border:1px solid var(--line2);color:var(--ink2);margin-left:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ATE 逻辑视图：测试平台 → 测试台（TPS）→ 测试用例 → 设备驱动</h1>
+  <p class="sub">参照 <code>D:\ATE</code> 实际结构绘制。一列到底 = 调用链；每一层的“不写什么”才是这套架构的关键。</p>
+
+  <!-- 1 测试平台 -->
+  <div class="layer">
+    <h2><span class="no">①</span>测试平台 <span class="role">ATE Runner：管“怎么跑、怎么记”，不碰具体仪器命令</span></h2>
+    <div class="boxes">
+      <div class="box blue"><div class="t">前端 Vue3</div>
+        <div class="d">装备树导航（产品→DUT→TPS）· 执行页（选 TPS + 输入 UUT）· 测试台注册向导 · 装备属性 · 记录/报告页</div></div>
+      <div class="box blue"><div class="t">后端 FastAPI <span class="mono">main.py</span></div>
+        <div class="d">License/登录 · TPS 注册与导入 · 测试台注册库（连通性自检）· 元数据管理（装备树 + BOM）· 执行引擎（后台线程 + 进度轮询）· 报告生成 · AI 失败分析</div></div>
+      <div class="box"><div class="t">存储 / 事实源</div>
+        <div class="d"><span class="mono">testresource/*.json</span>（TPS 源、测试台注册、预设）<br>
+            <span class="mono">tree/*.json</span>（装备树 + 测试台 BOM）<br>
+            <span class="mono">ate.db</span>（SQLite：记录库 + 设备/测试台档案投影）<br>
+            <span class="mono">logs/</span>（执行日志、报告、运维产物）</div></div>
+    </div>
+  </div>
+
+  <div class="arrow"><span>① 选 TPS + 输入 UUT → 建任务 task_id</span></div>
+
+  <!-- 2 TPS 运行环境 -->
+  <div class="layer">
+    <h2><span class="no">②</span>TPS 运行环境 <span class="role">tps_runtime + workspace：给每个测试台造一个干净的临时运行目录</span></h2>
+    <div class="boxes">
+      <div class="box violet"><div class="t">stage()　准备</div>
+        <div class="d">读 <span class="mono">tps.json</span> → 校验归一化 → 复制副本到 <span class="mono">workspace/&lt;TPS&gt;/run_&lt;task_id&gt;/</span> → 生成 <span class="mono">test_tps_generated.py</span> + <span class="mono">ate_env.json</span> → 部署公共 <span class="mono">conftest.py</span> → 清理超保留策略旧目录</div></div>
+      <div class="box violet"><div class="t">run_step()　执行</div>
+        <div class="d">在 run 目录里逐步骤跑 <span class="mono">pytest &lt;节点&gt; -v</span>（cwd=run_dir），实时回传进度</div></div>
+      <div class="box"><div class="t">公共 conftest（注入面）</div>
+        <div class="d"><span class="mono">ate_ctx</span> / <span class="mono">ate_bench</span> / <span class="mono">ate_devices</span> / <span class="mono">ate_thresholds</span> / <span class="mono">driver(别名)</span> / <span class="mono">ate_runner</span>；会话结束统一释放仪器</div></div>
+    </div>
+  </div>
+
+  <div class="arrow"><span>③ pytest 执行 setup / cmd_suit / teardown</span></div>
+
+  <!-- 3 测试台包 TPS -->
+  <div class="layer">
+    <h2><span class="no">③</span>测试台包（TPS）= 测试用例层 <span class="role">测试开发只在这里写业务：测什么、限值多少</span></h2>
+    <div class="boxes">
+      <div class="box green"><div class="t"><span class="mono">tps.json</span>（清单）</div>
+        <div class="d"><span class="mono">testconfig</span> 阈值（label/min/max/unit）<br>
+            <span class="mono">device_config</span> 设备别名 → 档案/角色<br>
+            <span class="mono">cmd_suit</span> 用例编排（含 checks 映射）<br>
+            <span class="mono">setup</span> / <span class="mono">teardown</span> 环境段</div></div>
+      <div class="box green"><div class="t"><span class="mono">testcase/*.py</span>（用例实现）</div>
+        <div class="d"><span class="mono">def 用例(ctx, **params) -&gt; float | dict | None</span><br>
+            只用 <span class="mono">ctx.command(别名, 动作, **参数)</span> 取数、<span class="mono">ctx.expect(阈值键, 值)</span> 判定</div></div>
+      <div class="box amber"><div class="t">运行副本（产物）</div>
+        <div class="d"><span class="mono">tps.json</span> · <span class="mono">testcase/</span> · <span class="mono">test_tps_generated.py</span> · <span class="mono">ate_env.json</span> · <span class="mono">conftest.py</span> · <span class="mono">run_result.json</span> · <span class="mono">run_log.txt</span></div></div>
+    </div>
+  </div>
+
+  <div class="arrow"><span>④ ctx.command(别名, 动作)　—— 用例里不出现 SCPI、不出现 IP</span></div>
+
+  <!-- 4 驱动层 -->
+  <div class="layer">
+    <h2><span class="no">④</span>设备驱动层 <span class="role">把“动作名”翻译成各家命令：差异全部收在这里</span></h2>
+    <div class="boxes">
+      <div class="box blue"><div class="t">驱动工厂 <span class="mono">drivers/factory</span></div>
+        <div class="d">按设备档案字段（型号 / 厂商 / 类别 / 接口）<b>打分选驱动</b>：先具体（如某系列示波器）→ 再类别（万用表/电源/负载/信号源/运动控制）→ 最后通用 SCPI 兜底</div></div>
+      <div class="box blue"><div class="t">驱动实现 <span class="mono">drivers/scope·scpi</span></div>
+        <div class="d">统一动作接口 <span class="mono">do(action, **params) -&gt; {ok, value, detail}</span>：示波器 / DMM / PSU / 电子负载 / AWG / 运动控制 / 被动设备</div></div>
+      <div class="box"><div class="t">传输层 <span class="mono">drivers/transport</span></div>
+        <div class="d">Socket（LAN/SCPI）· Serial（RS232/485）· Simulate（无硬件同构）；真机与仿真<b>只在这一层分叉</b></div></div>
+    </div>
+    <div class="note" style="margin-top:10px;border-style:solid">
+      <b>另有标准化驱动 SDK：<span class="mono">sdk/ate_drivers</span></b>（冻结契约 <span class="mono">api 1.2</span>）<span class="tag">面向驱动开发者/厂商</span><br>
+      <span class="mono">api.Scope</span>（通用顶层方法）→ <span class="mono">family/scope.ScopeDriver</span>（动作语义·单位·测量算法·波形结构）→ <span class="mono">vendors/&lt;厂商&gt;/driver.py</span>（只填差异面：命令表 / 前导字段 / 枚举映射 / 仿真模型 + <span class="mono">MODELS</span> 型号派发）→ <span class="mono">driver.json</span> 清单；<span class="mono">kit/cli·conformance</span> 负责骨架生成与上架门禁。
+    </div>
+  </div>
+
+  <div class="arrow"><span>⑤ SCPI / 串口帧（VISA · socket · 仿真）</span></div>
+
+  <!-- 5 仪器 -->
+  <div class="layer">
+    <h2><span class="no">⑤</span>仪器与链路 <span class="role">现场资产：地址、型号、序列号只存在于设备档案</span></h2>
+    <div class="boxes">
+      <div class="box"><div class="t">测试仪器</div><div class="d">示波器 · 数字万用表 · 可编程电源 · 电子负载 · 信号源/波形发生器 · 运动控制盒 · 被动夹具（仅登记）</div></div>
+      <div class="box"><div class="t">接入方式</div><div class="d">LAN（SCPI over socket）· 串口（RS232/485）· 仿真后端（离线联调/产线培训）</div></div>
+    </div>
+  </div>
+
+  <!-- 边界表 -->
+  <table>
+    <tr><th>层</th><th>谁写</th><th>只依赖</th><th>不写什么（关键约束）</th></tr>
+    <tr><td class="k">测试平台</td><td>平台开发</td><td>TPS 清单（只读元数据）+ 注册库</td><td>不写死仪器型号 / 站点地址 / 判断阈值</td></tr>
+    <tr><td class="k">TPS 包（tps.json）</td><td>测试开发 / 装备工程</td><td>别名 + 阈值键 + 用例引用</td><td>不写 SCPI、不写 IP/串口号、不写连接管理</td></tr>
+    <tr><td class="k">测试用例 testcase/*.py</td><td>测试开发</td><td>上下文契约 <span class="mono">ctx</span></td><td>不 import 驱动实现、不 sleep 等采集、不自己开关仪器</td></tr>
+    <tr><td class="k">驱动层</td><td>平台 / 仪器组</td><td>设备档案（SQLite）+ 传输层</td><td>不含阈值、不含测试流程、不写报表格式</td></tr>
+    <tr><td class="k">传输 / 仪器</td><td>现场 / 厂商</td><td>—</td><td>—</td></tr>
+  </table>
+
+  <div class="notes">
+    <div class="note"><b>数据流（谁给谁）</b><br>
+      ① UUT + task_id → <span class="mono">ate_env.json</span>（本次运行环境）<br>
+      ② 测试台 + 设备连接参数 → <span class="mono">ate.db</span>（device_registry / bench_registry）<br>
+      ③ 阈值 → TPS 的 <span class="mono">testconfig</span>（不在平台、不在驱动）<br>
+      ④ 测量值 + 判定明细 → <span class="mono">run_result.json</span> → 平台汇总成报告 / 回 MES</div>
+    <div class="note"><b>为什么是 pytest</b><br>
+      每个 TPS 步骤 = 一次 <span class="mono">pytest &lt;node id&gt;</span> 调用；配置、驱动、阈值全部由公共 <span class="mono">conftest.py</span> 注入。
+      于是测试用例只表达“测什么 + 限值多少”，平台统一负责“怎么跑、怎么记、怎么中断”。</div>
+    <div class="note"><b>与原始描述的对应</b><br>
+      TPS 文件夹里的配置文件，当前实现是 <span class="mono">tps.json</span>（清单）+ <span class="mono">ate_env.json</span>（本次运行环境，含 UUT 号）；UUT 属性档案另由 <span class="mono">/api/uut/{sn}</span> 或 <span class="mono">uut_profiles.json</span> 提供。若你们的规范确定叫 <span class="mono">uut.json</span>，可在 <span class="mono">tps_runtime</span> 里加一层文件名兼容即可。</div>
+  </div>
+
+  <p class="foot">生成：基于 <code>D:\ATE</code> 的 README、docs/architecture.md、tps_runtime/*、backend/drivers/*、sdk/ate_drivers/*、workspace 中的实际运行副本。</p>
+</div>
+</body>
+</html>
