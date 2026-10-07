@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tps.json 字段地图 · 设计意图与使用方式</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --ink: #121115; --ink2: #46434d; --muted: #78747f;
+    --line: rgba(18,17,21,.15); --soft: rgba(18,17,21,.06);
+    --accent: #43385c; --accent-bg: rgba(67,56,92,.06);
+    --ok: #31542a; --bad: #8a2d2d; --warn: #8a5a08;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --disp: "Segoe UI Variable Display", "Segoe UI Semibold", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+         font-size: 15.5px; line-height: 1.64; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 36px 96px; }
+  header { padding: 72px 0 30px; border-bottom: 1px solid var(--ink); }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--disp); font-size: clamp(29px, 4vw, 46px); line-height: 1.07; letter-spacing: -.028em; font-weight: 600; margin: 16px 0 0; }
+  .lede { font-size: 17.3px; line-height: 1.58; color: var(--ink2); margin: 16px 0 0; max-width: 790px; }
+  .metarow { display: flex; flex-wrap: wrap; margin-top: 30px; border-top: 1px solid var(--soft); padding-top: 14px; }
+  .metarow div { padding-right: 30px; margin-right: 30px; border-right: 1px solid var(--soft); }
+  .metarow div:last-child { border-right: 0; }
+  .metarow dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .metarow dd { margin: 4px 0 0; font-size: 14.4px; font-variant-numeric: tabular-nums; }
+
+  section { padding-top: 56px; }
+  .folio { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-family: var(--disp); font-size: clamp(21px, 2.4vw, 29px); line-height: 1.18; letter-spacing: -.022em;
+       font-weight: 600; margin: 11px 0 0; padding-bottom: 13px; border-bottom: 1px solid var(--ink); }
+  h3 { font-family: var(--disp); font-size: 16.4px; letter-spacing: -.012em; margin: 28px 0 6px; }
+  h4 { font-family: var(--disp); font-size: 15.2px; margin: 0; letter-spacing: -.01em; }
+  p { margin: 13px 0 0; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: .9em; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--soft); padding: 1.5px 5px; border-radius: 3px; border: 1px solid var(--soft); }
+  pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; background: #f2f1ee; border: 1px solid var(--line);
+        border-left: 2px solid var(--accent); padding: 15px 17px; overflow-x: auto; margin: 16px 0 0; border-radius: 2px; }
+  pre i { color: var(--muted); font-style: normal; }
+  pre b { color: var(--accent); font-weight: 600; }
+
+  table.g { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.8px; }
+  table.g th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+               text-align: left; font-weight: 500; padding: 0 10px 7px 0; border-bottom: 1px solid var(--ink); }
+  table.g td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--soft); vertical-align: top; }
+  table.g tr:hover td { background: var(--accent-bg); }
+  table.g td:last-child, table.g th:last-child { padding-right: 0; }
+  .c { font-family: var(--mono); font-size: 12.7px; }
+  .v { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; }
+  .v.req { border-color: var(--bad); color: var(--bad); }
+  .v.opt { border-color: var(--muted); color: var(--muted); }
+  .v.gen { border-color: var(--accent); color: var(--accent); }
+  .v.dead { border-color: var(--bad); background: rgba(138,45,45,.07); color: var(--bad); }
+
+  .steps { margin-top: 22px; border-top: 1px solid var(--ink); }
+  .step { display: grid; grid-template-columns: 62px 150px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--soft); align-items: start; }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--accent); padding-top: 3px; }
+  .step .s { font-family: var(--disp); font-size: 15.2px; font-weight: 600; letter-spacing: -.01em; }
+  .step .s span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--muted); font-weight: 400; margin-top: 3px; letter-spacing: .04em; }
+  .step .d { font-size: 14.2px; color: var(--ink2); }
+
+  .groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; margin-top: 22px; }
+  .grp { border: 1px solid var(--line); border-top: 2px solid var(--accent); padding: 16px 18px; background: #fff; }
+  .grp .gt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .grp h4 { margin-top: 5px; }
+  .grp p { font-size: 13.9px; color: var(--ink2); margin-top: 6px; }
+  .grp .fl { font-family: var(--mono); font-size: 12.3px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--soft); color: var(--ink); word-break: break-all; }
+  .grp .fl em { font-style: normal; color: var(--muted); }
+
+  .obs { margin-top: 20px; }
+  .obs .row { display: grid; grid-template-columns: 44px 200px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid var(--soft); }
+  .obs .row .i { font-family: var(--mono); font-size: 11px; color: var(--accent); padding-top: 3px; }
+  .obs .row .f { font-family: var(--mono); font-size: 12.6px; word-break: break-all; }
+  .obs .row .t { font-size: 14.1px; color: var(--ink2); }
+  .obs .row .t b { color: var(--ink); }
+
+  footer { margin-top: 66px; border-top: 1px solid var(--ink); padding-top: 16px; font-family: var(--mono);
+           font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+  @media (max-width: 900px) { .wrap { padding: 0 20px 64px; } .groups { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 1fr; gap: 4px; } .obs .row { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">字段地图 · TPS 清单 tps.json · ATE Runner</div>
+  <h1>tps.json 的每个字段：为什么存在，谁在什么时候读它</h1>
+  <p class="lede">逐字段核对了定义（<span class="mono">manifest.py</span>）、注入（<span class="mono">workspace.py</span> / <span class="mono">conftest_template.py</span>）、
+  报告与落库（<span class="mono">main.py</span>）。顶层 16 个字段里 <b>只有 4 个必需</b>；另有 3 个字段是<span class="mono">声明了却无人执行</span>的死胡同或双源。
+  设计意图可以概括成三条：<b>声明式、引用而非配置、判据集中判定分离</b>。</p>
+  <dl class="metarow">
+    <div><dt>分析对象</dt><dd>tps.json（tps.v2）</dd></div>
+    <div><dt>顶层字段</dt><dd>16 个（必需 4）</dd></div>
+    <div><dt>条目字段</dt><dd>9 个（必需 2）</dd></div>
+    <div><dt>样例</dt><dd>testresource/spm_rh_dyn</dd></div>
+    <div><dt>日期</dt><dd>2026-10-07</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="folio">01</div>
+  <h2>字段在生命周期中的六个落点</h2>
+  <p class="muted">同一个字段在不同阶段由不同代码读，理解字段必须连着阶段看——这是"使用方式"的全貌。</p>
+  <div class="steps">
+    <div class="step"><div class="n">01</div><div class="s">发现<span>load_tps_files</span></div>
+      <div class="d">扫 <span class="mono">testresource/</span>：子目录里的 <span class="mono">tps.json</span> 是 v2 包，顶层 <span class="mono">*.json</span> 是 v1 单文件。</div></div>
+    <div class="step"><div class="n">02</div><div class="s">识别<span>is_v2</span></div>
+      <div class="d"><span class="mono">schema == "tps.v2"</span>，或兜底判据"有 <span class="mono">cmd_suit</span> 且无 <span class="mono">steps</span>"。</div></div>
+    <div class="step"><div class="n">03</div><div class="s">校验<span>validate_v2</span></div>
+      <div class="d">必需项：<span class="mono">id</span> / <span class="mono">testconfig</span> / <span class="mono">device_config</span> / <span class="mono">cmd_suit</span>；条目必需 <span class="mono">case</span> + <span class="mono">name</span>。</div></div>
+    <div class="step"><div class="n">04</div><div class="s">归一化<span>normalize_tps</span></div>
+      <div class="d">补默认值、展开 <span class="mono">steps</span>，产出 <span class="mono">step_count</span> / <span class="mono">testconfig_count</span> / <span class="mono">device_alias_count</span>。</div></div>
+    <div class="step"><div class="n">05</div><div class="s">生成与注入<span>stage</span></div>
+      <div class="d">按 <span class="mono">workspace_dir</span> 建目录、复制临时副本、渲染 <span class="mono">test_tps_generated.py</span>、写 <span class="mono">ate_env.json</span>。</div></div>
+    <div class="step"><div class="n">06</div><div class="s">执行与记录<span>conftest</span></div>
+      <div class="d">读<span class="mono">运行副本</span>的 <span class="mono">testconfig</span> / <span class="mono">device_config</span>，判定写 <span class="mono">run_result.json</span> → 报告 → <span class="mono">test_records</span>。</div></div>
+  </div>
+  <p style="margin-top:16px"><b>注意第 06 步的"副本"二字</b>：每次运行都会 <span class="mono">copytree</span> 源 TPS 到 <span class="mono">run_&lt;task_id&gt;</span>，所以改源清单立即生效，各次运行互不污染——这也是为什么运行期读到的阈值一定等于当次快照。</p>
+</section>
+
+<section>
+  <div class="folio">02</div>
+  <h2>五组字段</h2>
+  <div class="groups">
+    <div class="grp">
+      <div class="gt">A · 身份与元信息</div>
+      <h4>schema / id / name / version / description / project / dut</h4>
+      <p>回答"这是哪个测试程序集、属于哪个项目与 DUT"。其中 <span class="mono">project</span> 与 <span class="mono">dut</span> 不只是展示——它们是记录查询的过滤维度。</p>
+      <div class="fl">报告标题 · 列表分组 · test_records.project/dut<br><em>version 无校验、无独立列</em></div>
+    </div>
+    <div class="grp">
+      <div class="gt">B · 落位与台架</div>
+      <h4>workspace_dir / environment / bench</h4>
+      <p><span class="mono">workspace_dir</span> 决定运行目录名；<span class="mono">environment</span> 是人读快照；<span class="mono">bench</span> 声明"该跑在哪台/哪类台架"。</p>
+      <div class="fl">bench_id → preset_id → serial 依次匹配注册库<br><em>匹配失败只告警不阻断</em></div>
+    </div>
+    <div class="grp">
+      <div class="gt">C · 装备引用</div>
+      <h4>device_config：别名 → device_id / role / category / model</h4>
+      <p>解耦"业务命名"与"物理连接"。先按 <span class="mono">device_id</span> 精确命中，再按 <span class="mono">role/category/model</span> 模糊匹配；失败进 <span class="mono">driver_errors</span>。</p>
+      <div class="fl">IP/端口/串口 一律来自 SQLite device_registry<br><em>note 不参与匹配，只是注释</em></div>
+    </div>
+    <div class="grp">
+      <div class="gt">D · 判据</div>
+      <h4>testconfig：阈值键 → label / min / max / unit / nominal</h4>
+      <p>阈值是受控数据：可评审、可按批次调整、在报告里显示。判定动作由消费方执行（<span class="mono">check</span> / <span class="mono">expect</span>）。</p>
+      <div class="fl">至少给 min 或 max；min&gt;max 报错<br><em>nominal / unit 不参与判定</em></div>
+    </div>
+    <div class="grp">
+      <div class="gt">E · 用例三段</div>
+      <h4>setup[] / cmd_suit[] / teardown[]</h4>
+      <p>顺序即执行顺序。条目字段：<span class="mono">id / no / name / case / description / params / checks / config / optional</span>。</p>
+      <div class="fl">case 指向 testcase/ 实现：module::function<br><em>整个条目会被 repr 进生成文件</em></div>
+    </div>
+    <div class="grp">
+      <div class="gt">F · 派生（不手写）</div>
+      <h4>steps / step_count / *_count / _raw / _generated / kind / func</h4>
+      <p>由归一化与 <span class="mono">case_entries</span> 产出，供既有任务模型、进度条、报告复用；<span class="mono">_raw</span> 保证写回副本时不带派生字段。</p>
+      <div class="fl">v1 的 steps 与 v2 的 cmd_suit 互斥<br><em>同时出现直接报错</em></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="folio">03</div>
+  <h2>字段去向：一份清单的字段分别进了哪</h2>
+  <table class="g">
+    <thead><tr><th style="width:210px">去向</th><th>涉及字段</th></tr></thead>
+    <tbody>
+      <tr><td><b>运行身份</b><br><span class="muted mono">ate_env.json</span></td>
+        <td><span class="mono">id→tps_id</span>、<span class="mono">name→tps_name</span>、<span class="mono">bench.*→bench_id/title/serial/preset_id</span>；<span class="mono">uut / task_id / mode</span> 来自运行请求，不来自清单</td></tr>
+      <tr><td><b>运行期判定与设备</b><br><span class="muted mono">conftest 读副本 tps.json</span></td>
+        <td><span class="mono">testconfig</span>（判定取值）、<span class="mono">device_config</span>（设备解析）、<span class="mono">cmd_suit</span>（仅用于算 expected 用例数）</td></tr>
+      <tr><td><b>HTML 报告</b><br><span class="muted mono">reports/tps_&lt;task&gt;.html</span></td>
+        <td><span class="mono">name / version / id / project / dut / environment</span>（逐行）、<span class="mono">steps[].name</span>，以及运行期实测与判定明细</td></tr>
+      <tr><td><b>固定记录落库</b><br><span class="muted mono">test_records（25 列）</span></td>
+        <td><span class="mono">project / dut / tps_id / tps_name</span>；<span class="mono">batch / part_no / operator / equipment_serial / result</span> 来自 UUT 档案与台架信息，不来自清单</td></tr>
+      <tr><td><b>前端</b><br><span class="muted mono">EquipmentView</span></td>
+        <td><span class="mono">schema</span>（筛选用）、<span class="mono">testconfig_count / device_alias_count / cmd_suit_count / step_count</span>、<span class="mono">environment / bench / workspace_dir</span></td></tr>
+    </tbody>
+  </table>
+  <div class="grp" style="margin-top:22px">
+    <div class="gt">最小可用清单</div>
+    <h4>必需项只有 4 个；条目必需 2 个</h4>
+    <pre>{ <b>"schema"</b>: "tps.v2",
+  <b>"id"</b>: "spm_rh_dyn",                       <i>// 必需</i>
+  "name": "SPM 读头动态测试",
+  <b>"testconfig"</b>: { "TC_VDD": { "min": 3.135, "max": 3.465, "unit": "V" } },   <i>// 必需</i>
+  <b>"device_config"</b>: { "dmm": { "device_id": "rh-dmm", "role": "dmm" } },      <i>// 必需</i>
+  <b>"cmd_suit"</b>: [ { "id": "TC001",
+                 <b>"name"</b>: "上电电压测试",                   <i>// 必需</i>
+                 <b>"case"</b>: "testcase.power::power_on_voltage",  <i>// 必需</i>
+                 "checks": { "VDD": "TC_VDD" } } ] }            <i>// 可选</i></pre>
+  </div>
+</section>
+
+<section>
+  <div class="folio">04</div>
+  <h2>14 条现网观察：死字段、双源与坑</h2>
+  <p class="muted">每条都对应可复查的代码位置。前三条最值得优先处理。</p>
+  <div class="obs">
+    <div class="row"><div class="i">01</div><div class="f">optional</div>
+      <div class="t"><b>死字段</b>：全库只在 <span class="mono">manifest.py</span> 出现（校验布尔类型 + 透传），conftest 与 runner 都不读。写了"可跳过"不产生任何效果。</div></div>
+    <div class="row"><div class="i">02</div><div class="f">checks ↔ ctx.expect</div>
+      <div class="t"><b>判定双轨</b>：<span class="mono">_apply_checks</span> 只在"返回值 + checks 映射"路径生效；用例若已内部 <span class="mono">expect</span>，返回标量会被再判一次。需二选一并写进准则。</div></div>
+    <div class="row"><div class="i">03</div><div class="f">params 里的 *_alias</div>
+      <div class="t"><b>双源</b>：样例里 <span class="mono">psu_alias / dmm_alias / awg_alias / scope_alias / motion_alias / fixture_alias / eload_alias</span> 共 7 个别名参数，而别名的事实源是 <span class="mono">device_config</span>。多通道并行时人工拼别名必错。</div></div>
+    <div class="row"><div class="i">04</div><div class="f">no</div>
+      <div class="t">与数组顺序双源（缺省取下标）。重排顺序忘改 <span class="mono">no</span>，报告序号与执行次序不一致。</div></div>
+    <div class="row"><div class="i">05</div><div class="f">name</div>
+      <div class="t">必填但纯展示，与 <span class="mono">testcase/</span> 函数 docstring 重复。</div></div>
+    <div class="row"><div class="i">06</div><div class="f">description（条目级）</div>
+      <div class="t">无渲染消费点：仅经 <span class="mono">steps_of</span> 透传，报告步骤表用的是 <span class="mono">name</span> 与运行期 detail。</div></div>
+    <div class="row"><div class="i">07</div><div class="f">version</div>
+      <div class="t">无校验、无独立落库列，只出现在报告副标题里，无法按版本检索记录。</div></div>
+    <div class="row"><div class="i">08</div><div class="f">unit / nominal</div>
+      <div class="t">不参与判定：<span class="mono">check()</span> 只用 min/max，unit 仅拼消息文本。</div></div>
+    <div class="row"><div class="i">09</div><div class="f">environment.interfaces</div>
+      <div class="t">值是数组时会被原样字符串化进报告（<span class="mono">f"&lt;td&gt;{v}&lt;/td&gt;"</span>），页面上显示为 Python 列表字面量。</div></div>
+    <div class="row"><div class="i">10</div><div class="f">workspace_dir</div>
+      <div class="t">改它等于换运行落位：旧运行记录留在旧目录，<span class="mono">list_runs()</span> 不再扫到，现场会误判"记录丢失"。</div></div>
+    <div class="row"><div class="i">11</div><div class="f">bench 匹配失败</div>
+      <div class="t">只返回 <span class="mono">bench_warning</span> 并继续准备运行；设备全未匹配要等用例调 <span class="mono">ctx.driver()</span> 才暴露。</div></div>
+    <div class="row"><div class="i">12</div><div class="f">project / dut</div>
+      <div class="t">自由文本却是查询维度（记录查询按项目/批次过滤），同义不同字会让记录查不全。</div></div>
+    <div class="row"><div class="i">13</div><div class="f">device_config.note</div>
+      <div class="t">不参与匹配，是注释；误当配置项会以为它有作用。</div></div>
+    <div class="row"><div class="i">14</div><div class="f">steps ↔ cmd_suit</div>
+      <div class="t">v1/v2 双路径并存，互斥检查只在两者同时出现时触发；维护时容易混写。</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="folio">05</div>
+  <h2>三条设计意图</h2>
+  <div class="groups" style="grid-template-columns:repeat(3,1fr)">
+    <div class="grp">
+      <div class="gt">意图 1</div>
+      <h4>声明式</h4>
+      <p>清单只声明"测什么、按什么判"，实现留在 <span class="mono">testcase/</span>。所以 <span class="mono">case</span> 是引用、<span class="mono">description</span> 只是说明——没有执行逻辑藏在清单里。</p>
+    </div>
+    <div class="grp">
+      <div class="gt">意图 2</div>
+      <h4>引用而非配置</h4>
+      <p>装备只写"别名 → 设备编号/角色"，连接参数一律走 SQLite；台架只写"跑在哪台/哪类台架"。这让同一份 TPS 能跨台架复用。</p>
+    </div>
+    <div class="grp">
+      <div class="gt">意图 3</div>
+      <h4>判据集中，判定分离</h4>
+      <p>阈值集中在 <span class="mono">testconfig</span>（可评审、可按批次调整），判定动作由消费方执行。<b>阈值是数据，判定是行为</b>，两者不混。</p>
+    </div>
+  </div>
+  <p style="margin-top:18px">按这三条回看样例：它的问题不在"写错了"，而在<b>清单里塞了本该属于代码的东西</b>（别名参数、用例描述、序号），以及<b>声明了却不生效的东西</b>（<span class="mono">optional</span>）。上面 14 条观察的共同根源就在这里。</p>
+</section>
+
+<section>
+  <div class="folio">06</div>
+  <h2>别混淆：TPS 清单 vs 驱动清单</h2>
+  <table class="g">
+    <thead><tr><th style="width:130px">对比项</th><th>TPS 清单</th><th>驱动清单</th></tr></thead>
+    <tbody>
+      <tr><td>文件</td><td class="c">testresource/&lt;包&gt;/tps.json</td><td class="c">sdk/ate_drivers/kit/manifest.json</td></tr>
+      <tr><td>解析代码</td><td class="c">backend/tps_runtime/manifest.py</td><td class="c">sdk/ate_drivers/kit/registry.py</td></tr>
+      <tr><td>schema 值</td><td class="c">tps.v2</td><td class="c">MANIFEST_SCHEMA（驱动自有）</td></tr>
+      <tr><td>关键字段</td><td class="c">testconfig / device_config / cmd_suit</td><td class="c">key / entry / models / api / capabilities</td></tr>
+      <tr><td>作用</td><td>测什么、用什么装备、按什么判据</td><td>驱动支持哪些型号、暴露哪些能力</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">两者都叫 manifest、都有 <span class="mono">schema</span> / <span class="mono">version</span> / <span class="mono">name</span>，grep 时极易串台。</p>
+</section>
+
+<footer>
+  tps.json 字段地图 · 2026-10-07 · ATE Runner<br>
+  完整字段说明见同目录 tps-json-fields.md · 相关文档：TPS设计.html<br>
+  核对来源：backend/tps_runtime/manifest.py（validate_v2 / case_entries / steps_of / normalize_tps）· workspace.py（tps_dir_name / _resolve_bench / stage）· templates.py · conftest_template.py（AteContext.limit / check / expect / _apply_checks / run_case）· main.py（_tps_summary / 报告 / _save_record）· 样例 backend/testresource/spm_rh_dyn/tps.json
+</footer>
+</div>
+</body>
+</html>

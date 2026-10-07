@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基于 TPS 文件的测试用例集设计 · uut.json 结构与执行流程</title>
+<style>
+  :root{
+    --paper:#F7F6F3; --ink:#1A1A1A; --ink-2:#4A4E53; --muted:#787D83;
+    --accent:#9B1C1C; --rule:#D9D5CF; --tint:#EFEDEA;
+    --han:"微软雅黑","Microsoft YaHei","PingFang SC",sans-serif;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--han);
+       font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  code{font-family:var(--mono);font-size:.92em}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .shell{max-width:1380px;margin:0 auto;padding:0 40px}
+
+  header.top{padding:60px 0 28px;border-bottom:1px solid var(--ink)}
+  .eyebrow{font-size:12.5px;letter-spacing:.14em;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(28px,3.4vw,42px);line-height:1.14;letter-spacing:-.01em;
+     margin:12px 0 0;color:var(--accent);font-weight:700}
+  .standfirst{font-size:18px;color:var(--ink-2);margin:16px 0 0;max-width:64ch}
+  .metaline{display:flex;flex-wrap:wrap;gap:36px;margin-top:24px;padding-top:14px;
+            border-top:1px solid var(--rule);font-size:13px;color:var(--muted)}
+  .metaline b{display:block;font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:400}
+
+  .body{display:grid;grid-template-columns:212px minmax(0,1fr);gap:56px;padding:42px 0 0}
+  nav.toc{position:sticky;top:26px;align-self:start;font-size:14px}
+  nav.toc .cap{font-size:11px;letter-spacing:.12em;color:var(--muted);
+               padding-bottom:8px;border-bottom:1px solid var(--rule);margin-bottom:10px}
+  nav.toc a{display:block;color:var(--ink-2);padding:5px 0}
+  nav.toc a:hover{color:var(--accent)}
+  nav.toc a b{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400;
+              display:inline-block;width:26px}
+  main{min-width:0}
+  section{padding-bottom:50px;scroll-margin-top:20px}
+  h2{font-size:23px;line-height:1.22;margin:0 0 6px;color:var(--accent);font-weight:700;
+     letter-spacing:-.005em}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+  h3{font-size:16.5px;margin:26px 0 6px;font-weight:700}
+  h4{font-size:15px;margin:0 0 4px;font-weight:700}
+  p{margin:14px 0 0;max-width:76ch}
+  .note{color:var(--ink-2);font-size:14px;margin-top:12px}
+
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px}
+  th{font-size:11px;letter-spacing:.1em;color:var(--muted);text-align:left;font-weight:400;
+     padding:0 12px 8px 0;border-bottom:1px solid var(--ink)}
+  td{padding:9px 12px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+  td:last-child,th:last-child{padding-right:0}
+  .k{font-family:var(--mono);font-size:13px;color:var(--accent);white-space:nowrap}
+  .num{font-family:var(--mono);font-size:13px;color:var(--muted);white-space:nowrap}
+
+  pre{margin:16px 0 0;padding:18px 20px;background:var(--tint);border:1px solid var(--rule);
+      font-family:var(--mono);font-size:13px;line-height:1.68;overflow-x:auto;color:var(--ink)}
+  pre em{color:var(--muted);font-style:normal}
+
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px;margin-top:6px}
+  .algo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+  .algo div{border:1px solid var(--rule);padding:13px 15px}
+  .algo h4{color:var(--accent);font-family:var(--mono);font-size:13.5px}
+  .algo p{font-size:13.5px;color:var(--ink-2);margin:6px 0 0;max-width:none}
+  .algo .par{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:6px}
+  .slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:16px}
+  .slot{border:1px solid var(--rule);padding:12px 14px}
+  .slot .pos{font-size:14px;font-weight:700}
+  .slot .src{font-family:var(--mono);font-size:12.5px;color:var(--accent);margin-top:5px}
+  .flow{border-top:1px solid var(--ink);margin-top:18px}
+  .flow div{display:grid;grid-template-columns:44px 200px minmax(0,1fr);gap:14px;
+            padding:11px 0;border-bottom:1px solid var(--rule);font-size:14px;align-items:baseline}
+  .flow .st{font-family:var(--mono);color:var(--muted);font-size:12.5px}
+  .flow .nm{font-weight:700}
+  .flow .ac{color:var(--ink-2)}
+  .legend{font-size:13.5px;color:var(--muted);margin-top:10px}
+  figure{margin:22px 0 0}
+  figure img{width:100%;height:auto;display:block;border:1px solid var(--rule)}
+  figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+  footer{border-top:1px solid var(--ink);margin-top:12px;padding:18px 0 70px;
+         font-size:13px;color:var(--muted)}
+  @media (max-width:980px){
+    .shell{padding:0 20px}
+    .body{grid-template-columns:1fr;gap:0}
+    nav.toc{position:static;border-bottom:1px solid var(--rule);padding-bottom:14px;margin-bottom:24px}
+    .grid2,.algo,.slots{grid-template-columns:1fr}
+    .flow div{grid-template-columns:1fr;gap:2px}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="top">
+  <div class="eyebrow">ATE RUNNER · TPS 清单</div>
+  <h1>基于 TPS 文件的测试用例集设计</h1>
+  <p class="standfirst">清单声明，代码执行：TPS 清单（<code>uut.json</code>，现网文件名 <code>tps.json</code>）
+     声明跑哪些用例、按什么顺序、按什么判据，测试动作由 <code>testcase/</code> 中的 Python 函数实现。</p>
+  <div class="metaline">
+    <div><b>结构版本</b>五键：metadata / adaptation / device / threshold / cmd_suit</div>
+    <div><b>包结构</b>tps.json + testcase/ + resource/ + wheel/</div>
+    <div><b>日期</b>2026-10-07</div>
+  </div>
+</header>
+
+<div class="body">
+  <nav class="toc">
+    <div class="cap">目录</div>
+    <a href="#s1"><b>01</b>设计意图</a>
+    <a href="#s2"><b>02</b>TPS 包结构</a>
+    <a href="#s3"><b>03</b>使用方法：Runner 与 conftest</a>
+    <a href="#s4"><b>04</b>执行流程</a>
+    <a href="#s5"><b>05</b>metadata · 版本数据</a>
+    <a href="#s6"><b>06</b>adaptation · PN 白名单与信号源匹配</a>
+    <a href="#s7"><b>07</b>device · 设备信息</a>
+    <a href="#s8"><b>08</b>threshold · 阈值与判定算法</a>
+    <a href="#s9"><b>09</b>cmd_suit · 用例编排</a>
+    <a href="#s10"><b>10</b>完整骨架</a>
+    <a href="#s11"><b>11</b>设计要点</a>
+  </nav>
+
+  <main>
+    <section id="s1">
+      <h2>01 · 设计意图</h2>
+      <p class="sub">把测试用例集从执行代码中剥离为受控数据</p>
+      <p>本方案要解决三个问题：测试内容散落在代码里、无法评审；同一台装备在不同台架上的判定口径不一致；
+        更换台架必须改动用例实现。据此确定四条设计约束。</p>
+      <table>
+        <thead><tr><th style="width:130px">约束</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>清单只声明，不实现</td><td>清单内不出现执行代码、连接参数、调用实参；测试动作全部由 <code>testcase/</code> 中的 Python 函数实现</td></tr>
+          <tr><td>单一事实源</td><td>用例顺序只写在 <code>cmd_suit</code>，判定算法与阈值只写在 <code>threshold</code>，设备引用只写在 <code>device</code>，被测对象适配范围只写在 <code>adaptation</code></td></tr>
+          <tr><td>引用而非复制</td><td>清单只写设备别名与注册库编号，IP、端口、串口、波特率由执行器在运行时从注册库查询</td></tr>
+          <tr><td>判定集中</td><td>通过/不通过只由用例调用判定接口产生，清单不承载判定表达式</td></tr>
+        </tbody>
+      </table>
+      <p class="note">清单的边界：不描述夹具接线细节，不承载测试向量数据——这类内容以配置文件形式放在包内
+        <code>resource/</code>，由用例按包内路径读取。</p>
+    </section>
+
+    <section id="s2">
+      <h2>02 · TPS 包结构</h2>
+      <p class="sub">一个 TPS = 一个目录（打包即压缩包）：清单 + 用例实现 + 配置文件 + 驱动包</p>
+      <pre>spm_rh_dyn/                                <em>← TPS 包（打包后即压缩包）</em>
+├─ tps.json                                 <em>← 清单：五键</em>
+├─ testcase/                                <em>← 每个 py 文件是一个 testcase 模块</em>
+│   ├─ __init__.py                          <em>必备</em>
+│   ├─ env_setup.py                         <em>含 setup / teardown 方法</em>
+│   ├─ power.py                             <em>含 setup / teardown 方法</em>
+│   └─ comm.py
+├─ resource/                                <em>其他配置文件</em>
+│   ├─ pn_whitelist.json
+│   ├─ channel_map.json
+│   └─ fixture_list.json
+└─ wheel/                                   <em>其余 Python 驱动</em>
+    ├─ scope_sdk-1.2.0-py3-none-any.whl
+    └─ dmm_driver-0.9.3-py3-none-any.whl</pre>
+      <table>
+        <thead><tr><th style="width:132px">子目录 / 文件</th><th style="width:210px">结构</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">tps.json</td><td>单个 JSON 文件，五键</td><td>清单：声明跑什么、按什么顺序、按什么判</td></tr>
+          <tr><td class="k">testcase/</td><td>Python 包，必须含 <code>__init__.py</code>，一个 py 文件一个 testcase 模块，模块内含 <code>setup</code> 与 <code>teardown</code> 方法</td><td>用例实现：清单条目 <code>case</code> 字段引用的目标函数</td></tr>
+          <tr><td class="k">resource/</td><td>配置文件目录，JSON / CSV / YAML 均可</td><td>存放清单之外的配置与数据：大批量 PN 白名单、通道表、夹具清单、测试向量</td></tr>
+          <tr><td class="k">wheel/</td><td><code>.whl</code> 文件</td><td>存放其余 Python 驱动与设备 SDK，随包分发，供离线工控机安装或直接加载</td></tr>
+          <tr><td class="k">运行期产物</td><td>不在包内</td><td><code>conftest.py</code>、<code>test_tps_generated.py</code>、<code>ate_env.json</code>、<code>run_&lt;task_id&gt;/</code> 由执行器在运行目录生成</td></tr>
+        </tbody>
+      </table>
+      <p class="note">导入接口接收单个 JSON 清单文本，后端将其落成 <code>testresource/&lt;id&gt;/tps.json</code>；
+        <code>testcase/</code>、<code>resource/</code>、<code>wheel/</code> 三个目录随后整体拷入同一 TPS 目录。</p>
+      <h3>2.1 运行时副本</h3>
+      <p>Runner 不在源包上直接执行。每次运行它都在 workspace 下建一个临时副本，把 TPS 内容整体复制进去，
+        之后的校验、注入与执行都发生在副本里。</p>
+      <table>
+        <thead><tr><th style="width:120px">环节</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>建副本</td><td><code>&lt;workspace&gt;/&lt;tps 目录名&gt;/run_&lt;task_id&gt;/</code>；同名目录先清掉再整体复制源目录</td></tr>
+          <tr><td>执行对象</td><td>副本，不是源包——源包改动后下一次运行立即生效，多次运行之间互不污染</td></tr>
+          <tr><td>副本内产物</td><td><code>conftest.py</code>（公共注入层副本）、<code>test_tps_generated.py</code>（执行入口）、<code>ate_env.json</code>（本次运行环境）</td></tr>
+          <tr><td>清理</td><td>按 <code>keep_runs</code> 保留最近若干次运行，其余自动清理</td></tr>
+        </tbody>
+      </table>
+      <figure>
+        <img src="assets/tps-runner-flow.png" alt="Runner 使用 TPS 的运行时流程：解压临时副本 → 校验 → 门禁 → 注入 → 执行 → 报告">
+        <figcaption>Runner 使用 TPS 的运行时流程：压缩包解压到 workspace 临时副本后，所有动作都在副本内完成。</figcaption>
+      </figure>
+    </section>
+
+    <section id="s3">
+      <h2>03 · 使用方法：Runner 与 conftest</h2>
+      <p class="sub">清单不可执行——Runner 负责读取、校验与编排，conftest 负责向用例注入所需的一切</p>
+      <figure>
+        <img src="assets/tps-software-view.png" alt="TPS 运行时软件视图：接入层 → Runner 服务层 → 运行现场临时副本 → 执行与判定，右侧为依赖与产物">
+        <figcaption>TPS 运行时软件视图：Runner 只在 workspace 临时副本上动手，conftest 是唯一注入通道，右侧为外部依赖与产物。</figcaption>
+      </figure>
+      <div class="grid2">
+        <div>
+          <h3>Runner（后端执行器）</h3>
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>动作</th><th style="width:150px">依赖字段</th></tr></thead>
+            <tbody>
+              <tr><td class="num">0</td><td>在 workspace 下建临时副本 <code>run_&lt;task_id&gt;/</code>，把 TPS 内容整体复制进去</td><td>—</td></tr>
+              <tr><td class="num">1</td><td>在副本内载入 <code>tps.json</code>，校验结构：schema、必填项、引用完整性</td><td>全量</td></tr>
+              <tr><td class="num">2</td><td>启动门禁：状态是否允许生产、件号是否在白名单、SN 形态是否匹配</td><td><code>metadata.status</code> / <code>adaptation</code></td></tr>
+              <tr><td class="num">3</td><td>解析设备与阈值：别名 → 注册库 → 连接参数；阈值键 → 算法与参数</td><td><code>device</code> / <code>threshold</code></td></tr>
+              <tr><td class="num">4</td><td>按三段顺序展开执行序列，渲染执行入口与环境描述</td><td><code>cmd_suit</code> / <code>setup</code> / <code>teardown</code></td></tr>
+              <tr><td class="num">5</td><td>逐条用例以独立 pytest 进程执行，收集判定明细</td><td>条目 <code>exec</code> / <code>parallel</code> / <code>manual</code></td></tr>
+              <tr><td class="num">6</td><td>汇总 <code>run_result.json</code>，生成 HTML 报告</td><td><code>metadata</code> / <code>threshold</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>conftest（注入通道）</h3>
+          <table>
+            <thead><tr><th style="width:130px">夹具</th><th>注入内容</th></tr></thead>
+            <tbody>
+              <tr><td class="k">ate_ctx</td><td>判定上下文：<code>expect(key, value, label)</code>、状态回传、人工确认</td></tr>
+              <tr><td class="k">ate_devices</td><td><code>别名 → 设备实例</code>，连接参数已就绪</td></tr>
+              <tr><td class="k">ate_thresholds</td><td>阈值键 → 判定算法与参数</td></tr>
+              <tr><td class="k">ate_bench</td><td>台架信息：编号、类型、BOM 摘要</td></tr>
+              <tr><td class="k">driver</td><td>设备驱动工厂：示波器、电源、DMM 按型号构造</td></tr>
+              <tr><td class="k">ate_runner</td><td>当前用例在序列中的位置与状态</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <pre>def test_vdd(ate_ctx, ate_devices):
+    dmm = ate_devices["dmm"]
+    ate_ctx.expect("TC_VDD", dmm.read_voltage())   <em># 判定口径来自 threshold</em></pre>
+      <p class="note">用例不读清单文件、不连设备、不判断阈值。</p>
+    </section>
+
+    <section id="s4">
+      <h2>04 · 执行流程</h2>
+      <p class="sub">五个键按固定顺序被消费，形成从启动到报告的一条流程</p>
+      <div class="flow">
+        <div><span class="st">01</span><span class="nm">载入与校验</span><span class="ac">结构校验与引用完整性检查；不通过即中止</span></div>
+        <div><span class="st">02</span><span class="nm">启动门禁</span><span class="ac">状态是否允许生产、件号是否在白名单、SN 形态是否匹配；件号未命中白名单或 SN 形态不符时直接抛异常，流程中止</span></div>
+        <div><span class="st">03</span><span class="nm">位号绑定</span><span class="ac">每个位号的 SN 绑定信号源与物理通道 → 通道映射表，后续数据按此归属</span></div>
+        <div><span class="st">04</span><span class="nm">设备解析</span><span class="ac">别名 → 注册库 → 连接参数 → 设备实例，形成 <code>ate_devices</code> 夹具</span></div>
+        <div><span class="st">05</span><span class="nm">阈值装载</span><span class="ac">按 <code>mode</code> 装载判定算法与参数，形成 <code>ate_thresholds</code> 夹具</span></div>
+        <div><span class="st">06</span><span class="nm">序列展开</span><span class="ac">三段顺序展开；串行按序、<code>per_sn</code> 按位号展开、<code>manual</code> 插入等待点</span></div>
+        <div><span class="st">07</span><span class="nm">执行与判定</span><span class="ac">每条用例独立进程执行，判定按算法取样本算值 → 判定明细、<code>run_result.json</code></span></div>
+        <div><span class="st">08</span><span class="nm">收尾与报告</span><span class="ac">安全收尾必跑，汇总结果 → HTML 报告与运行记录</span></div>
+      </div>
+    </section>
+
+    <section id="s5">
+      <h2>05 · metadata · 版本数据</h2>
+      <p class="sub">这份基线是什么版本、谁定的、什么时候定的；是评审与追溯的落点，不参与执行</p>
+      <table>
+        <thead><tr><th style="width:126px">字段</th><th style="width:52px">必需</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">version</td><td>是</td><td>基线版本号，报告据此追溯判据版本</td></tr>
+          <tr><td class="k">status</td><td>是</td><td><code>draft</code> / <code>review</code> / <code>released</code>；只有 <code>released</code> 允许用于正式生产运行</td></tr>
+          <tr><td class="k">author</td><td>是</td><td>责任人，判据谁定的</td></tr>
+          <tr><td class="k">created_at</td><td>是</td><td>基线建立日期（<code>YYYY-MM-DD</code>）</td></tr>
+          <tr><td class="k">id</td><td>是</td><td>基线编号：运行、报告、记录引用它的稳定键</td></tr>
+          <tr><td class="k">name</td><td>是</td><td>基线名称：报告标题与列表展示用</td></tr>
+          <tr><td class="k">applies_to</td><td>是</td><td>适用台架类型编号</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s6">
+      <h2>06 · adaptation · PN 白名单与多路 SN 信号源匹配</h2>
+      <p class="sub">这台 UUT 能不能用这份基线测；多路 SN 并行时，每个 SN 采到的数据属于哪个信号源</p>
+      <h3>6.1 PN 白名单机制</h3>
+      <p>件号从 UUT 名称中按正则提取，再与白名单逐项比对；不在白名单内<b>直接抛异常，拒绝执行</b>。白名单是
+        "这份基线适配哪些件号"的唯一声明处。</p>
+      <pre>UUT 名称 / 登记信息
+        │  part_number.regex 提取件号
+        ▼
+      件号 PN ──── 与 part_number.whitelist 比对 ────┬── 命中 ──→ 通过，继续执行
+                                                     └── 未命中 → 抛异常，拒绝执行</pre>
+      <table>
+        <thead><tr><th style="width:200px">字段</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">part_number.regex</td><td>从 UUT 名称中提取件号的正则（命名组 <code>pn</code>）</td></tr>
+          <tr><td class="k">part_number.whitelist</td><td>件号白名单；命中才允许执行，未命中直接抛异常</td></tr>
+          <tr><td class="k">part_number.whitelist_file</td><td>可选：白名单文件相对路径（如 <code>resource/pn_whitelist.json</code>），用于件号数量大、需独立维护的场景；与内联白名单合并生效</td></tr>
+        </tbody>
+      </table>
+      <h3>6.2 多路 SN 匹配信号源</h3>
+      <p><code>channels</code> 声明并行路数与"位号 → 信号源"的对应关系。几个 SN 同时测试时，每个位号的采集通道各接在一个信号源上；
+        这层关系不显式声明，就会出现 <b>数据串位</b>——A 位号采到 B 位号信号源的波形，报告把 A 判成合格或不合格。</p>
+      <table>
+        <thead><tr><th style="width:200px">字段</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">count</td><td>并行路数</td></tr>
+          <tr><td class="k">slots[].slot</td><td>位号（1..count），对应台架上第几个 SN 位</td></tr>
+          <tr><td class="k">slots[].signal_source</td><td>该位号 SN 采集数据所对应的信号源标识；判定与记录据此把数据归到正确的 SN</td></tr>
+          <tr><td class="k">slots[].source_channel</td><td>信号源上的物理输出通道，保证位号之间不落到同一个输出口</td></tr>
+          <tr><td class="k">slots[].fixture</td><td>可选：该位号使用的夹具编号</td></tr>
+        </tbody>
+      </table>
+      <div class="slots">
+        <div class="slot"><div class="pos">位号 1</div><div class="src">SIG-A · AWG-CH1</div></div>
+        <div class="slot"><div class="pos">位号 2</div><div class="src">SIG-A · AWG-CH2</div></div>
+        <div class="slot"><div class="pos">位号 3</div><div class="src">SIG-B · AWG-CH1</div></div>
+        <div class="slot"><div class="pos">位号 4</div><div class="src">SIG-B · AWG-CH2</div></div>
+      </div>
+      <figure>
+        <img src="assets/tps-slot-source-match.png" alt="位号 ↔ SN ↔ 信号源通道 匹配连线：4 个位号分属 SIG-A / SIG-B 两个信号源，各占一个独立输出口">
+        <figcaption>位号 ↔ SN ↔ 信号源通道 匹配：4 个位号分属两个信号源，每个位号占一个独立输出口，判定明细按 SN 归属。</figcaption>
+      </figure>
+      <p class="note">同一信号源被多个位号共用是刻意设计：<code>signal_source</code> 相同、<code>source_channel</code> 不同，一眼可辨。</p>
+      <h3>6.3 SN 形态</h3>
+      <table>
+        <thead><tr><th style="width:200px">字段</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">sn.regex</td><td>SN 形态正则（12 位英数），形态不符即抛异常，拒绝执行</td></tr>
+          <tr><td class="k">sn.note</td><td>可选：形态说明，供人阅读</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s7">
+      <h2>07 · device · 设备信息</h2>
+      <p class="sub">用例里的设备名，对应台架上真实的哪台设备；只写引用，不写连接参数</p>
+      <table>
+        <thead><tr><th style="width:126px">字段</th><th style="width:52px">必需</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">别名（键）</td><td>是</td><td><code>scope</code> / <code>dmm</code> / <code>psu</code> / <code>spin</code> 等，用例按别名取设备</td></tr>
+          <tr><td class="k">device_id</td><td>是</td><td>注册库（SQLite <code>device_registry</code>）中的设备编号，解析时精确命中</td></tr>
+          <tr><td class="k">category</td><td>是</td><td>设备类别：确认该类别确实在本台架 BOM 内</td></tr>
+        </tbody>
+      </table>
+      <p class="note">不写入清单的内容：IP、端口、串口、波特率等连接参数。这些由注入层在运行时从注册库查询——
+        换台架时连接参数必变，写进受控文件就是维护灾难。解析失败只记录告警，不阻断整套流程的启动。</p>
+    </section>
+
+    <section id="s8">
+      <h2>08 · threshold · 阈值与判定算法</h2>
+      <p class="sub">阈值只声明按什么算法判、参数是多少；判定逻辑由用例调用判定接口触发</p>
+      <div class="algo">
+        <div><h4>minmax · 上下限</h4><p>min ≤ 实测值 ≤ max</p><div class="par">min · max（至少其一）</div></div>
+        <div><h4>std · 统计偏差</h4><p>|均值 − x̄| ≤ n·σ</p><div class="par">n · min_samples</div></div>
+        <div><h4>mean · 均值偏差</h4><p>|标称 − x̄| ≤ delta</p><div class="par">delta（绝对或百分比）</div></div>
+        <div><h4>range · 极差</h4><p>max(x) − min(x) ≤ max_range</p><div class="par">max_range</div></div>
+        <div><h4>delta · 差值</h4><p>|a − b| ≤ max_delta</p><div class="par">against · max_delta</div></div>
+        <div><h4>count · 计数</h4><p>异常样本数 ≤ max_count</p><div class="par">max_count · fail_when</div></div>
+      </div>
+      <p>每个阈值键的公共字段：</p>
+      <table>
+        <thead><tr><th style="width:126px">字段</th><th style="width:52px">必需</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">mode</td><td>是</td><td>判定算法（上表之一）</td></tr>
+          <tr><td class="k">算法参数</td><td>是</td><td>按 <code>mode</code> 取值，见上表</td></tr>
+          <tr><td class="k">label</td><td>否</td><td>阈值名称，用于报告与判定明细</td></tr>
+          <tr><td class="k">unit</td><td>否</td><td>单位（V / mA / rpm），用于展示与判定消息文案</td></tr>
+        </tbody>
+      </table>
+      <h3>8.1 多算法兼容建议：统一结果结构</h3>
+      <p>判定算法会不断增加，但报告列、数据库列、明细渲染不应随之改动。建议所有算法产出同一种结果结构，
+        由用例判定接口填充；新增算法只扩展 <code>mode</code> 与算法参数，结果结构与消费方不动。</p>
+      <pre>result{
+  "key": "TC_VDD",              <em>// 阈值键</em>
+  "mode": "minmax",             <em>// 判定算法</em>
+  "samples": [3.301, 3.298],    <em>// 参与判定的样本（std / range / count 用）</em>
+  "value": 3.301,               <em>// 判定代表值：minmax 取实测值，std / mean / range 取统计值</em>
+  "min": 3.135, "max": 3.465,   <em>// 生效的判定边界（按 mode 换算后）</em>
+  "unit": "V", "ok": true,
+  "message": "3.301 V 位于 [3.135, 3.465]"   <em>// 供报告直接展示</em>
+}</pre>
+    </section>
+
+    <section id="s9">
+      <h2>09 · cmd_suit · 用例清单与编排</h2>
+      <p class="sub">跑哪些用例、什么顺序、失败怎么办；三层：环境初始化 / 测试套 / 环境终止</p>
+      <table>
+        <thead><tr><th style="width:126px">段</th><th>作用</th><th style="width:250px">执行方式</th></tr></thead>
+        <tbody>
+          <tr><td class="k">setup</td><td>环境初始化：上电、复位、装夹</td><td>串行，数组顺序即执行顺序</td></tr>
+          <tr><td class="k">cmd_suit</td><td>测试套：全部测试用例</td><td>默认串行；<code>parallel=per_sn</code> 时每位号各跑一遍</td></tr>
+          <tr><td class="k">teardown</td><td>环境终止：断电、卸载、归档</td><td>串行；<code>always_run=true</code> 的条目失败也必须执行</td></tr>
+        </tbody>
+      </table>
+      <h3>9.1 串行与并行</h3>
+      <table>
+        <thead><tr><th style="width:150px">方式</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>串行（默认）</td><td>条目按数组顺序依次执行，上一条结束才开始下一条</td></tr>
+          <tr><td><code>per_sn</code></td><td>该条目在每个位号上各执行一次，数据按 <code>adaptation.channels</code> 的绑定归属到对应 SN</td></tr>
+          <tr><td><code>shared</code></td><td>所有位号共用一次执行（如整机总上电、总功耗）</td></tr>
+        </tbody>
+      </table>
+      <h3>9.2 人工确认子用例</h3>
+      <p>需要操作员判断的步骤（外观检查、装夹确认、人工上下料）以人工确认子用例表达：运行时弹出确认窗口，
+        操作员确认后继续；超时按 <code>timeout_s</code> 处置。自动用例中途需要确认时，也可在用例内调用判定上下文的确认接口插入等待点。</p>
+      <pre>{
+  "id": "M-01",
+  "case": "testcase.manual::appearance_check",
+  "manual": {
+    "message": "确认外壳无划伤、屏面无亮点后继续",
+    "expect": "操作员确认",          <em>// 展示给操作员的确认口径</em>
+    "timeout_s": 300                 <em>// 超时处置：按失败记录或重试</em>
+  }
+}</pre>
+      <h3>9.3 用例条目字段</h3>
+      <table>
+        <thead><tr><th style="width:126px">字段</th><th style="width:52px">必需</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td class="k">id</td><td>是</td><td>条目标识：报告主键、执行入口的用例 id、运行结果的续写键</td></tr>
+          <tr><td class="k">case</td><td>是</td><td><code>module::function</code> 用例引用，清单与代码 1:1 映射的唯一锚点</td></tr>
+          <tr><td class="k">exec</td><td>否</td><td><code>timeout_s</code>；<code>retry{max, interval_s, on}</code>；<code>on_fail</code> 失败处置</td></tr>
+          <tr><td class="k">parallel</td><td>否</td><td><code>serial</code>（默认）/ <code>per_sn</code> / <code>shared</code></td></tr>
+          <tr><td class="k">manual</td><td>否</td><td><code>message</code> / <code>expect</code> / <code>timeout_s</code>，人工确认子用例</td></tr>
+          <tr><td class="k">skip_when</td><td>否</td><td>条件跳过（如设备缺失），条件成立则跳过而非失败</td></tr>
+          <tr><td class="k">always_run</td><td>否</td><td>仅 <code>teardown</code>：为 <code>true</code> 时失败也必须执行（安全收尾）</td></tr>
+        </tbody>
+      </table>
+      <p>不进入条目的字段（设计边界）：</p>
+      <table>
+        <thead><tr><th style="width:160px">字段</th><th style="width:230px">为何不进清单</th><th>它的去处</th></tr></thead>
+        <tbody>
+          <tr><td class="k">params</td><td>调用实参不是基线数据</td><td>用例以自身默认值为准，调用形如 <code>fn(ctx)</code></td></tr>
+          <tr><td class="k">resources</td><td>资源信息不属于基线</td><td>位号与信号源的关系由 <code>adaptation.channels</code> 表达</td></tr>
+          <tr><td class="k">name / description / no / tags</td><td>属用例自身属性</td><td>用例名与描述取自代码</td></tr>
+          <tr><td class="k">checks / optional / depends_on</td><td>属判定逻辑与运行策略</td><td>判定由用例完成；跳过与失败策略走 <code>skip_when</code> / <code>exec.on_fail</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s10">
+      <h2>10 · 完整骨架</h2>
+      <p class="sub">五键 + 三段，可直接作为新建 TPS 的起手模板</p>
+      <pre>{
+  "schema": "tps.v2",
+
+  "metadata": { "version": "1.3.0", "status": "released", "author": "测试工艺",
+                "created_at": "2026-10-07", "id": "SPM-RH-DYN",
+                "name": "SPM 高温动态测试", "applies_to": "SPM-RH-DYN-01" },
+
+  "adaptation": {
+    "part_number": { "regex": "(?P&lt;pn&gt;[A-Z0-9]{10})",
+                     "whitelist": ["SPM1234567", "SPM1234568"],
+                     "whitelist_file": "resource/pn_whitelist.json" },
+    "sn": { "regex": "[A-Z0-9]{12}", "note": "12 位英数" },
+    "channels": { "count": 2, "slots": [
+      { "slot": 1, "signal_source": "SIG-A", "source_channel": "AWG-CH1", "fixture": "FX-01" },
+      { "slot": 2, "signal_source": "SIG-B", "source_channel": "AWG-CH1", "fixture": "FX-02" } ] }
+  },
+
+  "device": {
+    "psu":   { "device_id": "DEV-PSU-01",   "category": "power_supply" },
+    "scope": { "device_id": "DEV-SCOPE-03", "category": "oscilloscope" },
+    "dmm":   { "device_id": "DEV-DMM-02",   "category": "multimeter" }
+  },
+
+  "threshold": {
+    "TC_VDD":  { "mode": "minmax", "min": 3.135, "max": 3.465, "label": "供电电压", "unit": "V" },
+    "TC_IDD":  { "mode": "std",    "n": 3, "min_samples": 8, "label": "静态电流", "unit": "mA" },
+    "TC_RPM":  { "mode": "mean",   "delta": 50, "label": "转速", "unit": "rpm" },
+    "TC_RIP":  { "mode": "range",  "max_range": 20, "label": "纹波极差", "unit": "mV" },
+    "TC_BAL":  { "mode": "delta",  "against": "TC_VDD_A", "max_delta": 0.05, "label": "双通道压差", "unit": "V" },
+    "TC_LOSS": { "mode": "count",  "max_count": 0, "fail_when": "value &gt; 0", "label": "丢包次数", "unit": "次" }
+  },
+
+  "setup": [
+    { "id": "S-01", "case": "testcase.env_setup::power_on",
+      "exec": { "timeout_s": 60, "retry": { "max": 2, "interval_s": 5, "on": "timeout" },
+                "on_fail": "abort" } }
+  ],
+  "cmd_suit": [
+    { "id": "T-01", "case": "testcase.power::test_vdd", "parallel": "per_sn" },
+    { "id": "T-02", "case": "testcase.comm::test_link", "parallel": "shared",
+      "skip_when": "device_missing:dmm" },
+    { "id": "M-01", "case": "testcase.manual::appearance_check",
+      "manual": { "message": "确认外壳无划伤后继续", "expect": "操作员确认", "timeout_s": 300 } }
+  ],
+  "teardown": [
+    { "id": "E-01", "case": "testcase.env_setup::power_off", "always_run": true }
+  ]
+}</pre>
+    </section>
+
+    <section id="s11">
+      <h2>11 · 设计要点</h2>
+      <p class="sub">变化的影响面被限制在单键内</p>
+      <table>
+        <thead><tr><th style="width:210px">关注点</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td>五键边界</td><td><code>metadata</code> 只管版本、<code>adaptation</code> 只管能不能测与数据归属、<code>device</code> 只管设备引用、<code>threshold</code> 只管判定算法、<code>cmd_suit</code> 只管编排</td></tr>
+          <tr><td>换台架</td><td>只改 <code>device</code> 引用或注册库记录，清单结构不动</td></tr>
+          <tr><td>改判据</td><td>只改 <code>threshold</code>，用例实现不动</td></tr>
+          <tr><td>加用例</td><td>只加 <code>testcase/</code> 模块与 <code>cmd_suit</code> 条目</td></tr>
+          <tr><td>责任分区</td><td>需评审的内容集中在清单，需维护的代码集中在 <code>testcase/</code>，随包分发的依赖集中在 <code>wheel/</code>，配置与数据集中在 <code>resource/</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<footer>
+  基于 TPS 文件的测试用例集设计 · uut.json 五键结构与执行流程 · 2026-10-07 · ATE Runner ·
+  同目录 Markdown 版：uut.json-文件结构与设计.md · 演示稿：TPS用例集设计.pptx
+</footer>
+</div>
+</body>
+</html>

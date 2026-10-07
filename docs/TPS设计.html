@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TPS 设计 · uut.json 驱动测试</title>
+<style>
+  :root {
+    --bg: #faf8f6; --ink: #14100f; --ink2: #4b4442; --muted: #7c7472;
+    --line: rgba(20,16,15,.16); --soft: rgba(20,16,15,.065);
+    --accent: #7a2e2e; --accent-bg: rgba(122,46,46,.06);
+    --ok: #31542a; --warn: #8a4b08;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --disp: "Segoe UI Variable Display", "Segoe UI Semibold", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+         font-size: 15.5px; line-height: 1.64; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 36px 96px; }
+  .col { max-width: 770px; }
+  header { padding: 72px 0 30px; border-bottom: 1px solid var(--ink); }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--disp); font-size: clamp(29px, 4vw, 46px); line-height: 1.07; letter-spacing: -.028em; font-weight: 600; margin: 16px 0 0; }
+  .lede { font-size: 17.3px; line-height: 1.58; color: var(--ink2); margin: 16px 0 0; max-width: 790px; }
+  .metarow { display: flex; flex-wrap: wrap; margin-top: 30px; border-top: 1px solid var(--soft); padding-top: 14px; }
+  .metarow div { padding-right: 30px; margin-right: 30px; border-right: 1px solid var(--soft); }
+  .metarow div:last-child { border-right: 0; }
+  .metarow dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .metarow dd { margin: 4px 0 0; font-size: 14.4px; font-variant-numeric: tabular-nums; }
+
+  section { padding-top: 56px; }
+  .folio { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-family: var(--disp); font-size: clamp(21px, 2.4vw, 29px); line-height: 1.18; letter-spacing: -.022em;
+       font-weight: 600; margin: 11px 0 0; padding-bottom: 13px; border-bottom: 1px solid var(--ink); }
+  h3 { font-family: var(--disp); font-size: 16.4px; letter-spacing: -.012em; margin: 30px 0 6px; }
+  h4 { font-family: var(--disp); font-size: 15.2px; margin: 0; letter-spacing: -.01em; }
+  p { margin: 13px 0 0; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: .9em; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--soft); padding: 1.5px 5px; border-radius: 3px; border: 1px solid var(--soft); }
+  pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; background: #f3efec; border: 1px solid var(--line);
+        border-left: 2px solid var(--accent); padding: 15px 17px; overflow-x: auto; margin: 16px 0 0; border-radius: 2px; }
+  pre i { color: var(--muted); font-style: normal; }
+  pre b { color: var(--accent); font-weight: 600; }
+
+  .layers { margin-top: 22px; border-top: 1px solid var(--ink); }
+  .layer { display: grid; grid-template-columns: 140px 1fr 300px; gap: 22px; padding: 15px 0; border-bottom: 1px solid var(--soft); align-items: start; }
+  .layer .nm { font-family: var(--disp); font-size: 15.4px; font-weight: 600; letter-spacing: -.01em; }
+  .layer .nm span { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+                    text-transform: uppercase; color: var(--muted); font-weight: 400; margin-top: 3px; }
+  .layer .resp { font-size: 14.3px; color: var(--ink2); }
+  .layer .no { font-size: 13.6px; color: var(--accent); }
+  .layer .no::before { content: "✕ "; }
+
+  table.g { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.9px; }
+  table.g th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+               text-align: left; font-weight: 500; padding: 0 10px 7px 0; border-bottom: 1px solid var(--ink); }
+  table.g td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--soft); vertical-align: top; }
+  table.g tr:hover td { background: var(--accent-bg); }
+  table.g td:last-child, table.g th:last-child { padding-right: 0; }
+  .c { font-family: var(--mono); font-size: 12.7px; }
+  .v { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; }
+  .v.in { border-color: var(--ok); color: var(--ok); }
+  .v.out { border-color: var(--accent); color: var(--accent); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+  .card { border: 1px solid var(--line); border-top: 2px solid var(--ink); padding: 18px 20px; margin-top: 22px; }
+  .card.acc { border-top-color: var(--accent); }
+  .card.ok { border-top-color: var(--ok); }
+  .card .kk { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .card p { margin-top: 7px; font-size: 14.2px; color: var(--ink2); }
+
+  .flow { margin-top: 22px; border: 1px solid var(--line); padding: 20px 22px; background: #fff; }
+  .frow { display: grid; grid-template-columns: 132px 1fr; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--soft); }
+  .frow:last-child { border-bottom: 0; }
+  .frow .t { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+  .frow .d { font-size: 14.3px; }
+  .arrow { font-family: var(--mono); color: var(--accent); }
+
+  .chain { margin-top: 20px; }
+  .chain .row { border: 1px solid var(--line); padding: 14px 16px; margin-top: 12px; background: #fff; }
+  .chain .row.dead { border-color: var(--accent); background: var(--accent-bg); }
+  .chain .row.live { border-color: var(--ok); }
+  .chain .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .chain pre { margin-top: 10px; background: transparent; border: 0; border-left: 2px solid var(--line); padding: 4px 0 4px 14px; }
+
+  footer { margin-top: 66px; border-top: 1px solid var(--ink); padding-top: 16px; font-family: var(--mono);
+           font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+  @media (max-width: 900px) { .wrap { padding: 0 20px 64px; } .grid2 { grid-template-columns: 1fr; gap: 0; }
+    .layer { grid-template-columns: 1fr; gap: 6px; } .frow { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">设计总览 · uut.json 驱动测试 · ATE Runner</div>
+  <h1>一份受控基线清单，四个角色各司其职</h1>
+  <p class="lede">uut.json 不替用例写逻辑，也不替报告定结构。它只做四件别处做不了的事：
+  <b>说明跑哪些用例与顺序、给出判据预置值、校验 PN 适配范围、绑定实际台架</b>。
+  判定挪进用例、用例名取自 docstring、连接参数来自 SQLite——cmd_suit 因此瘦到 <b>3 个必需字段</b>。</p>
+  <dl class="metarow">
+    <div><dt>载体</dt><dd>uut.json（TPS 清单）</dd></div>
+    <div><dt>注入</dt><dd>conftest.py v2 → v3</dd></div>
+    <div><dt>cmd_suit</dt><dd>15 → 3 必需 + 4 可选</dd></div>
+    <div><dt>判据</dt><dd>min / max / std</dd></div>
+    <div><dt>日期</dt><dd>2026-10-07</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="folio">01</div>
+  <h2>四个角色，各自只干一件事</h2>
+  <p class="muted">判据只有一条：<b>任何信息只允许有一个事实源</b>。谁能表达得最准确，就归谁。</p>
+  <div class="layers">
+    <div class="layer">
+      <div class="nm">清单层<span>uut.json</span></div>
+      <div class="resp">用例基线（跑哪些、什么顺序）· PN 适配校验 · 台架绑定 · 判据预置值</div>
+      <div class="no">不写用例逻辑、用例名、判定映射、连接参数、报告结构</div>
+    </div>
+    <div class="layer">
+      <div class="nm">用例层<span>testcase/*.py</span></div>
+      <div class="resp">业务动作 · 自我判定 <span class="mono">ctx.expect("键", 值)</span> · 产出测量值与判定明细</div>
+      <div class="no">不关心执行顺序、超时、重试、在哪个通道跑</div>
+    </div>
+    <div class="layer">
+      <div class="nm">注入层<span>conftest.py</span></div>
+      <div class="resp">环境 / 装备 / 驱动 / 阈值注入 · <span class="mono">run_case</span> 执行与记录 · 会话收尾释放设备</div>
+      <div class="no">不写任何具体判据值</div>
+    </div>
+    <div class="layer">
+      <div class="nm">执行层<span>main.py + tps_runtime</span></div>
+      <div class="resp">校验 → 生成入口 → 逐条拉起 pytest 进程 → 汇总 → 报告 → 落库</div>
+      <div class="no">不解释业务语义</div>
+    </div>
+    <div class="layer">
+      <div class="nm">存储层<span>ate.db</span></div>
+      <div class="resp"><span class="mono">test_records</span> 固定条目落库 · <span class="mono">device_registry</span> 提供连接参数</div>
+      <div class="no">不承载明细数据</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="frow"><div class="t">运行时数据流</div>
+      <div class="d"><span class="mono">testcase/*.py</span> <span class="arrow">──被 run_case 调用──►</span> <span class="mono">conftest.ctx</span>
+      <span class="arrow">──注入──►</span> 装备(SQLite) / 驱动 / 阈值(uut.json)</div></div>
+    <div class="frow"><div class="t">判定</div>
+      <div class="d">用例内 <span class="mono">ctx.expect(键, 实测值)</span> 自查 → 明细留痕</div></div>
+    <div class="frow"><div class="t">记录</div>
+      <div class="d"><span class="mono">run_result.json</span> <span class="arrow">──►</span> Runner 汇总 <span class="arrow">──►</span> HTML 报告
+      <span class="arrow">──►</span> <span class="mono">test_records</span> 固定条目</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="folio">02</div>
+  <h2>承载边界：什么进 uut.json</h2>
+  <p class="muted">判据一句话：<b>只有"与用例业务逻辑无关、且与实际台架或本批 PN 有关"的配置才进 uut.json。</b></p>
+  <table class="g">
+    <thead><tr><th style="width:300px">内容</th><th style="width:100px">进？</th><th style="width:230px">放哪</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>跑哪些用例、执行顺序</td><td><span class="v in">进</span></td><td class="c">baseline.cmd_suit</td><td>编排语义，用例代码无从知道</td></tr>
+      <tr><td>超时 / 重试 / 失败策略 / 条件跳过</td><td><span class="v in">进</span></td><td class="c">exec / skip_when</td><td>运行策略，属编排；用例不该自己重试</td></tr>
+      <tr><td>判据预置值（min / max / std）</td><td><span class="v in">进</span></td><td class="c">testconfig</td><td>随批次与 PN 调整，需工程师评审，不能埋进代码</td></tr>
+      <tr><td>设备种类与别名</td><td><span class="v in">进</span></td><td class="c">bench.device_config</td><td>与业务逻辑无关，只与实际台架有关</td></tr>
+      <tr><td>PN 批次号 / SN 规则 / 通道结构</td><td><span class="v in">进</span></td><td class="c">adaptation</td><td>本 TPS 的适配范围，运行前校验</td></tr>
+      <tr><td>用例实现引用 <span class="mono">module::function</span></td><td><span class="v in">进</span></td><td class="c">cmd_suit[].case</td><td>1:1 映射的唯一锚点</td></tr>
+      <tr><td>用例名、描述、标签、默认参数</td><td><span class="v out">不进</span></td><td class="c">docstring / marker</td><td>用例自身属性，写两遍必然漂移</td></tr>
+      <tr><td>测量值与阈值的对应关系</td><td><span class="v out">不进</span></td><td class="c">ctx.expect</td><td>判定逻辑属业务，随用例走</td></tr>
+      <tr><td>设备连接参数（IP / 端口 / 串口）</td><td><span class="v out">不进</span></td><td class="c">SQLite device_registry</td><td>换台架即变，写进受控文件就是灾难</td></tr>
+      <tr><td>报告 / 记录字段</td><td><span class="v out">不进</span></td><td class="c">用例产出 + 固定记录</td><td>R1/R2 是固定条目，uut.json 无权定义</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="folio">03</div>
+  <h2>判定链路：从"清单映射"到"用例自查"</h2>
+  <div class="grid2">
+    <div class="chain">
+      <div class="row dead">
+        <div class="tag">旧 · 废弃</div>
+        <h4 style="margin-top:4px">清单决定判什么，用例决定测什么</h4>
+        <pre>用例 return {"VDD": 3.31}
+  └─► _apply_checks
+        按 cmd_suit.checks {"VDD":"TC_VDD"} 映射
+          └─► ctx.check("TC_VDD", 3.31)</pre>
+        <p class="muted" style="font-size:13.8px">判定归属碎在两边：改一个参数化用例要在两个文件之间来回改。</p>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="row live">
+        <div class="tag">新 · 采用</div>
+        <h4 style="margin-top:4px">用例自查，conftest 只提供判据</h4>
+        <pre>v = ctx.command("dmm","measure_dc_voltage")
+ctx.expect("TC_VDD", v)     <i># 判定 + 留痕</i>
+  └─► ctx.take_checks()
+        └─► 明细进 run_result.json</pre>
+        <p class="muted" style="font-size:13.8px">conftest 需加 <span class="mono">_pending_checks</span> 与 <span class="mono">take_checks()</span>，
+        并升 <span class="mono">ATECONFTEST_VERSION 2 → 3</span>，否则现场不会更新。</p>
+      </div>
+    </div>
+  </div>
+  <div class="card acc">
+    <div class="kk">连带影响 · 必须一起做</div>
+    <h4>移除 <span class="mono">checks</span> 会让现网唯一的跨字段校验失效</h4>
+    <p>现在 <span class="mono">validate_v2</span> 会拦下"引用了未定义阈值"——那正是靠 <span class="mono">checks</span> 实现的。
+    删掉它，错误就从"导入时拦下"退化成"运行时 <span class="mono">KeyError</span>"。所以必须补一条静态扫描：
+    读 <span class="mono">testcase/*.py</span> 里 <span class="mono">ctx.expect("KEY"</span> / <span class="mono">ctx.check("KEY"</span> 的字面量，
+    校验 KEY 已在 <span class="mono">testconfig</span> 定义。这条校验要<b>先于</b> <span class="mono">checks</span> 的移除上线。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">04</div>
+  <h2>cmd_suit 收敛结果：3 个必需 + 4 个可选</h2>
+  <table class="g">
+    <thead><tr><th style="width:110px">字段</th><th style="width:90px">必需</th><th style="width:330px">作用</th><th>为什么留下 / 为什么删掉</th></tr></thead>
+    <tbody>
+      <tr><td class="c">id</td><td><span class="v in">必需</span></td><td>报告主键、<span class="mono">parametrize</span> 用例 id、结果续写键</td><td>现网 <span class="mono">record()</span> / <span class="mono">_upsert()</span> 全靠它</td></tr>
+      <tr><td class="c">case</td><td><span class="v in">必需</span></td><td><span class="mono">module::function</span> 引用</td><td><span class="mono">run_case</span> 用它 <span class="mono">_load_callable</span>，1:1 映射锚点</td></tr>
+      <tr><td class="c">params</td><td><span class="v in">必需</span></td><td>调用实参 <span class="mono">fn(ctx, **params)</span></td><td>现网调用契约；只放数值，别名从 <span class="mono">ctx</span> 取</td></tr>
+      <tr><td class="c">exec</td><td>可选</td><td><span class="mono">timeout_s</span> / <span class="mono">retry</span> / <span class="mono">on_fail</span></td><td>编排策略。因每条用例是独立进程，实现位置在 Runner 侧</td></tr>
+      <tr><td class="c">parallel</td><td>可选</td><td><span class="mono">per_channel</span> / <span class="mono">shared</span></td><td>并行调度信息，默认值不写</td></tr>
+      <tr><td class="c">skip_when</td><td>可选</td><td>条件跳过（设备缺失等）</td><td>替代旧 <span class="mono">optional</span>，语义唯一</td></tr>
+      <tr><td class="c">resources</td><td>可选</td><td>并行时的仪器占用声明</td><td>需与 <span class="mono">slots.resource_bindings</span> 一致校验</td></tr>
+      <tr><td class="c" style="color:var(--accent)">checks ↓</td><td><span class="v out">删除</span></td><td>原：测量字段 → 阈值键的映射</td><td>判定改由用例 <span class="mono">ctx.expect</span> 完成；报告由用例产出</td></tr>
+      <tr><td class="c" style="color:var(--accent)">name / description / no / tags / optional / depends_on / kind ↓</td><td><span class="v out">删除</span></td>
+        <td>原：用例名、描述、序号、标签、可跳过、依赖、类型</td>
+        <td>分别来自 docstring / marker / 数组顺序 / <span class="mono">on_fail</span> / 所在段落——全部是第二事实源</td></tr>
+    </tbody>
+  </table>
+  <div class="col">
+    <h3>精简后的条目（这就是全部）</h3>
+    <pre>{ "id": "TC004",
+  "case": "testcase.comm::playback_signal",
+  "params": { "freq": 1000, "vpp": 2.4 },
+  "exec": { "timeout_s": 40, "retry": { "max": 2, "interval_s": 1.0 } } }</pre>
+    <p class="muted">硬标准：<b>留下的每个字段，都能在 conftest 里指到真实读取它的那一行代码</b>。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">05</div>
+  <h2>校验清单（8 条，其中 3 条是本次新增的关键）</h2>
+  <table class="g">
+    <thead><tr><th style="width:52px">#</th><th style="width:270px">校验</th><th style="width:110px">类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="c">name 由必填降为可选</td><td>调整</td><td>用例名来自 docstring；若保留则加"与 docstring 不一致告警"</td></tr>
+      <tr><td class="c">2</td><td class="c">checks 引用校验失效</td><td><span style="color:var(--accent)" class="mono">副作用</span></td><td>移除 checks 后现网唯一跨字段校验消失</td></tr>
+      <tr><td class="c">3</td><td class="c">静态扫描 ctx.expect / ctx.check 的键</td><td><span style="color:var(--accent)" class="mono">新增·关键</span></td><td>补 #2 的空缺，防止退化为运行时 KeyError</td></tr>
+      <tr><td class="c">4</td><td class="c">case 存在性（在 testcase/ 找到该函数）</td><td><span style="color:var(--accent)" class="mono">新增</span></td><td>现在只校验字符串格式，函数写错要等运行时才炸</td></tr>
+      <tr><td class="c">5</td><td class="c">清单 ↔ 目录双向一致</td><td><span style="color:var(--accent)" class="mono">新增</span></td><td>引用不存在 → 报错；有用例未引用 → 提示</td></tr>
+      <tr><td class="c">6</td><td class="c">testconfig 判据类型</td><td>新增</td><td><span class="mono">range</span> 需 min 或 max；<span class="mono">stats</span> 需 std 且 k&gt;0、n≥2</td></tr>
+      <tr><td class="c">7</td><td class="c">adaptation 自洽</td><td>新增</td><td>批次正则能匹配 part_number；count 与 slots 一致；资源无重复占用</td></tr>
+      <tr><td class="c">8</td><td class="c">device_config 跨表一致</td><td>新增</td><td>类别 / device_id 须在该测试台 BOM 内；fixture 须存在</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="folio">06</div>
+  <h2>迁移路径</h2>
+  <table class="g">
+    <thead><tr><th style="width:110px">阶段</th><th style="width:400px">内容</th><th style="width:80px">风险</th><th>前置条件</th></tr></thead>
+    <tbody>
+      <tr><td class="c">阶段 0</td><td>uut.json 切新结构（metadata / adaptation / bench / testconfig / baseline）；cmd_suit 去 7 个字段；校验器放宽 name、补 #3 #4 #6</td>
+        <td><span class="v in">低</span></td><td>校验 #3 先上线</td></tr>
+      <tr><td class="c">阶段 1</td><td>conftest v3：<span class="mono">expect</span> 成功留痕 + <span class="mono">take_checks</span>；<span class="mono">stats</span> 判据；Runner 侧实现 timeout / retry</td>
+        <td><span class="v" style="border-color:var(--warn);color:var(--warn)">中</span></td><td>升版本号会让所有台架更新 conftest</td></tr>
+      <tr><td class="c">阶段 2</td><td>PN 校验接入执行链路，结果落 batch / part_no / equipment_serial</td>
+        <td><span class="v" style="border-color:var(--warn);color:var(--warn)">中</span></td><td>确认批次白名单</td></tr>
+      <tr><td class="c">阶段 3</td><td>并行：channels / slots / 资源互斥 / Runner 多通道拉起</td>
+        <td><span class="v out">高</span></td><td>资源声明与校验 #7</td></tr>
+      <tr><td class="c">阶段 4</td><td>R1 / R2 固定条目与报告模板固化；第二级记录落库</td>
+        <td><span class="v" style="border-color:var(--warn);color:var(--warn)">中</span></td><td>待确认 R1/R2 条目清单</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  uut.json 驱动测试 · 设计总览 · 2026-10-07 · ATE Runner<br>
+  依据代码：tps_runtime/conftest_template.py（v2，533 行）· manifest.py（validate_v2）· templates.py · workspace.py · backend/ate.db（test_records 25 列 / 15 行）<br>
+  完整说明见同目录 TPS设计.md
+</footer>
+</div>
+</body>
+</html>
