@@ -105,7 +105,7 @@
     <div><dt>注入</dt><dd>conftest.py v2 → v3</dd></div>
     <div><dt>cmd_suit</dt><dd>15 → 3 必需 + 4 可选</dd></div>
     <div><dt>判据</dt><dd>min / max / std</dd></div>
-    <div><dt>日期</dt><dd>2026-10-07</dd></div>
+    <div><dt>日期</dt><dd>2026-10-08</dd></div>
   </dl>
 </header>
 
@@ -279,8 +279,55 @@ ctx.expect("TC_VDD", v)     <i># 判定 + 留痕</i>
   </table>
 </section>
 
+<section>
+  <div class="folio">07</div>
+  <h2>metadata：TPS 的身份、归属与追溯（本次更新）</h2>
+  <p class="muted">命名规则 <b>子系统-测试台-ATE版本-TPS-TPS版本</b>，构成项即
+  <span class="mono">subsystem</span> / <span class="mono">testbenchtype</span> /
+  <span class="mono">version</span> / <span class="mono">tpsversion</span>，例如
+  <span class="mono">spm-wsec-static-v1.0.0-tps-v1.0.0</span>。</p>
+  <table class="g">
+    <thead><tr><th style="width:230px">字段</th><th style="width:80px">必需</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td class="c">tpsname</td><td><span class="v in">是</span></td><td>TPS 名称，按命名规则拼装</td></tr>
+      <tr><td class="c">tpsversion</td><td><span class="v in">是</span></td><td>TPS 版本，如 <span class="mono">v1.0.0</span></td></tr>
+      <tr><td class="c">subsystem</td><td><span class="v in">是</span></td><td>子系统，默认 <span class="mono">spm</span></td></tr>
+      <tr><td class="c">testbenchtype</td><td><span class="v in">是</span></td><td>测试台类型，默认 <span class="mono">wsec-static</span></td></tr>
+      <tr><td class="c">uutcategory</td><td><span class="v in">是</span></td><td>UUT 等级：<span class="mono">module</span>（模块）/ <span class="mono">component</span>（部件）</td></tr>
+      <tr><td class="c">processnumber</td><td><span class="v in">是</span></td><td>工序号，如 <span class="mono">OP111111111</span></td></tr>
+      <tr><td class="c">author</td><td><span class="v in">是</span></td><td>创建者工号</td></tr>
+      <tr><td class="c">version</td><td><span class="v in">是</span></td><td>创建该 TPS 的 <b>ATE 规则版本</b>（不是 TPS 版本）</td></tr>
+      <tr><td class="c">productioninfo.machineid</td><td><span class="v in">是</span></td><td>工控机编号，默认 <span class="mono">1000D</span></td></tr>
+      <tr><td class="c">status</td><td>否</td><td>启动门禁：只有 <span class="mono">released</span> 允许正式生产</td></tr>
+      <tr><td class="c">created_at</td><td>否</td><td>创建日期</td></tr>
+    </tbody>
+  </table>
+  <div class="col">
+    <h3>模板片段（可直接粘进新 TPS）</h3>
+    <pre>"metadata": {
+  "tpsname": "spm-wsec-static-v1.0.0-tps-v1.0.0",
+  "tpsversion": "v1.0.0",
+  "subsystem": "spm",
+  "testbenchtype": "wsec-static",
+  "uutcategory": "module",
+  "processnumber": "OP111111111",
+  "author": "10001234",
+  "version": "v1.0.0",
+  "productioninfo": { "machineid": "1000D" },
+  "status": "released",
+  "created_at": "2026-10-08"
+}</pre>
+  </div>
+  <div class="card acc">
+    <div class="kk">落地状态 · 模板与文档先行</div>
+    <p><span class="mono">metadata</span> 目前还没有进 <span class="mono">validate_v2</span>，运行期也不消费它，
+    真实样例 <span class="mono">backend/testresource/spm_rh_dyn/tps.json</span> 尚未含该块。
+    本次先把结构与默认值固化到模板与设计文档，代码接入见迁移路径「阶段 0」。</p>
+  </div>
+</section>
+
 <footer>
-  uut.json 驱动测试 · 设计总览 · 2026-10-07 · ATE Runner<br>
+  uut.json 驱动测试 · 设计总览 · 2026-10-08 · ATE Runner<br>
   依据代码：tps_runtime/conftest_template.py（v2，533 行）· manifest.py（validate_v2）· templates.py · workspace.py · backend/ate.db（test_records 25 列 / 15 行）<br>
   完整说明见同目录 TPS设计.md
 </footer>

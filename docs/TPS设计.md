@@ -1,8 +1,11 @@
 # TPS 设计说明 · uut.json 驱动测试
 
-> 版本 v2 · 2026-10-07 · 适用对象：ATE Runner（`D:\ATE`）
+> 版本 v2.1 · 2026-10-08 · 适用对象：ATE Runner（`D:\ATE`）
 > 交付位置：`D:\ATE\docs\TPS设计.md`（HTML 版：`TPS设计.html`）
 > 本文取代此前基于「cmd_suit 承载判定映射」的方案。凡与本文冲突的旧设计，以本文为准。
+>
+> **2026-10-08 更新**：`metadata` 改为 TPS 的「身份 / 归属 / 追溯」块——
+> `tpsname` / `tpsversion` / `subsystem` / `testbenchtype` / `uutcategory` / `processnumber` / `author` / `version` / `productioninfo`，详见 §4.1。
 
 ---
 
@@ -91,14 +94,17 @@ uut.json
 {
   "schema": "tps.v2",
   "metadata": {
-    "id": "SPM-RH-DYN",
-    "name": "SPM 读头动态测试",
-    "version": "1.3.0",
-    "status": "released",            // draft | review | released
-    "author": "fanyuhang",
-    "created_at": "2026-10-07",
-    "applies_to": "SPM-RH-DYN-01",   // 对应测试台类型编号
-    "changelog": [{ "version": "1.3.0", "date": "2026-10-07", "note": "判据移入用例，移除 checks" }]
+    "tpsname": "spm-wsec-static-v1.0.0-tps-v1.0.0",  // TPS 名称：子系统-测试台-ATE版本-TPS-TPS版本
+    "tpsversion": "v1.0.0",              // TPS 版本
+    "subsystem": "spm",                  // 子系统，默认 spm
+    "testbenchtype": "wsec-static",       // 测试台类型，默认 wsec-static
+    "uutcategory": "module",             // UUT 等级：module 模块 / component 部件
+    "processnumber": "OP111111111",      // 工序号
+    "author": "10001234",                // 创建者工号
+    "version": "v1.0.0",                 // 创建该 TPS 的 ATE 规则版本
+    "productioninfo": { "machineid": "1000D" },   // 生产信息：工控机编号，默认 1000D
+    "status": "released",                // draft | review | released
+    "created_at": "2026-10-08"
   },
 
   "adaptation": {
@@ -162,6 +168,30 @@ uut.json
 ```
 
 > 说明：`setup` / `cmd_suit` / `teardown` 现在位于 `baseline` 之下。若不想动现网 `case_entries()` 的三段取值，可先保持三段平铺在顶层，仅把 `metadata` / `adaptation` / `bench` 作为新增块——**功能等价，命名可后置**。
+
+### 4.1 metadata 字段（2026-10-08 更新）
+
+| 字段 | 必需 | 作用 | 取值 / 默认 |
+| --- | --- | --- | --- |
+| `tpsname` | 是 | TPS 名称，命名规则 `子系统-测试台-ATE版本-TPS-TPS版本` | 例 `spm-wsec-static-v1.0.0-tps-v1.0.0` |
+| `tpsversion` | 是 | TPS 版本 | 例 `v1.0.0` |
+| `subsystem` | 是 | 子系统 | 默认 `spm` |
+| `testbenchtype` | 是 | 测试台类型 | 默认 `wsec-static` |
+| `uutcategory` | 是 | UUT 等级 | `module`（模块）/ `component`（部件） |
+| `processnumber` | 是 | 工序号 | 例 `OP111111111` |
+| `author` | 是 | 创建者工号 | 例 `10001234` |
+| `version` | 是 | 创建该 TPS 的 **ATE 规则版本**（非 TPS 版本） | 例 `v1.0.0` |
+| `productioninfo.machineid` | 是 | 生产信息·工控机编号 | 默认 `1000D` |
+| `status` | 否 | 启动门禁：只有 `released` 允许正式生产 | `draft` / `review` / `released` |
+| `created_at` | 否 | 创建日期 | `YYYY-MM-DD` |
+
+> **与上一版的差异**：`name` → `tpsname`；`version` 由「基线版本号」改为「ATE 规则版本」，
+> TPS 自身版本另立 `tpsversion`；`applies_to` 由 `testbenchtype` 取代；
+> 新增 `subsystem` / `uutcategory` / `processnumber` / `tpsversion` / `productioninfo`；`author` 由姓名改为工号。
+>
+> **落地状态**：`metadata` 目前尚未进入 `validate_v2`，运行期也不消费它（真实样例
+> `backend/testresource/spm_rh_dyn/tps.json` 尚未含该块）。本版是**模板与文档先行**，
+> 代码接入见 §13 迁移路径「阶段 0」。
 
 ---
 

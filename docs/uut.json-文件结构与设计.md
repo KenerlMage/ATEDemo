@@ -30,10 +30,12 @@ spm_rh_dyn/                         ← TPS 包（打包后即压缩包）
 │   ├── env_setup.py                含 setup / teardown 方法
 │   ├── power.py                    含 setup / teardown 方法
 │   └── comm.py
-├── resource/                       其他配置文件
+├── resource/                       清单之外的配置与数据
 │   ├── pn_whitelist.json
 │   ├── channel_map.json
-│   └── fixture_list.json
+│   ├── fixture_list.json
+│   ├── appearance_check.md         manual 弹窗文案（按条目 resource 名取）
+│   └── appearance_check.png        同名图片，与文案一并展示
 └── wheel/                          其余 Python 驱动
     ├── scope_sdk-1.2.0-py3-none-any.whl
     └── dmm_driver-0.9.3-py3-none-any.whl
@@ -45,7 +47,7 @@ spm_rh_dyn/                         ← TPS 包（打包后即压缩包）
 | --- | --- | --- |
 | `tps.json` | 单个 JSON 文件，五键 | 清单：声明跑什么、按什么顺序、按什么判 |
 | `testcase/` | Python 包，必须含 `__init__.py`，一个 py 文件一个 testcase 模块，模块内含 `setup` 与 `teardown` 方法 | 用例实现：清单条目 `case` 字段引用的目标函数 |
-| `resource/` | 配置文件目录，JSON / CSV / YAML 均可 | 存放清单之外的配置与数据：大批量 PN 白名单、通道表、夹具清单、测试向量 |
+| `resource/` | 配置文件目录，JSON / CSV / YAML / Markdown / 图片均可 | 存放清单之外的配置与数据：大批量 PN 白名单、通道表、夹具清单、测试向量；`manual` 条目的弹窗文案与图片也在这里，由用例按名称取 |
 | `wheel/` | `.whl` 文件 | 存放其余 Python 驱动与设备 SDK，随包分发，供离线工控机安装或直接加载 |
 | 运行期产物 | 不在包内 | `conftest.py`、`test_tps_generated.py`、`ate_env.json`、`run_<task_id>/` 由执行器在运行目录生成 |
 
@@ -79,7 +81,7 @@ Runner 不在源包上直接执行。每次运行它都在 workspace 下建一�
 | 2 | 启动门禁：状态是否允许生产、件号是否在白名单内、SN 形态是否匹配 | `metadata.status` / `adaptation.part_number` / `adaptation.sn` |
 | 3 | 解析设备与阈值：别名 → 注册库记录 → 连接参数；阈值键 → 算法与参数 | `device` / `threshold` |
 | 4 | 按 `cmd_suit` 三段顺序展开执行序列，渲染执行入口与环境描述 | `cmd_suit` / `setup` / `teardown` |
-| 5 | 逐条用例以独立 pytest 进程执行，收集判定明细 | 条目的 `exec` / `parallel` / `manual` / `skip_when` |
+| 5 | 逐条用例以独立 pytest 进程执行，收集判定明细；`manual` 条目弹窗等操作员选 next / abort | 条目的 `type` / `resource` / `parallel` / `exec.timeout_s` |
 | 6 | 汇总 `run_result.json`，生成 HTML 报告 | `metadata` / `threshold` |
 
 **conftest（注入通道）**
@@ -114,9 +116,9 @@ def test_vdd(ate_ctx, ate_devices):
 | ③ 位号绑定 | `adaptation.channels` | 每个位号的 SN 绑定信号源与物理通道 | 通道映射表，后续数据按此归属 |
 | ④ 设备解析 | `device` | 别名 → 注册库 → 连接参数 → 设备实例 | `ate_devices` 夹具 |
 | ⑤ 阈值装载 | `threshold` | 按 `mode` 装载判定算法与参数 | `ate_thresholds` 夹具 |
-| ⑥ 序列展开 | `cmd_suit` / `setup` / `teardown` | 三段顺序展开；串行按序、`per_sn` 按位号展开、`manual` 插入等待点 | 执行序列与执行入口 |
+| ⑥ 序列展开 | `cmd_suit` / `setup` / `teardown` | 三段按书写顺序展开；`per_sn` 条目逐位号展开，`manual` 条目插入等待点（next / abort） | 执行序列与执行入口 |
 | ⑦ 执行与判定 | 条目的 `exec`、阈值算法 | 每条用例独立进程执行，判定按算法取样本算值 | 判定明细、`run_result.json` |
-| ⑧ 收尾与报告 | `teardown.always_run` / `metadata` | 安全收尾必跑，汇总结果 | HTML 报告、运行记录 |
+| ⑧ 收尾与报告 | `teardown` / `metadata` | 安全收尾必跑，汇总结果 | HTML 报告、运行记录 |
 
 ## 五、metadata · 版本数据
 
@@ -241,39 +243,47 @@ UUT 名称 / 登记信息
 
 新增算法只需扩展 `mode` 与算法参数，结果结构与消费方不动。
 
-## 九、cmd_suit · 用例清单与编排
+## 九、cmd_suit · 用例清单与执行顺序
 
-这一键声明跑哪些用例、什么顺序、失败怎么办。顶层三段平铺：
+这一键声明跑哪些用例、按什么顺序跑。顶层三段平铺，顺序就是书写顺序：
 
 | 段 | 作用 | 执行方式 |
 | --- | --- | --- |
-| `setup` | 环境初始化：上电、复位、装夹 | 串行，数组顺序即执行顺序 |
-| `cmd_suit` | 测试套：全部测试用例 | 默认串行；`parallel=per_sn` 时每位号各跑一遍 |
-| `teardown` | 环境终止：断电、卸载、归档 | 串行；`always_run=true` 的条目即使前面失败也必须执行 |
+| `setup` | 环境初始化：上电、复位、装夹 | 按数组顺序逐条执行 |
+| `cmd_suit` | 测试套：全部测试用例 | 按数组顺序逐条执行；`parallel=per_sn` 的条目逐位号各跑一遍 |
+| `teardown` | 环境终止：断电、卸载、归档 | 收尾段，前面的段跑完必定执行 |
 
-### 9.1 串行与并行
+编排上刻意只保留"顺序"这一件事：数组顺序即执行顺序，不引入排序、优先级、依赖、条件分支、失败策略与重试。清单里唯一能决定"要不要走下一步"的，是人工确认条目。
 
-- **串行（默认）**：条目按数组顺序依次执行，上一条结束才开始下一条。
-- **并行 `per_sn`**：该条目在每个位号上各执行一次，数据按 `adaptation.channels` 的绑定归属到对应 SN。
-- **并行 `shared`**：所有位号共用一次执行（如整机总上电、总功耗）。
+### 9.1 人工确认条目（`type: manual`）
 
-### 9.2 人工确认子用例
+需要操作员判断的步骤（外观检查、装夹确认、人工上下料）用 `type: manual` 表达：运行时弹出确认窗口，操作员二选一。
 
-需要操作员判断的步骤（外观检查、装夹确认、人工上下料）以人工确认子用例表达：运行时弹出确认窗口，操作员确认后继续；超时按 `timeout_s` 处置。
+| 选项 | 行为 |
+| --- | --- |
+| 继续下一步 `next` | 关闭弹窗，执行清单里的下一条 |
+| 中止 `abort` | 停止本轮测试，直接进入收尾与报告 |
+
+条目本身只写"用哪个名称"，弹窗内容不写在清单里：
 
 ```jsonc
 {
   "id": "M-01",
   "case": "testcase.manual::appearance_check",
-  "manual": {
-    "message": "确认外壳无划伤、屏面无亮点后继续",
-    "expect": "操作员确认",          // 展示给操作员的确认口径
-    "timeout_s": 300                 // 超时处置：按失败记录或重试
-  }
+  "type": "manual",
+  "resource": "appearance_check"        // resource/ 下的名称
 }
 ```
 
-自动用例中途需要人工确认时，也可在用例内调用判定上下文的确认接口插入等待点，两种方式并存。
+用例按 `resource` 名称到包内 `resource/` 目录取内容：文案取 `<名称>.md`（或 `.txt`），图片取同名文件（`.png` / `.jpg`），需要多张时用 `<名称>-1`、`<名称>-2`…。改文案、换示意图只改资源文件，不动受控清单。
+
+### 9.2 执行顺序与作用域
+
+- **顺序**：条目按数组顺序执行，上一条结束才开始下一条；失败记录后继续跑后续条目，整轮跑完再汇总。
+- **作用域 `parallel`**：只决定这条用例在几个位号上跑，不改变先后顺序。
+  - `serial`（默认）：跑一次。
+  - `per_sn`：每个位号各跑一次，数据按 `adaptation.channels` 的绑定归属到对应 SN。
+  - `shared`：所有位号共用一次执行（如整机总上电、总功耗）。
 
 ### 9.3 用例条目字段
 
@@ -281,11 +291,10 @@ UUT 名称 / 登记信息
 | --- | --- | --- |
 | `id` | 是 | 条目标识：报告主键、执行入口的用例 id、运行结果的续写键 |
 | `case` | 是 | `module::function` 用例引用，清单与代码 1:1 映射的唯一锚点 |
-| `exec` | 否 | `timeout_s` 单条超时；`retry{max, interval_s, on}` 重试次数、间隔与触发条件；`on_fail` 失败处置 |
-| `parallel` | 否 | `serial`（默认）/ `per_sn` / `shared` |
-| `manual` | 否 | `message` / `expect` / `timeout_s`，人工确认子用例 |
-| `skip_when` | 否 | 条件跳过（如设备缺失），条件成立则跳过而非失败 |
-| `always_run` | 否 | 仅 `teardown`：为 `true` 时即使前面失败也必须执行（安全收尾） |
+| `type` | 否 | 条目类型：缺省为普通自动用例；`manual` 为人工确认条目 |
+| `resource` | `type: manual` 时必填 | `resource/` 下的名称，弹窗文案与图片按名取 |
+| `parallel` | 否 | 作用域：`serial`（默认）/ `per_sn` / `shared` |
+| `exec.timeout_s` | 否 | 单条超时秒数，防止卡死；超时按下不通过记录 |
 
 不进入条目的字段（设计边界）：
 
@@ -294,7 +303,9 @@ UUT 名称 / 登记信息
 | `params`（调用实参） | 调用实参不是基线数据 | 用例以自身默认值为准，调用形如 `fn(ctx)`；确实需要外部改动的量走 `threshold` 与 `adaptation` |
 | `resources`（资源占用声明） | 资源信息不属于基线 | 位号与信号源的关系由 `adaptation.channels` 表达 |
 | `name` / `description` / `no` / `tags` | 属用例自身属性 | 用例名与描述取自代码 |
-| `checks` / `optional` / `depends_on` | 属判定逻辑与运行策略 | 判定由用例完成；跳过与失败策略走 `skip_when` / `exec.on_fail` |
+| `checks` / `optional` | 属判定逻辑 | 判定由用例调用判定接口完成 |
+| `on_fail` / `retry` / `skip_when` / `always_run` / `depends_on` | 属编排策略，清单只保留"顺序" | 跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 `abort` 表达 |
+| `manual.message` / `expect` / `timeout_s` | 弹窗内容是资源，不是基线声明 | 按 `resource` 名称从包内 `resource/` 取 |
 
 ## 十、完整骨架
 
@@ -349,20 +360,17 @@ UUT 名称 / 登记信息
 
   // ⑤ 三段：环境初始化 / 测试套 / 环境终止
   "setup": [
-    {
-      "id": "S-01",
-      "case": "testcase.env_setup::power_on",
-      "exec": { "timeout_s": 60, "retry": { "max": 2, "interval_s": 5, "on": "timeout" }, "on_fail": "abort" }
-    }
+    { "id": "S-01", "case": "testcase.env_setup::power_on", "exec": { "timeout_s": 60 } }
   ],
   "cmd_suit": [
     { "id": "T-01", "case": "testcase.power::test_vdd", "parallel": "per_sn" },
-    { "id": "T-02", "case": "testcase.comm::test_link", "parallel": "shared", "skip_when": "device_missing:dmm" },
+    { "id": "T-02", "case": "testcase.comm::test_link", "parallel": "shared" },
+    // 人工确认条目：弹窗给操作员 next / abort 两个选项
     { "id": "M-01", "case": "testcase.manual::appearance_check",
-      "manual": { "message": "确认外壳无划伤、屏面无亮点后继续", "expect": "操作员确认", "timeout_s": 300 } }
+      "type": "manual", "resource": "appearance_check" }   // 弹窗文案与图片取自 resource/
   ],
   "teardown": [
-    { "id": "E-01", "case": "testcase.env_setup::power_off", "always_run": true }
+    { "id": "E-01", "case": "testcase.env_setup::power_off" }   // 收尾段必定执行
   ]
 }
 ```
@@ -371,4 +379,5 @@ UUT 名称 / 登记信息
 
 - 五键职责互不重叠：`metadata` 只管版本、`adaptation` 只管能不能测与数据归属、`device` 只管设备引用、`threshold` 只管判定算法、`cmd_suit` 只管编排。
 - 三类变化的改动面：换台架只改 `device` 引用或注册库记录；改判据只改 `threshold`；加用例只加 `testcase/` 模块与 `cmd_suit` 条目。
+- 编排只有顺序：`cmd_suit` 是按书写顺序执行的清单，人工确认条目是唯一的控制点，弹窗内容走 `resource/`，改文案不改清单。
 - 需要评审的内容集中在清单，需要维护的代码集中在 `testcase/`，需要随包分发的依赖集中在 `wheel/`，配置与数据集中在 `resource/`。

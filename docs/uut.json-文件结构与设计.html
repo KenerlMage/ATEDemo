@@ -116,7 +116,7 @@
     <a href="#s6"><b>06</b>adaptation · PN 白名单与信号源匹配</a>
     <a href="#s7"><b>07</b>device · 设备信息</a>
     <a href="#s8"><b>08</b>threshold · 阈值与判定算法</a>
-    <a href="#s9"><b>09</b>cmd_suit · 用例编排</a>
+    <a href="#s9"><b>09</b>cmd_suit · 执行顺序</a>
     <a href="#s10"><b>10</b>完整骨架</a>
     <a href="#s11"><b>11</b>设计要点</a>
   </nav>
@@ -150,10 +150,12 @@
 │   ├─ env_setup.py                         <em>含 setup / teardown 方法</em>
 │   ├─ power.py                             <em>含 setup / teardown 方法</em>
 │   └─ comm.py
-├─ resource/                                <em>其他配置文件</em>
+├─ resource/                                <em>清单之外的配置与数据</em>
 │   ├─ pn_whitelist.json
 │   ├─ channel_map.json
-│   └─ fixture_list.json
+│   ├─ fixture_list.json
+│   ├─ appearance_check.md                  <em>manual 弹窗文案（按 resource 名取）</em>
+│   └─ appearance_check.png                 <em>同名图片，与文案一并展示</em>
 └─ wheel/                                   <em>其余 Python 驱动</em>
     ├─ scope_sdk-1.2.0-py3-none-any.whl
     └─ dmm_driver-0.9.3-py3-none-any.whl</pre>
@@ -162,7 +164,7 @@
         <tbody>
           <tr><td class="k">tps.json</td><td>单个 JSON 文件，五键</td><td>清单：声明跑什么、按什么顺序、按什么判</td></tr>
           <tr><td class="k">testcase/</td><td>Python 包，必须含 <code>__init__.py</code>，一个 py 文件一个 testcase 模块，模块内含 <code>setup</code> 与 <code>teardown</code> 方法</td><td>用例实现：清单条目 <code>case</code> 字段引用的目标函数</td></tr>
-          <tr><td class="k">resource/</td><td>配置文件目录，JSON / CSV / YAML 均可</td><td>存放清单之外的配置与数据：大批量 PN 白名单、通道表、夹具清单、测试向量</td></tr>
+          <tr><td class="k">resource/</td><td>配置文件目录，JSON / CSV / YAML / Markdown / 图片均可</td><td>存放清单之外的配置与数据：大批量 PN 白名单、通道表、夹具清单、测试向量；<code>manual</code> 条目的弹窗文案与图片也在这里，由用例按名称取</td></tr>
           <tr><td class="k">wheel/</td><td><code>.whl</code> 文件</td><td>存放其余 Python 驱动与设备 SDK，随包分发，供离线工控机安装或直接加载</td></tr>
           <tr><td class="k">运行期产物</td><td>不在包内</td><td><code>conftest.py</code>、<code>test_tps_generated.py</code>、<code>ate_env.json</code>、<code>run_&lt;task_id&gt;/</code> 由执行器在运行目录生成</td></tr>
         </tbody>
@@ -205,7 +207,7 @@
               <tr><td class="num">2</td><td>启动门禁：状态是否允许生产、件号是否在白名单、SN 形态是否匹配</td><td><code>metadata.status</code> / <code>adaptation</code></td></tr>
               <tr><td class="num">3</td><td>解析设备与阈值：别名 → 注册库 → 连接参数；阈值键 → 算法与参数</td><td><code>device</code> / <code>threshold</code></td></tr>
               <tr><td class="num">4</td><td>按三段顺序展开执行序列，渲染执行入口与环境描述</td><td><code>cmd_suit</code> / <code>setup</code> / <code>teardown</code></td></tr>
-              <tr><td class="num">5</td><td>逐条用例以独立 pytest 进程执行，收集判定明细</td><td>条目 <code>exec</code> / <code>parallel</code> / <code>manual</code></td></tr>
+              <tr><td class="num">5</td><td>逐条用例以独立 pytest 进程执行，收集判定明细；<code>manual</code> 条目弹窗等操作员选 next / abort</td><td>条目 <code>type</code> / <code>resource</code> / <code>parallel</code> / <code>exec.timeout_s</code></td></tr>
               <tr><td class="num">6</td><td>汇总 <code>run_result.json</code>，生成 HTML 报告</td><td><code>metadata</code> / <code>threshold</code></td></tr>
             </tbody>
           </table>
@@ -240,7 +242,7 @@
         <div><span class="st">03</span><span class="nm">位号绑定</span><span class="ac">每个位号的 SN 绑定信号源与物理通道 → 通道映射表，后续数据按此归属</span></div>
         <div><span class="st">04</span><span class="nm">设备解析</span><span class="ac">别名 → 注册库 → 连接参数 → 设备实例，形成 <code>ate_devices</code> 夹具</span></div>
         <div><span class="st">05</span><span class="nm">阈值装载</span><span class="ac">按 <code>mode</code> 装载判定算法与参数，形成 <code>ate_thresholds</code> 夹具</span></div>
-        <div><span class="st">06</span><span class="nm">序列展开</span><span class="ac">三段顺序展开；串行按序、<code>per_sn</code> 按位号展开、<code>manual</code> 插入等待点</span></div>
+        <div><span class="st">06</span><span class="nm">序列展开</span><span class="ac">三段按书写顺序展开；<code>per_sn</code> 条目逐位号展开，<code>manual</code> 条目插入等待点（next / abort）</span></div>
         <div><span class="st">07</span><span class="nm">执行与判定</span><span class="ac">每条用例独立进程执行，判定按算法取样本算值 → 判定明细、<code>run_result.json</code></span></div>
         <div><span class="st">08</span><span class="nm">收尾与报告</span><span class="ac">安全收尾必跑，汇总结果 → HTML 报告与运行记录</span></div>
       </div>
@@ -367,58 +369,71 @@
     </section>
 
     <section id="s9">
-      <h2>09 · cmd_suit · 用例清单与编排</h2>
-      <p class="sub">跑哪些用例、什么顺序、失败怎么办；三层：环境初始化 / 测试套 / 环境终止</p>
+      <h2>09 · cmd_suit · 用例清单与执行顺序</h2>
+      <p class="sub">跑哪些用例、按什么顺序跑；顺序就是书写顺序，人工确认是唯一的控制点</p>
       <table>
-        <thead><tr><th style="width:126px">段</th><th>作用</th><th style="width:250px">执行方式</th></tr></thead>
+        <thead><tr><th style="width:126px">段</th><th>作用</th><th style="width:270px">执行方式</th></tr></thead>
         <tbody>
-          <tr><td class="k">setup</td><td>环境初始化：上电、复位、装夹</td><td>串行，数组顺序即执行顺序</td></tr>
-          <tr><td class="k">cmd_suit</td><td>测试套：全部测试用例</td><td>默认串行；<code>parallel=per_sn</code> 时每位号各跑一遍</td></tr>
-          <tr><td class="k">teardown</td><td>环境终止：断电、卸载、归档</td><td>串行；<code>always_run=true</code> 的条目失败也必须执行</td></tr>
+          <tr><td class="k">setup</td><td>环境初始化：上电、复位、装夹</td><td>按数组顺序逐条执行</td></tr>
+          <tr><td class="k">cmd_suit</td><td>测试套：全部测试用例</td><td>按数组顺序逐条执行；<code>parallel=per_sn</code> 的条目逐位号各跑一遍</td></tr>
+          <tr><td class="k">teardown</td><td>环境终止：断电、卸载、归档</td><td>收尾段，前面的段跑完必定执行</td></tr>
         </tbody>
       </table>
-      <h3>9.1 串行与并行</h3>
+      <p class="note">编排上刻意只保留"顺序"这一件事：数组顺序即执行顺序，不引入排序、优先级、依赖、条件分支、
+        失败策略与重试。清单里唯一能决定"要不要走下一步"的，是人工确认条目。</p>
+      <h3>9.1 人工确认条目（<code>type: manual</code>）</h3>
+      <p>需要操作员判断的步骤（外观检查、装夹确认、人工上下料）用 <code>type: manual</code> 表达：
+        运行时弹出确认窗口，操作员二选一。</p>
       <table>
-        <thead><tr><th style="width:150px">方式</th><th>含义</th></tr></thead>
+        <thead><tr><th style="width:200px">选项</th><th>行为</th></tr></thead>
         <tbody>
-          <tr><td>串行（默认）</td><td>条目按数组顺序依次执行，上一条结束才开始下一条</td></tr>
-          <tr><td><code>per_sn</code></td><td>该条目在每个位号上各执行一次，数据按 <code>adaptation.channels</code> 的绑定归属到对应 SN</td></tr>
-          <tr><td><code>shared</code></td><td>所有位号共用一次执行（如整机总上电、总功耗）</td></tr>
+          <tr><td class="k">继续下一步 next</td><td>关闭弹窗，执行清单里的下一条</td></tr>
+          <tr><td class="k">中止 abort</td><td>停止本轮测试，直接进入收尾与报告</td></tr>
         </tbody>
       </table>
-      <h3>9.2 人工确认子用例</h3>
-      <p>需要操作员判断的步骤（外观检查、装夹确认、人工上下料）以人工确认子用例表达：运行时弹出确认窗口，
-        操作员确认后继续；超时按 <code>timeout_s</code> 处置。自动用例中途需要确认时，也可在用例内调用判定上下文的确认接口插入等待点。</p>
+      <p>条目本身只写"用哪个名称"，弹窗内容不写在清单里：</p>
       <pre>{
   "id": "M-01",
   "case": "testcase.manual::appearance_check",
-  "manual": {
-    "message": "确认外壳无划伤、屏面无亮点后继续",
-    "expect": "操作员确认",          <em>// 展示给操作员的确认口径</em>
-    "timeout_s": 300                 <em>// 超时处置：按失败记录或重试</em>
-  }
+  "type": "manual",
+  "resource": "appearance_check"        <em>// resource/ 下的名称</em>
 }</pre>
+      <p>用例按 <code>resource</code> 名称到包内 <code>resource/</code> 目录取内容：文案取 <code>&lt;名称&gt;.md</code>（或 <code>.txt</code>），
+        图片取同名文件（<code>.png</code> / <code>.jpg</code>），需要多张时用 <code>&lt;名称&gt;-1</code>、<code>&lt;名称&gt;-2</code>…。
+        改文案、换示意图只改资源文件，不动受控清单。</p>
+      <h3>9.2 执行顺序与作用域</h3>
+      <table>
+        <thead><tr><th style="width:170px">项</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>顺序</td><td>条目按数组顺序执行，上一条结束才开始下一条；失败记录后继续跑后续条目，整轮跑完再汇总</td></tr>
+          <tr><td><code>serial</code>（默认）</td><td>这条用例跑一次</td></tr>
+          <tr><td><code>per_sn</code></td><td>每个位号各跑一次，数据按 <code>adaptation.channels</code> 的绑定归属到对应 SN</td></tr>
+          <tr><td><code>shared</code></td><td>所有位号共用一次执行（如整机总上电、总功耗）</td></tr>
+        </tbody>
+      </table>
+      <p class="note"><code>parallel</code> 只决定这条用例在几个位号上跑，不改变先后顺序。</p>
       <h3>9.3 用例条目字段</h3>
       <table>
-        <thead><tr><th style="width:126px">字段</th><th style="width:52px">必需</th><th>作用</th></tr></thead>
+        <thead><tr><th style="width:190px">字段</th><th style="width:150px">必需</th><th>作用</th></tr></thead>
         <tbody>
           <tr><td class="k">id</td><td>是</td><td>条目标识：报告主键、执行入口的用例 id、运行结果的续写键</td></tr>
           <tr><td class="k">case</td><td>是</td><td><code>module::function</code> 用例引用，清单与代码 1:1 映射的唯一锚点</td></tr>
-          <tr><td class="k">exec</td><td>否</td><td><code>timeout_s</code>；<code>retry{max, interval_s, on}</code>；<code>on_fail</code> 失败处置</td></tr>
-          <tr><td class="k">parallel</td><td>否</td><td><code>serial</code>（默认）/ <code>per_sn</code> / <code>shared</code></td></tr>
-          <tr><td class="k">manual</td><td>否</td><td><code>message</code> / <code>expect</code> / <code>timeout_s</code>，人工确认子用例</td></tr>
-          <tr><td class="k">skip_when</td><td>否</td><td>条件跳过（如设备缺失），条件成立则跳过而非失败</td></tr>
-          <tr><td class="k">always_run</td><td>否</td><td>仅 <code>teardown</code>：为 <code>true</code> 时失败也必须执行（安全收尾）</td></tr>
+          <tr><td class="k">type</td><td>否</td><td>条目类型：缺省为普通自动用例；<code>manual</code> 为人工确认条目</td></tr>
+          <tr><td class="k">resource</td><td><code>type: manual</code> 时必填</td><td><code>resource/</code> 下的名称，弹窗文案与图片按名取</td></tr>
+          <tr><td class="k">parallel</td><td>否</td><td>作用域：<code>serial</code>（默认）/ <code>per_sn</code> / <code>shared</code></td></tr>
+          <tr><td class="k">exec.timeout_s</td><td>否</td><td>单条超时秒数，防止卡死；超时按下不通过记录</td></tr>
         </tbody>
       </table>
       <p>不进入条目的字段（设计边界）：</p>
       <table>
-        <thead><tr><th style="width:160px">字段</th><th style="width:230px">为何不进清单</th><th>它的去处</th></tr></thead>
+        <thead><tr><th style="width:250px">字段</th><th style="width:200px">为何不进清单</th><th>它的去处</th></tr></thead>
         <tbody>
           <tr><td class="k">params</td><td>调用实参不是基线数据</td><td>用例以自身默认值为准，调用形如 <code>fn(ctx)</code></td></tr>
           <tr><td class="k">resources</td><td>资源信息不属于基线</td><td>位号与信号源的关系由 <code>adaptation.channels</code> 表达</td></tr>
           <tr><td class="k">name / description / no / tags</td><td>属用例自身属性</td><td>用例名与描述取自代码</td></tr>
-          <tr><td class="k">checks / optional / depends_on</td><td>属判定逻辑与运行策略</td><td>判定由用例完成；跳过与失败策略走 <code>skip_when</code> / <code>exec.on_fail</code></td></tr>
+          <tr><td class="k">checks / optional</td><td>属判定逻辑</td><td>判定由用例调用判定接口完成</td></tr>
+          <tr><td class="k">on_fail / retry / skip_when / always_run / depends_on</td><td>属编排策略，清单只保留"顺序"</td><td>跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 <code>abort</code> 表达</td></tr>
+          <tr><td class="k">manual.message / expect / timeout_s</td><td>弹窗内容是资源，不是基线声明</td><td>按 <code>resource</code> 名称从包内 <code>resource/</code> 取</td></tr>
         </tbody>
       </table>
     </section>
@@ -459,19 +474,17 @@
   },
 
   "setup": [
-    { "id": "S-01", "case": "testcase.env_setup::power_on",
-      "exec": { "timeout_s": 60, "retry": { "max": 2, "interval_s": 5, "on": "timeout" },
-                "on_fail": "abort" } }
+    { "id": "S-01", "case": "testcase.env_setup::power_on", "exec": { "timeout_s": 60 } }
   ],
   "cmd_suit": [
     { "id": "T-01", "case": "testcase.power::test_vdd", "parallel": "per_sn" },
-    { "id": "T-02", "case": "testcase.comm::test_link", "parallel": "shared",
-      "skip_when": "device_missing:dmm" },
+    { "id": "T-02", "case": "testcase.comm::test_link", "parallel": "shared" },
+    <em>// 人工确认条目：弹窗给操作员 next / abort 两个选项</em>
     { "id": "M-01", "case": "testcase.manual::appearance_check",
-      "manual": { "message": "确认外壳无划伤后继续", "expect": "操作员确认", "timeout_s": 300 } }
+      "type": "manual", "resource": "appearance_check" }
   ],
   "teardown": [
-    { "id": "E-01", "case": "testcase.env_setup::power_off", "always_run": true }
+    { "id": "E-01", "case": "testcase.env_setup::power_off" }   <em>// 收尾段必定执行</em>
   ]
 }</pre>
     </section>
@@ -486,6 +499,7 @@
           <tr><td>换台架</td><td>只改 <code>device</code> 引用或注册库记录，清单结构不动</td></tr>
           <tr><td>改判据</td><td>只改 <code>threshold</code>，用例实现不动</td></tr>
           <tr><td>加用例</td><td>只加 <code>testcase/</code> 模块与 <code>cmd_suit</code> 条目</td></tr>
+          <tr><td>编排只有顺序</td><td><code>cmd_suit</code> 按书写顺序执行，人工确认条目是唯一的控制点，弹窗文案与图片走 <code>resource/</code>，改文案不改清单</td></tr>
           <tr><td>责任分区</td><td>需评审的内容集中在清单，需维护的代码集中在 <code>testcase/</code>，随包分发的依赖集中在 <code>wheel/</code>，配置与数据集中在 <code>resource/</code></td></tr>
         </tbody>
       </table>
