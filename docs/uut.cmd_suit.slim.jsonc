@@ -1,0 +1,95 @@
+// =============================================================================
+// uut.json · cmd_suit 精简版（编排层只留"py 用例不可能知道"的信息）
+// -----------------------------------------------------------------------------
+// 精简依据：cmd_suit 的每一项与 testcase/ 下的一个 pytest 用例 1:1 对应，
+//           因此凡是能从 py 代码读出来的，都不该再在 uut.json 里写一遍。
+//
+// 字段去向（删掉的 6 个 + 改名 1 个）
+//   删 no          → 数组顺序即执行顺序，与 id 双源
+//   删 name        → 来自 py 用例名 / docstring（collect 阶段提取）
+//   删 description → 来自 py 用例 docstring；编排层如需说明"为什么纳入本套"，用 suite_note
+//   删 depends_on  → 顺序由数组表达，失败传播由 exec.on_fail 表达
+//   删 optional    → 与 exec.on_fail / skip_when 语义重叠
+//   删 tags        → 与 pytest marker 双源，只保留 py 侧一处
+//   params → args   → 只放"覆盖值"；设备别名不再写，由 pn.channels.slots 绑定派生
+//
+// 保留的字段与理由
+//   id         报告主键、历史记录对比、pytest node id 的稳定锚
+//   case       1:1 映射的锚点（module::function），编排层唯一必须显式写的东西
+//   checks     代码产出 ↔ 阈值的 join 契约（测量项名 → testconfig 键）
+//   args       仅放需要覆盖的数值（不写则用 py 用例默认值）
+//   exec       超时 / 重试 / 失败策略 —— 纯编排语义，py 用例不该自己重试
+//   resources  并行调度用；显式声明优于从源码推导依赖
+//   scope      多通道编排；py 用例不知道自己在哪个通道
+//   parallel   同上，默认 per_channel，非默认才写
+//   skip_when  条件跳过（设备缺失 / 前置未满足）
+//
+// 默认值（写了才叫多余）
+//   scope.channels = "all"      parallel = "per_channel"      exec.on_fail = "continue"
+// =============================================================================
+{
+  "setup": [
+    {
+      "id": "SETUP01",
+      "case": "testcase.env_setup::init_environment",
+      "args": { "voltage": 3.3 },
+      "exec": { "timeout_s": 120, "retry": { "max": 1, "interval_s": 3.0 }, "on_fail": "abort" }
+      // scope 省略 = 每通道各跑一次（默认 "all"）
+    }
+  ],
+
+  "cmd_suit": [
+    {
+      "id": "TC001",
+      "case": "testcase.power::power_on_voltage",
+      "checks": { "VDD": "TC_VDD" },
+      "args": { "voltage": 3.3 },
+      "exec": { "timeout_s": 30, "retry": { "max": 2, "interval_s": 1.0 }, "on_fail": "abort" },
+      "resources": ["psu", "dmm"]
+      // scope / parallel 均为默认（all / per_channel），不写
+    },
+    {
+      "id": "TC002",
+      "case": "testcase.power::read_head_current",
+      "checks": { "IDD": "TC_IDD" },
+      "exec": { "timeout_s": 45, "retry": { "max": 1, "interval_s": 2.0 } },
+      "resources": ["dmm", "spin"],
+      "parallel": "shared"                    // 非默认：依赖单 DUT 口的转速控制盒，需排队
+    },
+    {
+      "id": "TC003",
+      "case": "testcase.comm::spin_speed",
+      "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" },
+      "args": { "rpm": 3600 },
+      "exec": { "timeout_s": 60, "retry": { "max": 3, "interval_s": 2.0, "on": ["error", "timeout"] }, "on_fail": "abort" },
+      "resources": ["spin"],
+      "parallel": "shared"
+    },
+    {
+      "id": "TC004",
+      "case": "testcase.comm::playback_signal",
+      "checks": { "VPP": "TC_SIG_VPP", "FREQ": "TC_SIG_FREQ" },
+      "args": { "signal": "sine", "freq": 1000, "vpp": 2.4, "points": 2000 },
+      "exec": { "timeout_s": 40, "retry": { "max": 2, "interval_s": 1.0 } },
+      "resources": ["scope", "awg"]
+    },
+    {
+      "id": "TC005",
+      "case": "testcase.comm::load_voltage",
+      "checks": { "VLOAD": "TC_ELOAD_V" },
+      "args": { "current": 0.5 },
+      "exec": { "timeout_s": 30, "retry": { "max": 1, "interval_s": 1.0 } },
+      "resources": ["eload"],
+      "skip_when": "not device.eload.present"  // 条件跳过：非必备设备缺失
+    }
+  ],
+
+  "teardown": [
+    {
+      "id": "TD01",
+      "case": "testcase.env_setup::teardown_environment",
+      "exec": { "timeout_s": 90, "retry": { "max": 1, "interval_s": 2.0 }, "on_fail": "warn" },
+      "always_run": true                        // 异常中断也必须执行，防设备带电
+    }
+  ]
+}

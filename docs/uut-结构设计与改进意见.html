@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATE Runner · uut.json 结构设计与改进意见</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --ink: #14140f; --ink2: #4a4a42; --muted: #7d7d72;
+    --line: rgba(20,20,15,.16); --soft: rgba(20,20,15,.07);
+    --accent: #8a4b08; --accent-bg: rgba(138,75,8,.07);
+    --ok: #3f6212; --bad: #9a3412;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --disp: "Segoe UI Variable Display", "Segoe UI Semibold", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 15.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 36px 100px; }
+  .col { max-width: 770px; }
+  a { color: var(--accent); }
+
+  header { padding: 74px 0 32px; border-bottom: 1px solid var(--ink); }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--disp); font-size: clamp(30px, 4.2vw, 50px); line-height: 1.06; letter-spacing: -.028em; font-weight: 600; margin: 16px 0 0; }
+  .lede { font-size: 17.5px; line-height: 1.58; color: var(--ink2); margin: 16px 0 0; max-width: 760px; }
+  .metarow { display: flex; flex-wrap: wrap; margin-top: 32px; border-top: 1px solid var(--soft); padding-top: 14px; }
+  .metarow div { padding-right: 32px; margin-right: 32px; border-right: 1px solid var(--soft); }
+  .metarow div:last-child { border-right: 0; }
+  .metarow dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .metarow dd { margin: 4px 0 0; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+
+  section { padding-top: 58px; }
+  .folio { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-family: var(--disp); font-size: clamp(22px, 2.5vw, 30px); line-height: 1.18; letter-spacing: -.022em; font-weight: 600; margin: 11px 0 0; padding-bottom: 13px; border-bottom: 1px solid var(--ink); }
+  h3 { font-family: var(--disp); font-size: 16.5px; letter-spacing: -.012em; margin: 32px 0 6px; }
+  h4 { font-family: var(--disp); font-size: 15.5px; margin: 0; letter-spacing: -.01em; }
+  p { margin: 13px 0 0; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: .9em; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--soft); padding: 1.5px 5px; border-radius: 3px; border: 1px solid var(--soft); }
+  pre { font-family: var(--mono); font-size: 12.6px; line-height: 1.6; background: #f4f2ee; border: 1px solid var(--line); border-left: 2px solid var(--accent); padding: 15px 17px; overflow-x: auto; margin: 16px 0 0; border-radius: 2px; }
+  pre i { color: var(--muted); font-style: normal; }
+  pre b { color: var(--accent); font-weight: 600; }
+
+  table.g { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+  table.g th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); text-align: left; font-weight: 500; padding: 0 10px 7px 0; border-bottom: 1px solid var(--ink); }
+  table.g td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--soft); vertical-align: top; }
+  table.g tr:hover td { background: var(--accent-bg); }
+  table.g td:last-child, table.g th:last-child { padding-right: 0; }
+  .c { font-family: var(--mono); font-size: 12.6px; }
+  .tag { font-family: var(--mono); font-size: 10.5px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; }
+  .p0 { border-color: #9a3412; color: #9a3412; }
+  .p1 { border-color: var(--accent); color: var(--accent); }
+  .p2 { border-color: var(--muted); color: var(--muted); }
+  .yes { color: var(--ok); font-family: var(--mono); font-size: 12px; }
+  .no { color: var(--bad); font-family: var(--mono); font-size: 12px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .card { border: 1px solid var(--line); border-top: 2px solid var(--ink); padding: 18px 20px; margin-top: 22px; }
+  .card.acc { border-top-color: var(--accent); }
+  .card.bad { border-top-color: var(--bad); }
+  .card .kk { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .card p { margin-top: 7px; font-size: 14.3px; color: var(--ink2); }
+
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 18px 0 0; }
+  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--soft); }
+  ol.steps li::before { content: counter(s, decimal-leading-zero); font-family: var(--mono); font-size: 11px; color: var(--accent); padding-top: 3px; }
+
+  ul.tight { margin: 12px 0 0; padding-left: 20px; }
+  ul.tight li { margin: 6px 0; }
+
+  .verdict { border: 1px solid var(--ink); padding: 20px 22px; margin-top: 24px; background: #fff; }
+  .verdict div { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  footer { margin-top: 70px; border-top: 1px solid var(--ink); padding-top: 16px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+  @media (max-width: 860px) { .wrap { padding: 0 20px 64px; } .grid2 { grid-template-columns: 1fr; gap: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">TPS 设计 · uut.json 结构与改进意见 · ATE Runner</div>
+  <h1>uut.json：五块结构，与它落在现网代码上的真实形状</h1>
+  <p class="lede">按你给的五块（元数据 / PN / 设备信息 / 测试阈值 / 用例编排）写出了完整 JSONC 模板，
+  并以本仓库现网字段为基准做过对齐与实测：<b>去注释后是合法 JSON，过现网 <span class="mono">validate_v2</span> 零错误，
+  归一化出 7 个步骤、7 项阈值、7 个设备别名</b>。下面是结构映射、实测结论，以及 5 条我建议必须改的问题。</p>
+  <dl class="metarow">
+    <div><dt>Template</dt><dd>uut.jsonc · 16.7 KB</dd></div>
+    <div><dt>Validator</dt><dd>manifest.validate_v2</dd></div>
+    <div><dt>Result</dt><dd>0 errors</dd></div>
+    <div><dt>Backend</dt><dd>tps.v2 · D:\ATE\backend</dd></div>
+    <div><dt>Date</dt><dd>2026-10-07</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="folio">01</div>
+  <h2>五块结构 ↔ 现网字段 ↔ 落地状态</h2>
+  <p class="muted">你列的五块里，两块现网已有（阈值、编排），三块是新增或需要拆开的。下表是逐块对齐结果——
+  「状态」一栏决定这份模板能不能直接用：<span class="yes">已支持</span> 表示现在就能跑，
+  <span class="no">需改 parser</span> 表示写进去现网也不会读。</p>
+  <table class="g">
+    <thead><tr><th style="width:150px">你要的结构</th><th style="width:170px">模板里的键</th><th style="width:190px">现网对应字段 / 位置</th><th style="width:120px">状态</th><th>本次新增了什么</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>① 元数据</b><br><span class="muted">格式版本、作者</span></td>
+        <td class="c">metadata</td>
+        <td class="c">version（顶层平铺）</td>
+        <td><span class="no">需改 parser</span></td>
+        <td>author / owner / status / review 审批 / applies_to / tags / checksum / changelog</td>
+      </tr>
+      <tr>
+        <td><b>② PN 结构</b><br><span class="muted">批次号、并行通道</span></td>
+        <td class="c">pn.adapt / pn.channels</td>
+        <td class="c">bench.serial（空占位）<br>无并发概念</td>
+        <td><span class="no">需改 parser</span></td>
+        <td>批次提取正则 + 白/黑名单、SN 形态约束、通道数、槽位夹具、<b>每通道物理资源绑定</b>、共享资源队列</td>
+      </tr>
+      <tr>
+        <td><b>③ 设备信息</b><br><span class="muted">种类、别名</span></td>
+        <td class="c">device_config</td>
+        <td class="c">device_config（别名→device_id / role）</td>
+        <td><span class="yes">已支持</span></td>
+        <td>category 与 BOM 的 category 对齐、mode（shared / per_channel / exclusive）、instrument_channel</td>
+      </tr>
+      <tr>
+        <td><b>④ 测试阈值</b><br><span class="muted">与用例对应</span></td>
+        <td class="c">testconfig</td>
+        <td class="c">testconfig：label / min / max / unit / nominal</td>
+        <td><span class="yes">已支持</span>＋扩展</td>
+        <td>type 判据、tol 容差表达式、decimal 比较口径、severity 严重级、sample 采样口径、guard 安全上限、source+rationale 依据</td>
+      </tr>
+      <tr>
+        <td><b>⑤ 用例编排</b><br><span class="muted">顺序、重试、超时</span></td>
+        <td class="c">cmd_suit / setup / teardown</td>
+        <td class="c">no / id / name / case / params / checks / optional</td>
+        <td><span class="yes">已支持</span>＋扩展</td>
+        <td><b>exec.timeout_s + retry + on_fail</b>、depends_on、scope.channels、parallel、resources、tags、skip_when、teardown.always_run</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="verdict">
+    <div>一句话结论</div>
+    <p style="margin-top:8px">现网 <span class="mono">validate_v2</span> 对未知键是<b>宽容透传</b>的——<span class="mono">metadata</span>、<span class="mono">pn</span>
+    不会报错，但也没有任何代码读它们。所以模板不是「能不能过校验」的问题，而是<b>要不要同步改 parser / 前端 / 报告三处</b>的问题；
+    不改，这两块就是写在文件里的注释。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">02</div>
+  <h2>三条实测结论（不是推断）</h2>
+  <div class="grid2">
+    <div class="card acc">
+      <div class="kk">实测 ① · 模板本身</div>
+      <h4>去注释后合法，且过现网校验</h4>
+      <p>16678 → 11269 字符（去注释后）；<span class="mono">validate_v2</span> 返回 <b>0 错误</b>；
+      <span class="mono">normalize_tps</span> 得到 setup 1 / test 5 / teardown 1 = 7 步，
+      7 项阈值全部被 <span class="mono">checks</span> 引用（无孤儿阈值）。</p>
+    </div>
+    <div class="card bad">
+      <div class="kk">实测 ② · 版本号陷阱</div>
+      <h4>升成 <span class="mono">tps.v3</span> 会两头不一致</h4>
+      <p><span class="mono">is_v2()</span> 因「有 cmd_suit 且无 steps」的兜底判据，对 <span class="mono">tps.v3</span> 仍返回 <b>True</b>；
+      但 <span class="mono">validate_v2</span> 会直接报 <span class="mono">schema 只支持 tps.v2（实际: tps.v3）</span>。
+      结论：本次模板保持 <span class="mono">"tps.v2"</span>；真升 v3 必须同时改这两处，否则是"被当 v2 处理但不让通过"。</p>
+    </div>
+    <div class="card">
+      <div class="kk">实测 ③ · 校验的空白</div>
+      <h4>只查引用，不查孤儿，也不查跨表一致</h4>
+      <p>现网校验拦得住的：未定义阈值被引用、id 重复、case 格式、min&gt;max、缺 case/name。
+      拦不住的：<b>定义了却没人用的阈值</b>、<b>device_id 是否真在测试台 BOM 里</b>、
+      <b>slot.fixture 是否存在于 BOM</b>、<b>threshold_overrides 的键是否是已定义阈值</b>——这四条正是并行测试最容易错的地方。</p>
+    </div>
+    <div class="card">
+      <div class="kk">现状 · 并发能力</div>
+      <h4>现网是单 SN 串行</h4>
+      <p><span class="mono">collect_cases()</span> 里写死 <span class="mono">uut="COLLECT00001"</span>，
+      <span class="mono">stage(tps, source_dir, task_id, uut=…, bench_id=…)</span> 收单个 SN 字符串；
+      <span class="mono">bench.serial</span> 是空占位。多通道并行不是"加个字段"，而是任务模型要按 (SN × 通道) 扇出。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="folio">03</div>
+  <h2>并行多 SN 的真实难点：不是通道数，是仪器资源互斥</h2>
+  <p>这是我认为你这套设计里最需要先想清楚的一点。四个通道并行时，DUT 侧天然隔离（四个夹具、四个 SN），
+  但<b>仪器侧不是</b>：示波器只有 8 个输入口、转速控制盒只有一个 DUT 接口、电源可能只有两路输出。
+  如果 <span class="mono">pn.channels</span> 只写一个 <span class="mono">count: 4</span>，
+  调度器无从判断"这几个通道能不能真的同时跑"，结果就是两路同时抢 COM6 拿转速 → 数据串台 → 误判，而 报告上看起来一切正常。</p>
+  <p>所以模板把通道拆成<b>两层声明</b>：<span class="mono">resource_bindings</span> 说明每通道占用哪些物理通道，
+  <span class="mono">shared_resources</span> 说明哪些资源全局只有一份、必须排队。</p>
+  <pre><i>// pn.channels.slots[i] —— 通道占用了什么，决定"能不能并行"</i>
+"resource_bindings": [
+  { "alias": "scope", "instrument_channel": "CH1" },   <i>// 8 通道机型：CH1..CH4 各喂一个 DUT，可并行</i>
+  { "alias": "psu",   "instrument_channel": "CH1" },   <i>// IT6332A 双路：CH1/CH2 可并行，CH3、CH4 需排队</i>
+  { "alias": "spin",  "instrument_channel": ""    }    <i>// 单 DUT 口 → 必须排队</i>
+],
+"threshold_overrides": { "TC_SIG_VPP": { "min": 2.28, "max": 2.52 } }  <i>// 通道间探头衰减差异就地修正</i>
+
+<i>// pn.channels.shared_resources —— 全局唯一资源，调度器据此串行化</i>
+"shared_resources": [
+  { "alias": "spin", "reason": "单台转速控制盒只有一个 DUT 接口", "queue": "fifo" }
+]</pre>
+  <p>对应地，每条用例用 <span class="mono">parallel</span> 声明自己的并发属性：<span class="mono">per_channel</span> 的（测电压、测波形）四通道可同时跑；
+  <span class="mono">shared</span> 的（要动转速控制盒）先抢占资源再执行。这样调度器不用理解业务，只看声明就能排程。</p>
+</section>
+
+<section>
+  <div class="folio">04</div>
+  <h2>改进意见：5 条 P0，4 条 P1，4 条 P2</h2>
+  <p class="muted">按"不做会不会在产线上真出问题"排序。每条都标了影响面——决定改动落在 parser、前端还是报告。</p>
+  <table class="g">
+    <thead><tr><th style="width:60px">级别</th><th style="width:250px">建议</th><th>理由 / 现状差距</th><th style="width:170px">影响面</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag p0">P0</span></td>
+        <td><b>声明式资源互斥</b><br><span class="muted">slots.resource_bindings + shared_resources + cmd_suit.resources</span></td>
+        <td>并行时仪器是共享资源。没有声明，两通道抢同一串口会得到"看起来正常"的错误数据——比直接报错更危险。</td>
+        <td class="c">调度器 / 任务模型</td></tr>
+      <tr><td><span class="tag p0">P0</span></td>
+        <td><b>阈值分级 severity</b><br><span class="muted">critical / warning / info</span></td>
+        <td>现网只有 min/max，超限一律 fail。实际产线需要"超上限记警告但放行"（如握手响应 50ms）。目前只能塞进 case 内部硬编码，判定逻辑散落在 AW 里，报告不可复现。</td>
+        <td class="c">parser + 报告 + 前端</td></tr>
+      <tr><td><span class="tag p0">P0</span></td>
+        <td><b>exec 超时/重试进 schema</b><br><span class="muted">timeout_s / retry.max / interval_s / on_fail</span></td>
+        <td>你明确要"重试次数、超时时间"，但现网 schema 没有这两个键——写进 params 就没有统一语义，报告也读不到，前端更展示不了。目前唯一的超时是 <span class="mono">collect_cases</span> 里硬编码的 120s。</td>
+        <td class="c">parser + runner + 报告</td></tr>
+      <tr><td><span class="tag p0">P0</span></td>
+        <td><b>teardown 强制回收</b><br><span class="muted">teardown[].always_run</span></td>
+        <td>异常中断若不执行 teardown，3.3V 电源和转速控制盒会一直带电——这是安全事故而不只是数据问题。现在 teardown 存在，但 schema 不表达"必须执行"。</td>
+        <td class="c">runner</td></tr>
+      <tr><td><span class="tag p0">P0</span></td>
+        <td><b>SN 只存规则不存值 + 记录加通道维度</b></td>
+        <td>SN 写死在 TPS 里，每换一批物料就要改受控文件。同时 <span class="mono">records</span> 表现在按 12 位 SN 查询，并行后必须加 <span class="mono">channel</span>，否则一份报告分不清哪个通道测的哪台。</td>
+        <td class="c">DB schema + 报告 + 查询</td></tr>
+      <tr><td><span class="tag p1">P1</span></td>
+        <td><b>阈值双向校验 + 跨表一致校验</b></td>
+        <td>现网只查"引用未定义"。建议补：孤儿阈值、<span class="mono">device_id</span> 是否在测试台 BOM 的 items[].id 里、<span class="mono">fixture</span> 是否存在、<span class="mono">threshold_overrides</span> 键是否已定义。这四类错误现在要等到运行时才暴露。</td>
+        <td class="c">manifest 校验</td></tr>
+      <tr><td><span class="tag p1">P1</span></td>
+        <td><b>容差表达式 tol</b><br><span class="muted">nominal ± 5% → 自动推导 min/max</span></td>
+        <td>现在要手写 3.135 / 3.465，手算易错且改动标称值时要重算两个数。<span class="mono">tol</span> 保留表达意图，解析期推导上下限。</td>
+        <td class="c">parser + 前端表单</td></tr>
+      <tr><td><span class="tag p1">P1</span></td>
+        <td><b>params 拆分设备引用与数值</b></td>
+        <td>现在 <span class="mono">params</span> 里 <span class="mono">psu_alias</span> 和 <span class="mono">voltage</span> 混放。并行时设备引用应由 <span class="mono">slot.alias_suffix</span> 自动注入（<span class="mono">psu</span> → <span class="mono">psu_c1</span>），人工拼别名在多通道下必错。</td>
+        <td class="c">parser + AW 契约</td></tr>
+      <tr><td><span class="tag p1">P1</span></td>
+        <td><b>统一比较口径 decimal</b></td>
+        <td>浮点比较需要显式位数（3.4649999 判成超限是典型误判）。当前 <span class="mono">_fmt()</span> 只管显示格式，不管判定。</td>
+        <td class="c">parser + 判定逻辑</td></tr>
+      <tr><td><span class="tag p2">P2</span></td>
+        <td>JSON Schema 落库 + VSCode 联动</td>
+        <td>现在是"导入时后端报错"。有了 schema，编辑器里边写边标红，且能自动补全 <span class="mono">checks</span> 里可引用的阈值键。</td>
+        <td class="c">docs + .vscode</td></tr>
+      <tr><td><span class="tag p2">P2</span></td>
+        <td>checksum + 发布状态门禁</td>
+        <td>产线只接受 <span class="mono">status=released</span> 且校验和匹配的 TPS——否则改了文件不递版本，报告里的 version 与实际内容无关。</td>
+        <td class="c">parser + 运行入口</td></tr>
+      <tr><td><span class="tag p2">P2</span></td>
+        <td>tags 选择性执行</td>
+        <td><span class="mono">["smoke"]</span> 子集能在换型/排障时几分钟拿到结论，不必跑满套。现在只能删用例或全跑。</td>
+        <td class="c">前端 + runner</td></tr>
+      <tr><td><span class="tag p2">P2</span></td>
+        <td>登记 aw 库版本</td>
+        <td>uut.json 里 <span class="mono">case</span> 指向 <span class="mono">module::function</span>，AW 库升级会让同一个 uut.json 行为改变。建议 metadata 里锁定 <span class="mono">aw_version</span>，与 driver SDK 文档的做法一致。</td>
+        <td class="c">metadata + 依赖校验</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="folio">05</div>
+  <h2>要改的三处代码（按最小改动）</h2>
+  <div class="col">
+    <h3>1 · <span class="mono">manifest.validate_v2</span>：接住新键</h3>
+    <p>新增 <span class="mono">metadata</span> / <span class="mono">pn</span> 的必填与内联校验；给 <span class="mono">testconfig[*]</span> 加
+    <span class="mono">type / severity / decimal</span> 的枚举与类型检查；给 <span class="mono">cmd_suit[*]</span> 加
+    <span class="mono">exec</span> 结构与 <span class="mono">retry.max &gt;= 0</span> 一类数值约束。</p>
+    <pre><i># 建议插入位置：validate_v2 的 testconfig 段之后</i>
+<b>pn</b> = raw.get("pn") or {}
+channels = (pn.get("channels") or {})
+slots = channels.get("slots") or []
+if channels.get("count") and len(slots) != int(channels["count"]):
+    errors.append(f"pn.channels.count={channels['count']} 与 slots 数量 {len(slots)} 不一致")
+seen_ch, seen_pair = set(), set()
+for i, s in enumerate(slots, 1):
+    ch = s.get("channel", i)
+    if ch in seen_ch: errors.append(f"pn.channels.slots[{i}].channel 重复: {ch}")
+    seen_ch.add(ch)
+    for rb in (s.get("resource_bindings") or []):
+        pair = (rb.get("alias"), rb.get("instrument_channel") or "-")
+        if pair in seen_pair:      <i># 同一仪器同一通道被两个 slot 占用 = 并行必然串台</i>
+            errors.append(f"资源冲突: {pair[0]} 的 {pair[1]} 被多个通道占用")
+        seen_pair.add(pair)
+
+<i># 用例侧：retry / timeout 的边界</i>
+exec_spec = case.get("exec") or {}
+if not isinstance(exec_spec, dict):
+    errors.append(f"{prefix}[{index}].exec 必须是对象")
+else:
+    rt = exec_spec.get("retry") or {}
+    if rt and (not isinstance(rt.get("max"), int) or rt["max"] &lt; 0):
+        errors.append(f"{prefix}[{index}].exec.retry.max 必须是非负整数")</pre>
+
+    <h3>2 · <span class="mono">workspace.stage()</span>：从单 SN 变成 (SN × 通道)</h3>
+    <p>现在签名是 <span class="mono">stage(tps, source_dir, task_id, uut, bench_id, mode)</span>，单 SN 单跑。
+    并行需要按 <span class="mono">slot</span> 扇出：每个通道一个 run 目录、一份生成用例，别名按
+    <span class="mono">alias_suffix</span> 注入。建议保持单通道签名不变，新增 <span class="mono">stage_channel(slot, uut, …)</span> 由上层批量调用——
+    这样单件场景零回归。</p>
+
+    <h3>3 · 报告与 records：加 <span class="mono">sn</span> 与 <span class="mono">channel</span> 两个维度</h3>
+    <p>并行后一份任务对应多台 UUT。<span class="mono">records</span> 表需要 <span class="mono">(task_id, channel, sn)</span> 维度，
+    报告里按通道分组并给出各自结论；否则"这次任务通过了吗"这个最基本的问题会变成"哪些通道通过"却答不上来。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">06</div>
+  <h2>建议的落地顺序</h2>
+  <ol class="steps">
+    <li>
+      <h4>先加 P0 的两个字段并只做校验，不改执行</h4>
+      <p class="muted" style="margin-top:5px"><span class="mono">exec.timeout_s/retry</span> 与 <span class="mono">teardown.always_run</span>：
+      写进 schema、过校验、在报告里显示，但执行侧先沿用现有行为。这一步零风险，却能立刻暴露现有 TPS 里"超时靠猜"的地方。</p>
+    </li>
+    <li>
+      <h4>阈值分级与 decimal</h4>
+      <p class="muted" style="margin-top:5px">把 <span class="mono">severity</span> 接进判定与报告着色。建议先只对 warning 级做"记录不拦"，跑两周看有多少原本 fail 的项其实是 warning，用数据验证分级标准。</p>
+    </li>
+    <li>
+      <h4>单通道下的 pn + metadata</h4>
+      <p class="muted" style="margin-top:5px">先让 <span class="mono">count: 1</span> 的 <span class="mono">pn</span> 走通全链路（批次校验、SN 形态校验、metadata 进报告头），
+      把 parser / 前端 / 报告三处改完，再谈并行。这样并行的复杂度落在已验证的地基上。</p>
+    </li>
+    <li>
+      <h4>并行调度：资源互斥 + 任务扇出</h4>
+      <p class="muted" style="margin-top:5px">实现 <span class="mono">shared_resources</span> 队列与 <span class="mono">stage_channel</span> 扇出，
+      先用两个通道跑同一份 TPS 验证隔离性，再放到产线工位。</p>
+    </li>
+    <li>
+      <h4>补 P1 校验与 P2 门禁</h4>
+      <p class="muted" style="margin-top:5px">跨表一致性校验、JSON Schema + VSCode 联动、checksum 与发布门禁——这些是长期护栏，前置成本高但一次投入长期有效。</p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <div class="folio">07</div>
+  <h2>取舍与风险</h2>
+  <div class="grid2">
+    <div class="card">
+      <div class="kk">取舍 ①</div>
+      <h4>为什么设备信息里不写 IP / 端口</h4>
+      <p>你最初提到 uut.json 里含 device_info（设备 IP/端口），但现网把连接参数放在测试台注册库（SQLite），
+      TPS 只写别名引用。这个方向是对的：TPS 是受控文件、要跨台架复用；写死 IP 意味着换台架就改程序集。
+      模板沿用 <span class="mono">device_config</span> 别名引用，连接参数仍由注册库解析。</p>
+    </div>
+    <div class="card">
+      <div class="kk">取舍 ②</div>
+      <h4>为什么叫 <span class="mono">device_config</span> 而不是 <span class="mono">device_info</span></h4>
+      <p>现网 <span class="mono">validate_v2</span>、<span class="mono">case_entries</span>、前端计数都用这个名字，改名会打断已有 TPS。
+      如果想要 <span class="mono">device_info</span> 这个名字，建议 parser 同时接受两个键（别名映射），而不是重命名。</p>
+    </div>
+    <div class="card">
+      <div class="kk">风险 ①</div>
+      <h4>并行把"偶发问题"放大成"批量误判"</h4>
+      <p>单通道时串扰只是偶发；四通道共用一台仪器时，资源冲突会稳定复现成数据串台。
+      这就是为什么我把资源互斥放在 P0 而不是放到实现阶段再说。</p>
+    </div>
+    <div class="card">
+      <div class="kk">风险 ②</div>
+      <h4>扩展键写了但没人读</h4>
+      <p>最坏的情况不是校验失败，而是"写进模板 → 以为生效 → 实际被忽略"。
+      建议每加一组键，同步加一条校验或一处报告展示，做到"写了就一定有反馈"。</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  ATE Runner · uut.json 结构设计与改进意见 · 2026-10-07<br>
+  基准代码：backend/tps_runtime/manifest.py（validate_v2 / case_entries / normalize_tps）· backend/tps_runtime/__init__.py（stage / collect_cases）<br>
+  基准数据：testresource/spm_rh_dyn/tps.json · tree/bom/SPM-RH-DYN-01.json · docs/ate-device-template.jsonc<br>
+  实测：JSONC 去注释校验 + 现网 validate_v2 → 0 错误；tps.v3 版本字串行为已复现
+</footer>
+</div>
+</body>
+</html>

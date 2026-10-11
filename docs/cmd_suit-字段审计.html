@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmd_suit 字段审计 · 哪些是多余的</title>
+<style>
+  :root {
+    --bg: #f8f9f9; --ink: #101214; --ink2: #43484c; --muted: #767c81;
+    --line: rgba(16,18,20,.15); --soft: rgba(16,18,20,.06);
+    --accent: #1f3a5f; --accent-bg: rgba(31,58,95,.06);
+    --cut: #9a3412; --keep: #31542a;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --disp: "Segoe UI Variable Display", "Segoe UI Semibold", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+         font-size: 15.5px; line-height: 1.64; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 36px 96px; }
+  .col { max-width: 760px; }
+  header { padding: 72px 0 30px; border-bottom: 1px solid var(--ink); }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--disp); font-size: clamp(30px, 4.2vw, 48px); line-height: 1.06;
+       letter-spacing: -.028em; font-weight: 600; margin: 16px 0 0; }
+  .lede { font-size: 17.5px; line-height: 1.58; color: var(--ink2); margin: 16px 0 0; max-width: 780px; }
+  .metarow { display: flex; flex-wrap: wrap; margin-top: 30px; border-top: 1px solid var(--soft); padding-top: 14px; }
+  .metarow div { padding-right: 30px; margin-right: 30px; border-right: 1px solid var(--soft); }
+  .metarow div:last-child { border-right: 0; }
+  .metarow dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .metarow dd { margin: 4px 0 0; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+
+  section { padding-top: 56px; }
+  .folio { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-family: var(--disp); font-size: clamp(21px, 2.4vw, 29px); line-height: 1.18; letter-spacing: -.022em;
+       font-weight: 600; margin: 11px 0 0; padding-bottom: 13px; border-bottom: 1px solid var(--ink); }
+  h3 { font-family: var(--disp); font-size: 16.5px; letter-spacing: -.012em; margin: 30px 0 6px; }
+  h4 { font-family: var(--disp); font-size: 15.5px; margin: 0; letter-spacing: -.01em; }
+  p { margin: 13px 0 0; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: .9em; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--soft); padding: 1.5px 5px; border-radius: 3px; border: 1px solid var(--soft); }
+  pre { font-family: var(--mono); font-size: 12.6px; line-height: 1.6; background: #f2f4f5; border: 1px solid var(--line);
+        border-left: 2px solid var(--accent); padding: 15px 17px; overflow-x: auto; margin: 16px 0 0; border-radius: 2px; }
+  pre i { color: var(--muted); font-style: normal; }
+  pre b { color: var(--accent); font-weight: 600; }
+
+  table.g { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.8px; }
+  table.g th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+               text-align: left; font-weight: 500; padding: 0 10px 7px 0; border-bottom: 1px solid var(--ink); }
+  table.g td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--soft); vertical-align: top; }
+  table.g td:last-child, table.g th:last-child { padding-right: 0; }
+  table.g tr:hover td { background: var(--accent-bg); }
+  .f { font-family: var(--mono); font-size: 12.8px; white-space: nowrap; }
+  .v { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; }
+  .v.cut { border-color: var(--cut); color: var(--cut); }
+  .v.keep { border-color: var(--keep); color: var(--keep); }
+  .v.mix { border-color: var(--accent); color: var(--accent); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 38px; }
+  .card { border: 1px solid var(--line); border-top: 2px solid var(--ink); padding: 18px 20px; margin-top: 22px; }
+  .card.acc { border-top-color: var(--accent); }
+  .card.bad { border-top-color: var(--cut); }
+  .card .kk { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .card p { margin-top: 7px; font-size: 14.2px; color: var(--ink2); }
+
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); margin-top: 22px; }
+  .metric { padding: 18px 20px; border-right: 1px solid var(--line); }
+  .metric:last-child { border-right: 0; }
+  .metric .m { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .metric .n { font-family: var(--disp); font-size: 30px; font-weight: 600; letter-spacing: -.03em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .metric .d { font-size: 13.4px; color: var(--ink2); margin-top: 4px; }
+
+  footer { margin-top: 68px; border-top: 1px solid var(--ink); padding-top: 16px; font-family: var(--mono);
+           font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+  @media (max-width: 860px) { .wrap { padding: 0 20px 64px; } .grid2 { grid-template-columns: 1fr; gap: 0; }
+    .metrics { grid-template-columns: 1fr; } .metric { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">字段审计 · cmd_suit · uut.json</div>
+  <h1>cmd_suit 里哪些字段是多余的</h1>
+  <p class="lede">结论：<b>15 个字段里有 6 个该删、1 个该改名瘦身</b>，精简到 8 个，JSON 文本量下降 48%。
+  判定依据只有一条——cmd_suit 是编排层，凡是 <b>testcase/*.py 自己能表达</b>的信息再写一遍就是双事实源，
+  迟早会漂移。下面是逐字段判定、实测证据，以及一个更值得先回答的问题：cmd_suit 本身该显式枚举还是从目录派生。</p>
+  <dl class="metarow">
+    <div><dt>审计对象</dt><dd>cmd_suit / setup / teardown</dd></div>
+    <div><dt>字段数</dt><dd>15 → 8</dd></div>
+    <div><dt>文本量</dt><dd>2427 → 1265 字符</dd></div>
+    <div><dt>校验器</dt><dd>manifest.validate_v2</dd></div>
+    <div><dt>日期</dt><dd>2026-10-07</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="folio">01</div>
+  <h2>判定准则：三层过滤</h2>
+  <p>cmd_suit 的每一项与 <span class="mono">testcase/</span> 下的一个 pytest 用例 1:1 对应，
+  这个前提决定了字段的归属。任何一个字段，问三个问题就能定性：</p>
+  <div class="grid2">
+    <div class="card acc">
+      <div class="kk">过滤器 A · 保留</div>
+      <h4>py 用例<b>不可能知道</b>的信息</h4>
+      <p>执行顺序、超时、重试、失败后是否继续、在哪个通道跑、要不要排队抢仪器、这次要不要跑（条件跳过）。
+      这些是"这次运行怎么组织"的事，用例代码无从得知，必须写在编排层。</p>
+    </div>
+    <div class="card bad">
+      <div class="kk">过滤器 B · 删除</div>
+      <h4>py 用例<b>已经表达</b>的信息</h4>
+      <p>用例叫什么、干什么用的、默认参数是多少、属于哪一类（pytest marker）。已有 <span class="mono">case</span>
+      指向那个函数，再写一遍名字与描述，就等于同一事实有两个来源——改了一处忘了另一处，报告和代码就会对不上。</p>
+    </div>
+    <div class="card bad">
+      <div class="kk">过滤器 C · 合并</div>
+      <h4>字段之间<b>语义重叠</b></h4>
+      <p>同一件事有两种写法时，必然出现"两种写法行为不一致"的退化情况。典型：<span class="mono">optional</span>
+      与 <span class="mono">on_fail</span> / <span class="mono">skip_when</span> 都在表达"这条可以不过"；
+      <span class="mono">on_timeout</span> 与 <span class="mono">on_fail</span> 在表达同一类策略。</p>
+    </div>
+    <div class="card">
+      <div class="kk">边界 · 阈值归属</div>
+      <h4>为什么 <span class="mono">checks</span> 不算重复</h4>
+      <p>阈值（<span class="mono">testconfig</span>）需要测试工程师评审、按批次调整，不能埋进代码；
+      而 py 用例只能产出"VDD = 3.31 V"这样的测量值。所以"测量项名 → 阈值键"这个映射是代码与阈值的
+      <b>join 契约</b>，是编排层最有价值的字段之一，必须留。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="folio">02</div>
+  <h2>逐字段判定</h2>
+  <table class="g">
+    <thead><tr><th style="width:130px">字段</th><th style="width:86px">判定</th><th>依据</th><th style="width:230px">去向 / 替代</th></tr></thead>
+    <tbody>
+      <tr><td class="f">no</td><td><span class="v cut">删除</span></td>
+        <td>数组顺序即执行顺序。再写一个 <span class="mono">no</span> 就有了两个顺序来源——拖动排序后忘改 <span class="mono">no</span>，报告就与执行次序不符。</td>
+        <td>用数组下标；展示编号由前端生成</td></tr>
+      <tr><td class="f">name</td><td><span class="v cut">删除</span></td>
+        <td>用例名就在 py 函数名与 docstring 里。<b>实测：现网校验器把 name 当必填</b>（见第 04 节），删它需同步把该校验降级。</td>
+        <td>collect 阶段从 docstring 注入显示名</td></tr>
+      <tr><td class="f">description</td><td><span class="v cut">删除</span></td>
+        <td>同 name，属于用例自身的说明，重复写会漂移。</td>
+        <td>docstring；若要写"为什么纳入本测试套"，用 <span class="mono">suite_note</span>（可选，非重复语义）</td></tr>
+      <tr><td class="f">tags</td><td><span class="v cut">删除</span></td>
+        <td>pytest marker 已经在做同一件事（<span class="mono">@pytest.mark.smoke</span>），两处写必然不一致。</td>
+        <td>读 py 的 marker；collect 时提取</td></tr>
+      <tr><td class="f">optional</td><td><span class="v cut">删除</span></td>
+        <td>与 <span class="mono">exec.on_fail=continue</span>（失败不中断）和 <span class="mono">skip_when</span>（不满足则跳过）语义重叠，三者组合出多种行为组合，无法规约。</td>
+        <td>合并进 <span class="mono">exec.on_fail</span> + <span class="mono">skip_when</span></td></tr>
+      <tr><td class="f">depends_on</td><td><span class="v cut">删除</span></td>
+        <td>线性编排下顺序已由数组表达；"前置失败则跳过"由 <span class="mono">on_fail: abort</span> 表达。只有做 DAG 编排才有价值，而这套是顺序套。</td>
+        <td>数组顺序 + <span class="mono">exec.on_fail</span></td></tr>
+      <tr><td class="f">params</td><td><span class="v mix">改名瘦身</span></td>
+        <td>现在混了两类：设备别名（<span class="mono">psu_alias</span>）与数值。别名已由 <span class="mono">pn.channels.slots</span> 与 <span class="mono">device_config</span> 确定，再写一遍在多通道下必错。</td>
+        <td>改名 <span class="mono">args</span>，<b>只放需要覆盖的数值</b>；别名由 slot 绑定自动注入</td></tr>
+      <tr><td class="f">id</td><td><span class="v keep">保留</span></td>
+        <td>报告主键、历史记录横向对比、pytest node id 的稳定锚。<span class="mono">case</span> 也能当锚，但函数重构改名会割断历史数据。</td>
+        <td>保留；若接受"函数名即 ID"，可与 case 二选一</td></tr>
+      <tr><td class="f">case</td><td><span class="v keep">保留</span></td>
+        <td>1:1 映射的唯一锚点，编排层最不可替代的字段。</td>
+        <td>建议同时升级校验：确认该函数在 testcase/ 里真实存在</td></tr>
+      <tr><td class="f">checks</td><td><span class="v keep">保留</span></td>
+        <td>代码产出与阈值的 join 契约，交给测试工程师评审的入口。现网已校验"引用了未定义阈值"。</td>
+        <td>若某用例只判一个值，可退化为单值键</td></tr>
+      <tr><td class="f">exec.timeout_s</td><td><span class="v keep">保留</span></td>
+        <td>纯编排语义，用例自己不该管"跑多久算超时"。</td>
+        <td>—</td></tr>
+      <tr><td class="f">exec.retry</td><td><span class="v keep">保留</span></td>
+        <td>同上。"重试几次"是运行策略，写进 py 会让用例不可复用。</td>
+        <td>合并 <span class="mono">on_timeout</span> 进 <span class="mono">retry.on: ["error","timeout"]</span></td></tr>
+      <tr><td class="f">exec.on_fail</td><td><span class="v keep">保留</span></td>
+        <td>失败传播策略：中断 / 继续 / 记警告。py 用例无法决定自己在整个套里的角色。</td>
+        <td>作为 <span class="mono">optional</span> 的替代</td></tr>
+      <tr><td class="f">resources</td><td><span class="v keep">保留</span></td>
+        <td>并行调度的前提。理论上可从代码静态推导依赖，但推导不可靠（AW 内部调用看不到），显式声明更安全。</td>
+        <td>与 <span class="mono">slots.resource_bindings</span> 加一致性校验，避免又一处分叉</td></tr>
+      <tr><td class="f">scope / parallel</td><td><span class="v keep">保留</span></td>
+        <td>多通道编排信息，py 用例不知道自己在哪个通道跑。</td>
+        <td><b>只在非默认值时写</b>：默认 <span class="mono">channels=all</span>、<span class="mono">parallel=per_channel</span></td></tr>
+      <tr><td class="f">skip_when</td><td><span class="v keep">保留</span></td>
+        <td>条件跳过（设备缺失、前置条件不满足），编排层语义。</td>
+        <td>与 testconfig 的 <span class="mono">applicable_when</span> 二选一，统一到用例层</td></tr>
+      <tr><td class="f">always_run</td><td><span class="v keep">保留</span></td>
+        <td>teardown 专用：异常中断也必须执行，防设备带电。</td>
+        <td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="folio">03</div>
+  <h2>精简结果</h2>
+  <div class="metrics">
+    <div class="metric"><div class="m">字段数 / 每条用例</div><div class="n">15 → 8</div><div class="d">删 6 个、改名瘦身 1 个</div></div>
+    <div class="metric"><div class="m">JSON 文本量</div><div class="n">-48%</div><div class="d">2427 → 1265 字符（test 段）</div></div>
+    <div class="metric"><div class="m">实测报错</div><div class="n">7</div><div class="d">全部来自删 <span class="mono">name</span>，需同步改校验</div></div>
+  </div>
+  <div class="col">
+    <h3>精简后的骨架（这就是全部）</h3>
+    <pre>{
+  "id": "TC004",                              <i>// 报告主键 · 历史对比锚</i>
+  "case": "testcase.comm::playback_signal",   <i>// 1:1 映射锚点</i>
+  "checks": { "VPP": "TC_SIG_VPP", "FREQ": "TC_SIG_FREQ" },   <i>// 代码 ↔ 阈值的 join</i>
+  "args": { "freq": 1000, "vpp": 2.4 },       <i>// 仅覆盖值；设备别名由 slot 注入</i>
+  "exec": { "timeout_s": 40, "retry": { "max": 2, "interval_s": 1.0 } },  <i>// 编排策略</i>
+  "resources": ["scope", "awg"]               <i>// 并行调度</i>
+  <i>// scope / parallel / skip_when 只在非默认时出现</i>
+}</pre>
+    <p class="muted">字段少了一半，语义反而更清楚：一屏就能看出"这条用例跑什么、判什么、跑多久、能不能和别人并行"。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">04</div>
+  <h2>实测证据：现网校验器对每个字段的必填性</h2>
+  <p class="muted">做法：取完整 cmd_suit 的一条用例，逐个删掉字段后跑 <span class="mono">validate_v2</span>，看是否报错。</p>
+  <table class="g">
+    <thead><tr><th style="width:170px">删除的字段</th><th style="width:130px">现网是否拦下</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td class="f">name</td><td><span class="v cut">报错</span></td><td><span class="mono">cmd_suit[1] 缺少 name（用例名称）</span>，空字符串同样报错</td></tr>
+      <tr><td class="f">case</td><td><span class="v cut">报错</span></td><td><span class="mono">cmd_suit[1] 缺少 case</span>；且校验格式（<span class="mono">module::function</span>）</td></tr>
+      <tr><td class="f">id / no / description / tags / optional /<br>depends_on / params / checks / exec /<br>scope / parallel / resources</td>
+        <td><span class="v keep">均不报错</span></td><td>现网全部视为可选——<b>这意味着只把多余字段删掉，不会撞任何校验</b></td></tr>
+      <tr><td class="f">checks 引用未定义阈值</td><td><span class="v cut">报错</span></td><td>唯一的跨字段校验：<span class="mono">引用了未定义的阈值: TC_NOT_EXIST</span></td></tr>
+      <tr><td class="f">case 指向不存在的函数</td><td><span class="v keep">不报错</span></td><td><b>缺口</b>：只校验字符串格式，不校验 <span class="mono">testcase/</span> 里是否真有这个函数——1:1 映射下这恰恰最该校验</td></tr>
+    </tbody>
+  </table>
+  <div class="card bad">
+    <div class="kk">要注意的一处连带改动</div>
+    <h4>删 <span class="mono">name</span> 会把 7 条用例全撞成错误</h4>
+    <p>实测拼回完整 TPS 后 <span class="mono">validate_v2</span> 返回 7 条 <span class="mono">缺少 name</span>
+    （1 条 setup + 5 条 cmd_suit + 1 条 teardown）。所以精简必须成对进行：<b>要么保留 name，
+    要么把 <span class="mono">_validate_case</span> 里的 name 必填检查降级为可选</b>（推荐后者，名字交给 docstring 注入）。
+    只删字段不改校验，结果就是所有 TPS 都导不进来。</p>
+  </div>
+</section>
+
+<section>
+  <div class="folio">05</div>
+  <h2>更根本的问题：cmd_suit 该显式枚举，还是从目录派生？</h2>
+  <p>你问的是"字段有没有多余"，但把字段砍到剩 8 个之后，会露出一个更大的重复：
+  <b>如果每个用例与 <span class="mono">testcase/</span> 里的 py 用例 1:1，那 cmd_suit 这份清单本身是否也多余？</b>
+  两种设计各有取舍，我倾向保留显式清单。</p>
+  <div class="grid2">
+    <div class="card acc">
+      <div class="kk">设计 A · 显式清单（推荐）</div>
+      <h4>uut.json 枚举跑哪些用例、按什么顺序</h4>
+      <p><b>优点</b>：这份 TPS 跑什么，是一个能被人评审、被 diff 的受控事实；py 目录里新增一个用例不会悄悄进产线。
+      <b>代价</b>：需要维护清单，所以要补一致性校验（见下）。</p>
+      <p class="muted">适合产线：可审计性优先于省事。</p>
+    </div>
+    <div class="card">
+      <div class="kk">设计 B · 目录即清单</div>
+      <h4>自动收集 testcase/ 下所有用例，uut.json 只写覆盖与排除</h4>
+      <p><b>优点</b>：零维护，加用例即生效。
+      <b>代价</b>：新增用例会自动进入产线执行——这恰恰是受控测试程序集最不希望发生的事；且顺序依赖文件命名约定，重组目录就会改变执行次序。</p>
+      <p class="muted">适合研发自测，不适合量产受控。</p>
+    </div>
+  </div>
+  <p>选了 A，就要补两条一致性校验把这套设计守住——否则清单和目录还是会各自漂移。</p>
+</section>
+
+<section>
+  <div class="folio">06</div>
+  <h2>精简后需要补的 5 条校验</h2>
+  <table class="g">
+    <thead><tr><th style="width:56px">序</th><th style="width:250px">校验</th><th>为什么必须</th><th style="width:150px">类型</th></tr></thead>
+    <tbody>
+      <tr><td class="f">1</td><td><span class="mono">name</span> 必填 → 降级为可选</td>
+        <td>不降级，删 name 会让所有 TPS 校验失败（实测 7 条错）。</td><td class="f">改现有规则</td></tr>
+      <tr><td class="f">2</td><td><span class="mono">case</span> 存在性校验</td>
+        <td>升级为"在 <span class="mono">testcase/</span> 中确实能找到该函数"。现在只校验字符串格式，写错函数名要到运行时才炸。</td><td class="f">新增</td></tr>
+      <tr><td class="f">3</td><td>清单 ↔ 目录双向一致</td>
+        <td>清单引用了不存在的用例 → <b>报错</b>；目录里有用例未被清单引用 → <b>提示</b>（可能是漏排，也可能是刻意不跑）。</td><td class="f">新增</td></tr>
+      <tr><td class="f">4</td><td>默认值补齐</td>
+        <td><span class="mono">scope.channels=all</span>、<span class="mono">parallel=per_channel</span>、<span class="mono">on_fail=continue</span> 在解析期填入，让"不写"有确定含义。</td><td class="f">解析期</td></tr>
+      <tr><td class="f">5</td><td><span class="mono">resources</span> ↔ <span class="mono">slots.resource_bindings</span> 一致</td>
+        <td>保留 resources 的前提是它不能成为第二个事实源：用例声明的资源必须是该通道 slot 里真实绑定过的。</td><td class="f">新增</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="folio">07</div>
+  <h2>删掉 name 之后，报告里的用例名从哪来</h2>
+  <div class="col">
+    <p>这是精简方案唯一的实现依赖，路径是现成的——你的运行环境已经在用 pytest collect：</p>
+    <ol class="steps" style="list-style:none;counter-reset:s;padding:0;margin:18px 0 0">
+      <li style="display:grid;grid-template-columns:34px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--soft)">
+        <span class="mono" style="color:var(--accent);font-size:11px">01</span>
+        <div><b>py 用例写 docstring</b><br><span class="muted">函数 docstring 首行即报告里的用例名，marker 即 tags。这是唯一事实源。</span></div>
+      </li>
+      <li style="display:grid;grid-template-columns:34px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--soft)">
+        <span class="mono" style="color:var(--accent);font-size:11px">02</span>
+        <div><b>collect 阶段提取</b><br><span class="muted"><span class="mono">pytest --collect-only -q</span> 已能拿到节点 id；要拿 docstring 与 marker，
+        在生成 <span class="mono">test_tps_generated.py</span> 的 wrapper 时顺带写入元数据，或改用带 JSON 输出的 collect。</span></div>
+      </li>
+      <li style="display:grid;grid-template-columns:34px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--soft)">
+        <span class="mono" style="color:var(--accent);font-size:11px">03</span>
+        <div><b>报告与前端消费</b><br><span class="muted">报告标题、步骤列表文案都从 collect 结果取；uut.json 不再参与命名，从此不存在"改了名字报告没更新"的情况。</span></div>
+      </li>
+    </ol>
+    <p style="margin-top:18px"><b>代价要说清楚</b>：这一步让"改文案"从改 uut.json 变成改 py 代码——对测试工程师来说门槛变高了。
+    如果你更看重"现场工程师不碰代码就能改文案"，那就保留 <span class="mono">name</span>，并加一条校验：与 docstring 不一致时告警。
+    这是一次明确的取舍，两种都成立，别两种都留一半。</p>
+  </div>
+</section>
+
+<footer>
+  cmd_suit 字段审计 · 2026-10-07 · ATE Runner<br>
+  实测基准：backend/tps_runtime/manifest.py 的 validate_v2 / _validate_case（逐个删键探测）<br>
+  精简产物：uut.cmd_suit.slim.jsonc（15 → 8 字段，文本量 −48%，可直接替换 uut.json 的三段）
+</footer>
+</div>
+</body>
+</html>

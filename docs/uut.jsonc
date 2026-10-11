@@ -1,0 +1,332 @@
+// =============================================================================
+// ATE Runner · uut.json 结构模板（JSONC）
+// -----------------------------------------------------------------------------
+// 文件性质：JSON with Comments。`//` 之后是字段说明，解析前 strip 掉即为合法 JSON。
+// 示例主体：SPM 读头动态测试（数据取自 backend/testresource/spm_rh_dyn/tps.json 与
+//           backend/tree/bom/SPM-RH-DYN-01.json，可对照阅读）。
+//
+// 与现网解析器的关系（backend/tps_runtime/manifest.py）
+//   [已支持] schema / id / name / version / description / project / dut / workspace_dir
+//            bench / environment / device_config / testconfig / setup / cmd_suit / teardown
+//   [新增]   metadata / pn            ← 现网 parser 不认识，不加校验就是"死字段"
+//   [扩展]   testconfig[*] 的 type/severity/decimal/... ；cmd_suit[*] 的 exec/depends_on/...
+//            ← 现网校验对未知键是宽容的（不会报错），但也不会被读取，需要同步 parser
+//
+// 硬约束（现网 validate_v2 会真的拦下来）
+//   1. id 只能 [A-Za-z0-9_.-]{1,64}
+//   2. testconfig 非空；每个阈值至少给 min 或 max 之一，min <= max
+//   3. cmd_suit 非空；每项必须有 case（module::function，正则校验）与 name；id 不得重复
+//   4. checks 里引用的阈值键必须已在 testconfig 中定义（否则报错）
+//   5. steps（v1）与 cmd_suit（v2）不得同时出现
+// =============================================================================
+{
+  // ===========================================================================
+  // 顶层身份：决定这份 TPS 是谁、给谁跑。字段名沿用现网 tps.v2，前端列表页在用。
+  // ===========================================================================
+  "schema": "tps.v2",                     // 【必填】现网只认 "tps.v2"；若升 v3 必须同步改 manifest.is_v2 / validate_v2
+  "id": "spm_rh_dyn",                     // 【必填·全库唯一】目录名与之一致，URL /api/tps/{tps_id} 用它取用
+  "name": "SPM读头动态测试",                // 【必填】前端展示与报告标题
+  "version": "3.0.0",                     // 【必填】TPS 自身版本；改了编排或阈值就要递增（报告里会写进结论）
+  "description": "SPM 读头动态测试 TPS：上电 → 激励加载 → 转速闭环 → 回放信号 → 负载验证 → 环境终止。",
+  "project": "SPM 项目",                   // 装备树第一级（产品）
+  "dut": "SPM 读头",                       // 装备树第二级（子系统 / DUT）
+  "workspace_dir": "SPM读头动态测试",       // 运行期临时副本目录名；不填则回退用 id
+
+  // ===========================================================================
+  // ① 元数据 metadata —— 【新增块】版本、作者、责任与发布状态
+  //    为什么单独成块：TPS 是受控文件，产线用哪一版必须可追溯。
+  //    现网只把 version 平铺在顶层（前端列表在用），所以这里不重复存版本号。
+  // ===========================================================================
+  "metadata": {
+    "author": "孙工",                      // 编写人
+    "owner": "SPM 总装线 · 读头动态测试工位",  // 责任工位/团队，出问题时找谁
+    "contact": "sun@example.com",          // 联系方式（可留空）
+    "created_at": "2026-10-07",            // YYYY-MM-DD
+    "updated_at": "2026-10-07",
+    "status": "released",                  // draft 草稿 | review 待审 | released 已发布 | deprecated 停用
+    "review": {                            // 发布审批（status=released 时建议必填）
+      "approved_by": "李工",
+      "approved_at": "2026-10-07",
+      "ticket": "ATE-2026-1007"
+    },
+    "applies_to": {                        // 这份 TPS 面向什么产线/阶段，便于检索
+      "stage": "量产",                      // 试制 | 量产 | 返修
+      "site": "一号厂房 A 区 3 号工位",
+      "line": "SPM 总装线"
+    },
+    "tags": ["spm", "读头", "动态", "smoke"],  // 检索与批量选择用
+    "checksum": "",                        // 【平台回写】发布时对"去注释后的 JSON"算 sha256；手填无效
+    "changelog": [                         // 变更记录：谁、何时、改了哪块
+      { "version": "3.0.0", "date": "2026-10-07", "author": "孙工", "note": "拆分 uut.json + aw，新增 pn 多通道与 exec 编排" },
+      { "version": "2.0.0", "date": "2026-09-12", "author": "孙工", "note": "迁移到 tps.v2（cmd_suit / testconfig / device_config）" }
+    ]
+  },
+
+  // ===========================================================================
+  // ② PN 结构 pn —— 【新增块】本 TPS 适配哪些部件、支持几个 SN 并行
+  //    设计要点：这里只放"规则"，不放"本次要测的实际 SN 列表"。
+  //    SN 是运行期输入（前端扫码 / 接口传入 / run profile），写死在 TPS 里会导致每换一批
+  //    物料就要改测试程序集，违背 TPS 受控文件的定位。
+  // ===========================================================================
+  "pn": {
+    "part_number": "SPM-RH-3600",          // 部件号（PN）：这份 TPS 对应的标准件
+    "model": "SPM 读头 3600rpm 版",
+    "hw_revision": ["A", "B"],             // 适配的硬件版本；不在列表内的 UUT 应被拦下
+
+    // ---- 适配规则：决定"这个 SN 能不能上这份 TPS" ----
+    "adapt": {
+      "batch": {                           // 批次号：从 SN 中提取，决定适配范围
+        "extract_regex": "^SPM(\\d{6})",    // 从 SN 里抽批次的规则（第一个捕获组 = 批次号）
+        "whitelist": ["SPM202608", "SPM202609"],  // 允许的批次；空数组 = 不限制（不建议）
+        "blacklist": [],                   // 明确排除的批次（优先于 whitelist）
+        "on_mismatch": "block"             // block 拒绝执行 | warn 执行但报告标警告
+      },
+      "sn": {                              // SN 形态约束（平台全局是 12 位英数，这里可收紧）
+        "regex": "^SPM\\d{9}$",
+        "length": 12,
+        "charset": "ALNUM_UPPER"
+      },
+      "variant": {                          // 可选：同 PN 下的选配差异（如带/不带放大电路）
+        "key": "option_code",               // 从 uut_profiles 的属性里取值
+        "allowed": ["STD", "AMP"]
+      }
+    },
+
+    // ---- 通道结构：同时执行多个 SN 时的并行编排 ----
+    "channels": {
+      "mode": "parallel",                  // single 单件串行 | parallel 多通道并行
+      "count": 2,                          // 并行通道数：上工位实际装几个 DUT 就写几个
+      "max_count": 4,                      // 该 TPS 设计上限（受工装与仪器通道数限制）
+      "slot_assignment": "auto",           // auto 运行期按空闲工位分配 | fixed 按下表固定绑定
+      "fail_policy": "isolate",            // isolate 单通道失败不影响其他通道 | abort_all 一失败全停
+      "slots": [                           // 每通道的物理归属：夹具 + 仪器通道 + 通道专属阈值
+        {
+          "channel": 1,
+          "uut": "",                        // 运行期写入实际 SN；TPS 内必须留空
+          "fixture": "rh-fixture-1",        // 该通道的夹具（须存在于测试台 BOM）
+          "alias_suffix": "c1",             // 设备别名后缀：psu → psu_c1，用于按通道取不同设备
+          "resource_bindings": [            // 【关键】该通道实际占用的物理仪器通道，决定能不能并行
+            { "alias": "psu", "instrument_channel": "CH1" },
+            { "alias": "scope", "instrument_channel": "CH1" },
+            { "alias": "dmm", "instrument_channel": "CH1" },
+            { "alias": "awg", "instrument_channel": "CH1" },
+            { "alias": "eload", "instrument_channel": "CH1" },
+            { "alias": "spin", "instrument_channel": "" }
+          ],
+          "threshold_overrides": {          // 通道级阈值覆盖（夹具差异、探头衰减差异）
+            "TC_SIG_VPP": { "min": 2.28, "max": 2.52 }
+          }
+        },
+        {
+          "channel": 2,
+          "uut": "",
+          "fixture": "rh-fixture-2",
+          "alias_suffix": "c2",
+          "resource_bindings": [
+            { "alias": "psu", "instrument_channel": "CH2" },
+            { "alias": "scope", "instrument_channel": "CH2" },
+            { "alias": "dmm", "instrument_channel": "CH2" },
+            { "alias": "awg", "instrument_channel": "CH2" },
+            { "alias": "eload", "instrument_channel": "" },
+            { "alias": "spin", "instrument_channel": "" }
+          ],
+          "threshold_overrides": {}
+        }
+        // channel 3 / 4 同构；count 改大时同步补 slot，并确认仪器还有空闲通道
+      ],
+      "shared_resources": [                 // 声明"不能被两个通道同时占用"的资源 → 调度器据此串行化
+        { "alias": "spin", "reason": "单台转速控制盒只有一个 DUT 接口，通道必须排队", "queue": "fifo" }
+      ]
+    }
+  },
+
+  // ===========================================================================
+  // ③ 设备信息 device_config —— 【现网已有】TPS 只声明"用哪些设备、当什么角色"
+  //    重要原则：这里不写 IP / 端口 / 串口号。
+  //    连接参数的事实源是测试台注册库（SQLite / testbenches.json），BOM 是预设来源。
+  //    写死进 TPS 的后果：换一条测试台就要改测试程序集，而 TPS 是受控文件。
+  // ===========================================================================
+  "device_config": {
+    // 别名（TPS 内部引用名）: 引用信息。别名短、无设备含义，便于同一份 TPS 跑不同台架。
+    "psu":     { "device_id": "rh-psu",     "role": "psu",     "category": "电源",     "interface": "LAN",    "mode": "exclusive", "note": "读头供电，通道按 slot 分配 CH1/CH2" },
+    "scope":   { "device_id": "rh-scope",   "role": "scope",   "category": "示波器",   "interface": "LAN",    "mode": "per_channel", "note": "8 通道机型，每通道占 1 个输入口" },
+    "dmm":     { "device_id": "rh-dmm",     "role": "dmm",     "category": "万用表",   "interface": "LAN",    "mode": "per_channel", "note": "静态工作点与阻值基准" },
+    "awg":     { "device_id": "rh-awg",     "role": "awg",     "category": "信号源",   "interface": "LAN",    "mode": "per_channel", "note": "回放激励" },
+    "eload":   { "device_id": "rh-eload",   "role": "eload",   "category": "电子负载", "interface": "LAN",    "mode": "exclusive", "required": false, "note": "非必备：无负载机型可跳过相关用例" },
+    "spin":    { "device_id": "rh-spin",    "role": "motion",  "category": "运动控制", "interface": "SERIAL", "mode": "shared",   "note": "只有 1 个 DUT 口 → 并行时排队执行" },
+    "fixture": { "device_id": "rh-fixture", "role": "fixture", "category": "夹具",     "interface": "NONE",   "mode": "passive", "programmable": false, "note": "被动设备，仅登记与寿命追溯" }
+    // 现网兼容写法：{ "别名": "device_id" } 也允许（简写），但无法声明 mode/category，不利于并行调度
+  },
+
+  // 环境说明：写给人看的信息（工位、固件、接口），不参与执行逻辑
+  "environment": {
+    "name": "SPM 读头动态测试环境",
+    "device": "泰克 MSO54 + Fluke 8846A + ITECH IT6332A + ITECH IT8512A+ + Keysight 33500B + 转速控制盒 + 装夹夹具",
+    "interfaces": ["LAN (SCPI)", "串口 (COM6 115200)"],
+    "firmware": "v2.0.0",
+    "location": "SPM 总装线 · 读头动态测试工位"
+  },
+
+  // 测试台绑定：可留空，运行期按实际台架解析
+  "bench": { "preset_id": "SPM-RH-DYN-01", "bench_id": "", "serial": "" },
+
+  // ===========================================================================
+  // ④ 测试阈值 testconfig —— 【现网已有】阈值字典；cmd_suit 通过 checks 引用
+  //    现网支持：label / min / max / unit / nominal
+  //    本次扩展：type / tol / decimal / severity / scope / sample / guard / source
+  //    （扩展键现网不会报错，但需要 parser 与报告同步，否则等于注释）
+  // ===========================================================================
+  "testconfig": {
+    "TC_VDD": {
+      "label": "读头上电电压",
+      "type": "range",                     // range 区间 | le/ge 单边 | eq 等值 | abs 绝对值 | delta 相对基准 | discrete 枚举
+      "nominal": 3.3,                      // 标称值
+      "tol": { "value": 5, "unit": "pct" }, // 用标称±容差表达，解析时推导 min/max（避免手算 3.135/3.465）
+      "min": 3.135, "max": 3.465,          // 【必填·现网校验】至少给 min 或 max 之一
+      "unit": "V",
+      "decimal": 3,                         // 比较前统一 round 到 3 位，避免 3.4649999 误判
+      "severity": "critical",               // critical 超限=fail | warning 超限=pass+warn | info 仅记录
+      "scope": "per_channel",               // global | per_channel（per_channel 才吃 slot 的 threshold_overrides）
+      "sample": { "stat": "mean", "n": 5, "window_s": 1.0 },  // 采样口径：mean/max/min/p2p/sigma
+      "guard": { "hard_max": 4.0, "delay_s": 0.2 },           // 安全保护：接近上限前先降压，防止打坏 DUT
+      "source": "calibrated",               // spec 规格书 | calibrated 已校准台架实测 | history 历史基线
+      "rationale": "DUT 规格书 §4.2：3.3V ±5%"                  // 阈值依据，评审时必看
+    },
+    "TC_IDD": {
+      "label": "读头工作电流", "type": "range", "min": 150, "max": 250, "unit": "mA",
+      "decimal": 1, "severity": "critical", "scope": "per_channel",
+      "sample": { "stat": "mean", "n": 3 }, "source": "spec", "rationale": "稳态电流窗口"
+    },
+    "TC_RPM": {
+      "label": "读头转速", "type": "range", "nominal": 3600, "min": 3560, "max": 3640, "unit": "rpm",
+      "decimal": 0, "severity": "critical", "scope": "per_channel",
+      "sample": { "stat": "mean", "n": 10, "window_s": 2.0 }, "source": "spec"
+    },
+    "TC_MOTION_HS": {
+      "label": "运动控制握手响应", "type": "le", "max": 50, "unit": "ms",
+      "decimal": 0, "severity": "warning", "scope": "shared",   // shared：该设备全局共用，不按通道算
+      "sample": { "stat": "max", "n": 5 }, "source": "history", "rationale": "单边上限，超过了也能出货但要记录"
+    },
+    "TC_SIG_VPP": {
+      "label": "回放信号幅度", "type": "range", "nominal": 2.4, "tol": { "value": 4, "unit": "pct" },
+      "min": 2.304, "max": 2.496, "unit": "V", "decimal": 3,
+      "severity": "critical", "scope": "per_channel",
+      "sample": { "stat": "p2p", "n": 2000 }, "source": "calibrated",
+      "rationale": "示波器测 Vpp；通道间探头衰减差异已在 slot.threshold_overrides 修正"
+    },
+    "TC_SIG_FREQ": {
+      "label": "回放信号频率", "type": "range", "min": 990, "max": 1010, "unit": "Hz",
+      "decimal": 1, "severity": "critical", "scope": "per_channel", "source": "spec"
+    },
+    "TC_ELOAD_V": {
+      "label": "负载端电压", "type": "range", "min": 3.1, "max": 3.5, "unit": "V",
+      "decimal": 3, "severity": "warning", "scope": "per_channel",
+      "applicable_when": "device.eload.present",   // 条件阈值：装了电子负载才参与判定
+      "source": "spec"
+    }
+  },
+
+  // ===========================================================================
+  // ⑤ 用例编排 cmd_suit —— 【现网已有】有序测试套；setup / teardown 为环境段
+  //    现网支持：no / id / name / case / description / params / checks / optional
+  //    本次扩展：exec（超时、重试、失败策略）、depends_on、scope、parallel、resources、tags
+  // ===========================================================================
+  "setup": [
+    {
+      "id": "SETUP01",
+      "name": "环境初始化",
+      "case": "testcase.env_setup::init_environment",
+      "description": "上电、设置回放激励、读头复位、示波器自检（逐通道执行）",
+      "params": { "psu_alias": "psu", "awg_alias": "awg", "spin_alias": "spin", "scope_alias": "scope", "fixture_alias": "fixture", "voltage": 3.3 },
+      "scope": { "channels": "all" },        // 每通道各跑一次
+      "exec": { "timeout_s": 120, "retry": { "max": 1, "interval_s": 3.0, "on": ["error"] }, "on_fail": "abort" }
+    }
+  ],
+  "cmd_suit": [
+    {
+      "no": 1,
+      "id": "TC001",
+      "name": "上电电压测试",
+      "case": "testcase.power::power_on_voltage",
+      "description": "供电 3.3V 后由万用表测量读头上电电压",
+      "params": { "psu_alias": "psu", "dmm_alias": "dmm", "voltage": 3.3 },   // 设备引用与数值参数混放（现网如此，改进意见见文档）
+      "checks": { "VDD": "TC_VDD" },          // 键=报告里的测量项名，值=testconfig 阈值键（现网强校验）
+      "exec": { "timeout_s": 30, "retry": { "max": 2, "interval_s": 1.0, "on": ["error"], "backoff": "linear" }, "on_fail": "abort", "on_timeout": "fail" },
+      "depends_on": [],                       // 前置用例：不满足则 skip（而非 fail）
+      "scope": { "channels": "all" },
+      "parallel": "per_channel",              // per_channel 各通道独立并行 | shared 需先抢占共享资源
+      "resources": ["psu", "dmm"],            // 声明占用：调度器据此避免通道间抢同一台仪器
+      "tags": ["smoke", "power", "critical"], // 支持按标签选择性子集执行（如只跑 smoke）
+      "optional": false
+    },
+    {
+      "no": 2,
+      "id": "TC002",
+      "name": "读头工作电流测试",
+      "case": "testcase.power::read_head_current",
+      "description": "转速稳定后测量读头工作电流",
+      "params": { "dmm_alias": "dmm", "spin_alias": "spin", "rpm": 3600 },
+      "checks": { "IDD": "TC_IDD" },
+      "exec": { "timeout_s": 45, "retry": { "max": 1, "interval_s": 2.0, "on": ["error"] }, "on_fail": "continue" },
+      "scope": { "channels": "all" },
+      "parallel": "shared",                   // 依赖转速控制盒 → 通道排队
+      "resources": ["dmm", "spin"],
+      "tags": ["power"]
+    },
+    {
+      "no": 3,
+      "id": "TC003",
+      "name": "转速闭环测试",
+      "case": "testcase.comm::spin_speed",
+      "description": "串口握手后设定 3600 rpm，回读实际转速与握手响应时间",
+      "params": { "motion_alias": "spin", "rpm": 3600 },
+      "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" },
+      "exec": { "timeout_s": 60, "retry": { "max": 3, "interval_s": 2.0, "on": ["error", "timeout"], "backoff": "exponential" }, "on_fail": "abort" },
+      "scope": { "channels": "all" },
+      "parallel": "shared",
+      "resources": ["spin"],
+      "tags": ["motion", "smoke"]
+    },
+    {
+      "no": 4,
+      "id": "TC004",
+      "name": "回放信号幅度与频率测试",
+      "case": "testcase.comm::playback_signal",
+      "description": "波形发生器回放 1 kHz / 2.4 Vpp 正弦，示波器测量峰峰值与频率",
+      "params": { "scope_alias": "scope", "signal": "sine", "freq": 1000, "vpp": 2.4, "points": 2000 },
+      "checks": { "VPP": "TC_SIG_VPP", "FREQ": "TC_SIG_FREQ" },
+      "exec": { "timeout_s": 40, "retry": { "max": 2, "interval_s": 1.0, "on": ["error"] }, "on_fail": "continue" },
+      "scope": { "channels": "all" },
+      "parallel": "per_channel",
+      "resources": ["scope", "awg"],
+      "tags": ["signal", "critical"]
+    },
+    {
+      "no": 5,
+      "id": "TC005",
+      "name": "负载端电压测试",
+      "case": "testcase.comm::load_voltage",
+      "description": "电子负载 CC 0.5A 加载后测量负载端电压",
+      "params": { "eload_alias": "eload", "current": 0.5 },
+      "checks": { "VLOAD": "TC_ELOAD_V" },
+      "exec": { "timeout_s": 30, "retry": { "max": 1, "interval_s": 1.0, "on": ["error"] }, "on_fail": "continue" },
+      "scope": { "channels": "all" },
+      "parallel": "per_channel",
+      "resources": ["eload"],
+      "skip_when": "not device.eload.present",  // 非必备设备缺失时跳过，而非报错
+      "tags": ["load"]
+    }
+  ],
+  "teardown": [
+    {
+      "id": "TD01",
+      "name": "环境终止",
+      "case": "testcase.env_setup::teardown_environment",
+      "description": "关闭供电与激励输出、停止转速、释放装备",
+      "params": { "psu_alias": "psu", "awg_alias": "awg", "spin_alias": "spin" },
+      "scope": { "channels": "all" },
+      "exec": { "timeout_s": 90, "retry": { "max": 1, "interval_s": 2.0, "on": ["error"] }, "on_fail": "warn" },
+      "always_run": true                      // 即使前面用例失败/中断也必须执行，防止设备一直带电
+    }
+  ]
+}
