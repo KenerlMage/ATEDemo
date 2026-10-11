@@ -135,7 +135,8 @@
       },
       "checks": {
         "VDD": "TC_VDD"
-      }
+      },
+      "step": true
     },
     {
       "no": 2,
@@ -173,7 +174,8 @@
       "checks": {
         "RPM": "TC_RPM",
         "HS_MS": "TC_MOTION_HS"
-      }
+      },
+      "step": true
     },
     {
       "no": 5,

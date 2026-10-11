@@ -24,6 +24,8 @@ ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 # 人工操作条目的提示文件（Markdown）：resource/ 下的文件名，可含一层子目录
 MANUAL_RESOURCE_RE = re.compile(r"^[A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*\.(?:md|markdown|txt)$", re.I)
 MANUAL_TYPES = {"manual", "人工", "human"}
+# 单步执行：条目上的 `"step": true` —— 本条执行完暂停，等操作员点「下一步 next」再继续
+STEP_KEYS = ("step", "single_step", "step_hold")
 
 
 def is_manual_case(case: Any) -> bool:
@@ -31,6 +33,13 @@ def is_manual_case(case: Any) -> bool:
     if not isinstance(case, dict):
         return False
     return str(case.get("type") or case.get("kind") or "").strip().lower() in MANUAL_TYPES
+
+
+def is_step_hold(case: Any) -> bool:
+    """条目是否开启单步执行（`"step": true`）：跑完这条暂停，等操作员点「下一步」"""
+    if not isinstance(case, dict):
+        return False
+    return any(bool(case.get(k)) for k in STEP_KEYS)
 CASE_REF_RE = re.compile(r"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*::[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")
 
 CASE_KINDS = {"setup": ("init", "test_setup"), "test": ("test", "test_case"), "teardown": ("teardown", "test_teardown")}
@@ -159,6 +168,14 @@ def _validate_case(case: Any, index: int, testconfig: dict, seen_ids: set, prefi
         if timeout is not None and (not isinstance(timeout, (int, float)) or isinstance(timeout, bool)):
             errors.append(f"{prefix}[{index}].timeout_s 必须是数字（等待操作员确认的秒数）")
         return errors
+    for key in STEP_KEYS:
+        if key in case and not isinstance(case[key], bool):
+            errors.append(
+                f"{prefix}[{index}].{key} 必须是布尔值（true = 本条跑完暂停，等操作员点「下一步」）"
+            )
+    timeout = case.get("timeout_s")
+    if timeout is not None and (not isinstance(timeout, (int, float)) or isinstance(timeout, bool)):
+        errors.append(f"{prefix}[{index}].timeout_s 必须是数字（单步暂停等操作员的秒数）")
     ref = str(case.get("case") or "").strip()
     if not ref:
         errors.append(f"{prefix}[{index}] 缺少 case（用例实现引用，如 testcase.power::power_on_voltage）")
@@ -230,6 +247,9 @@ def case_entries(tps: dict) -> dict:
                 "manual": manual,
                 "resource": str(case.get("resource") or "") if manual else "",
                 "timeout_s": case.get("timeout_s") if manual else None,
+                # 单步执行：跑完这条暂停等操作员点「下一步」（对人工条目无意义，人工条目本身就是暂停点）
+                "step": is_step_hold(case) and not manual,
+                "hold_timeout_s": case.get("timeout_s") if (is_step_hold(case) and not manual) else None,
             })
     return out
 
@@ -258,6 +278,7 @@ def steps_of(tps: dict) -> list[dict]:
                     "optional": case["optional"],
                     "node": node,
                     "manual": manual,
+                    "step": bool(case.get("step")),
                 },
             }
             if manual:
@@ -265,6 +286,13 @@ def steps_of(tps: dict) -> list[dict]:
                     "id": case["id"],
                     "resource": case.get("resource", ""),
                     "timeout_s": case.get("timeout_s"),
+                    "options": ["next", "abort"],
+                }
+            if case.get("step"):
+                # 单步暂停点：本条（测试用例）执行完毕后等待操作员放行
+                step["hold"] = {
+                    "id": case["id"],
+                    "timeout_s": case.get("hold_timeout_s"),
                     "options": ["next", "abort"],
                 }
             steps.append(step)
@@ -312,6 +340,7 @@ def summary_tps(tps: dict) -> dict:
         "dut": tps.get("dut", ""),
         "cmd_suit_count": len(tps.get("cmd_suit") or []),
         "manual_count": sum(1 for s in (tps.get("steps") or []) if s.get("manual")),
+        "step_hold_count": sum(1 for s in (tps.get("steps") or []) if s.get("hold")),
         "testconfig_count": len(tps.get("testconfig") or {}),
         "device_alias_count": len(tps.get("device_config") or {}),
         "bench": tps.get("bench", {}),

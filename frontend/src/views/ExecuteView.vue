@@ -89,6 +89,11 @@ const manualSubmitting = ref(false)
 const manualError = ref('')
 // 提示内容由后端从 TPS 包 resource/ 目录读出并随任务快照下发
 const manualHtml = computed(() => renderMarkdown(manual.value?.markdown || '', selectedTpsId.value))
+// ---- 单步执行（cmd_suit 条目 step=true）----
+// 该条用例跑完后 Runner 暂停：界面弹出「下一步」按钮，放行后才执行清单里的下一条
+const manualKind = computed(() => manual.value?.kind || 'manual')
+const manualIsManual = computed(() => manualOpen.value && manualKind.value === 'manual')
+const stepHoldOpen = computed(() => manualOpen.value && manualKind.value === 'step')
 
 function escapeHtml(s) {
   return String(s)
@@ -575,6 +580,18 @@ onUnmounted(() => {
           <span v-if="currentTask?.current_step">当前第 {{ currentTask.current_step }} / {{ steps.length }} 步</span>
         </div>
 
+        <div v-if="stepHoldOpen" class="step-hold-banner">
+          <span class="step-hold-tag">单步暂停</span>
+          <span class="step-hold-text">
+            第 {{ currentTask.current_step }} 条「{{ manual.name }}」已执行完毕，点「下一步」放行后续用例。
+          </span>
+          <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
+          <button class="btn primary step-next" :disabled="manualSubmitting" @click="answerManual('next')">
+            下一步 next
+          </button>
+        </div>
+        <div v-if="stepHoldOpen && manualError" class="tip err">{{ manualError }}</div>
+
         <div v-if="loadingDetail && !steps.length" class="panel-tip">正在加载步骤…</div>
         <div v-else-if="!steps.length" class="panel-tip">该 TPS 没有定义步骤</div>
         <ol v-else class="step-list">
@@ -588,11 +605,19 @@ onUnmounted(() => {
               <div class="step-desc">{{ st.description }}</div>
               <div class="step-meta">
                 <span class="step-type" :class="{ 'step-type-manual': st.manual }">{{ st.manual ? '人工操作' : ({ init: '环境初始化', test: '测试用例', teardown: '环境终止' }[st.type] || st.type) }}</span>
+                <span v-if="st.v2?.step" class="step-type step-type-step">单步暂停点</span>
                 <span v-if="stepState[i + 1]?.duration != null" class="step-dur">
                   耗时 {{ stepState[i + 1].duration.toFixed(2) }}s
                 </span>
               </div>
               <pre v-if="stepState[i + 1]?.detail" class="step-detail">{{ stepState[i + 1].detail }}</pre>
+              <div v-if="stepHoldOpen && manual.id && st.v2?.id === manual.id" class="step-hold-row">
+                <span class="step-hold-hint">本条已执行完毕，等待放行</span>
+                <button class="btn primary step-next" :disabled="manualSubmitting" @click="answerManual('next')">
+                  下一步 next
+                </button>
+                <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
+              </div>
             </div>
           </li>
         </ol>
@@ -661,12 +686,13 @@ onUnmounted(() => {
     </div>
 
     <!-- 人工操作环节弹窗：内容取自 TPS 包 resource/ 下清单里标注的 Markdown -->
-    <div v-if="manualOpen" class="manual-mask">
+    <!-- 单步执行（step=true）不弹遮罩，改由步骤列表上方的横幅与暂停行内的「下一步」按钮放行 -->
+    <div v-if="manualIsManual" class="manual-mask">
       <div class="manual-card">
         <div class="manual-head">
           <span class="manual-tag">人工操作</span>
           <h3 class="manual-title">{{ manual.name }}</h3>
-          <span class="manual-res">resource/{{ manual.resource }}</span>
+          <span v-if="manual.resource" class="manual-res">resource/{{ manual.resource }}</span>
         </div>
         <div class="manual-body" v-html="manualHtml"></div>
         <div v-if="manualError" class="tip err manual-err">{{ manualError }}</div>
@@ -1077,6 +1103,32 @@ onUnmounted(() => {
 .manual-actions { display: flex; gap: 10px; }
 .manual-err { margin: 0 18px; }
 .step-type-manual { color: var(--accent); font-weight: 600; }
+
+/* ---- 单步执行（cmd_suit 条目 step=true）---- */
+.step-type-step { color: var(--accent); font-weight: 600; }
+.step-hold-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(var(--accent-rgb), 0.06);
+}
+.step-hold-tag {
+  background: rgba(var(--accent-2-rgb), 0.16);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.step-hold-text { flex: 1; min-width: 200px; font-size: 12.5px; color: var(--text); }
+.step-hold-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.step-hold-hint { font-size: 11.5px; color: var(--accent); }
+.step-next { padding: 4px 12px; font-size: 12px; }
 
 @media (max-width: 900px) {
   .tps-wrap { grid-template-columns: 1fr; padding: 14px; }

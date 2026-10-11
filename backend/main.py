@@ -743,6 +743,8 @@ TPS_TASKS_LOCK = threading.Lock()
 # 事件对象不进 task（task 会被 JSON 序列化返回给前端）
 MANUAL_WAITS: dict[str, threading.Event] = {}
 DEFAULT_MANUAL_TIMEOUT_S = 1800
+# 单步执行（cmd_suit 条目 step=true）：跑完一条后等操作员点「下一步」的最长等待
+DEFAULT_STEP_TIMEOUT_S = 1800
 
 
 class TpsRunRequest(BaseModel):
@@ -847,9 +849,15 @@ def _generate_report(task: dict, tps: dict) -> str:
         detail = (st.get("detail") or "").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
         duration = st.get("duration")
         dur_text = f"{duration:.2f}s" if duration is not None else "-"
+        if step.get("manual"):
+            step_type_label = "人工操作"
+        elif step.get("hold"):
+            step_type_label = "测试用例 · 单步"
+        else:
+            step_type_label = {"init": "环境初始化", "teardown": "环境终止"}.get(step.get("type"), "测试用例")
         step_rows += f"""<tr>
           <td>{i}</td><td>{step.get('name', '')}</td>
-          <td>{'人工操作' if step.get('manual') else ('环境初始化' if step.get('type')=='init' else ('环境终止' if step.get('type')=='teardown' else '测试用例'))}</td>
+          <td>{step_type_label}</td>
           <td><span class="badge {badge_cls}">{status_label}</span></td>
           <td>{dur_text}</td><td class="detail">{detail}</td>
         </tr>"""
@@ -957,6 +965,45 @@ def _manual_md_path(stage_info: dict | None, resource: str, source_dir: Path | N
     return None
 
 
+def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource: str,
+                   source: str, timeout_s: float, log_label: str, log_path: Path,
+                   hold_id: str = "") -> str:
+    """把「等操作员做选择」的暂停点下发到任务快照，并阻塞等待；返回 next / abort / timeout
+
+    快照 `task["manual"]` 同时服务于两类暂停点：
+    * `kind="manual"` —— 清单里 `type=manual` 的人工操作环节，内容来自 `resource/<名称>`
+    * `kind="step"`   —— 条目 `step=true` 的单步暂停，内容由 Runner 生成
+    """
+    task_id = task["id"]
+    event = threading.Event()
+    with TPS_TASKS_LOCK:
+        MANUAL_WAITS[task_id] = event
+        task["manual"] = {
+            "status": "waiting",
+            "kind": kind,
+            "id": str(hold_id or ""),
+            "name": title,
+            "resource": resource,
+            "markdown": markdown,
+            "options": ["next", "abort"],
+            "requested_at": now_str(),
+            "timeout_s": timeout_s,
+            "source": source,
+        }
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{now_str()}] {log_label} [{title}] 等待操作员确认（{source or ('缺失 resource/' + resource) if resource else 'Runner 生成'}）\n")
+    answered = event.wait(timeout=timeout_s)
+    with TPS_TASKS_LOCK:
+        MANUAL_WAITS.pop(task_id, None)
+        snap = dict(task.get("manual") or {})
+        decision = str(snap.get("decision") or "").lower()
+        if not answered or decision not in ("next", "abort"):
+            decision = "timeout" if not answered else "abort"
+        snap.update(status="answered", decision=decision, answered_at=now_str(), markdown="")
+        task["manual"] = snap
+    return decision
+
+
 def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: Path | None,
                   log_path: Path) -> tuple[str, str]:
     """执行一条人工操作条目：把弹窗内容写进任务快照 -> 阻塞等待操作员选择 -> 返回 (决定, 说明)
@@ -975,32 +1022,10 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
         markdown = (f"# 缺少提示文件\n\n未找到 `resource/{resource}`，"
                     "请在 TPS 包内补齐该 Markdown 后重新执行。\n")
         source = ""
-    task_id = task["id"]
-    event = threading.Event()
-    with TPS_TASKS_LOCK:
-        MANUAL_WAITS[task_id] = event
-        task["manual"] = {
-            "status": "waiting",
-            "id": info.get("id", ""),
-            "name": title,
-            "resource": resource,
-            "markdown": markdown,
-            "options": ["next", "abort"],
-            "requested_at": now_str(),
-            "timeout_s": timeout_s,
-            "source": source,
-        }
-    with open(log_path, "a", encoding="utf-8") as lf:
-        lf.write(f"[{now_str()}] 人工操作 [{title}] 等待操作员确认（{source or '缺失 resource/' + resource}）\n")
-    answered = event.wait(timeout=timeout_s)
-    with TPS_TASKS_LOCK:
-        MANUAL_WAITS.pop(task_id, None)
-        snap = dict(task.get("manual") or {})
-        decision = str(snap.get("decision") or "").lower()
-        if not answered or decision not in ("next", "abort"):
-            decision = "timeout" if not answered else "abort"
-        snap.update(status="answered", decision=decision, answered_at=now_str(), markdown="")
-        task["manual"] = snap
+    decision = _wait_operator(
+        task, kind="manual", title=title, markdown=markdown, resource=resource, source=source,
+        timeout_s=timeout_s, log_label="人工操作", log_path=log_path, hold_id=str(info.get("id") or ""),
+    )
     if decision == "next":
         detail = f"操作员确认继续（{title}）"
     elif decision == "abort":
@@ -1009,6 +1034,36 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
         detail = f"等待操作员确认超时（{timeout_s:.0f}s，按中止处理）：{title}"
     with open(log_path, "a", encoding="utf-8") as lf:
         lf.write(f"[{now_str()}] 人工操作 [{title}] -> {decision}（{detail}）\n")
+    return decision, detail
+
+
+def _await_step_hold(task: dict, step: dict, log_path: Path, remaining: int) -> tuple[str, str]:
+    """单步执行暂停点：本条用例已跑完，等操作员点「下一步 next」再继续
+
+    `step: true` 的条目执行完毕后进入这里；提示内容由 Runner 自己生成（不需要 resource/）。
+    返回值与 `_await_manual` 一致：`next` / `abort` / `timeout`。
+    """
+    info = step.get("hold") or {}
+    title = step.get("name") or "单步暂停"
+    timeout_s = float(info.get("timeout_s") or DEFAULT_STEP_TIMEOUT_S)
+    markdown = (
+        f"# 单步执行暂停\n\n"
+        f"本条已执行完毕：**{title}**\n\n"
+        f"- 点「下一步」继续执行清单里的下一条（后面还有 {remaining} 条）\n"
+        f"- 点「中止测试」结束本轮，直接进入收尾与报告\n"
+    )
+    decision = _wait_operator(
+        task, kind="step", title=title, markdown=markdown, resource="", source="",
+        timeout_s=timeout_s, log_label="单步暂停", log_path=log_path, hold_id=str(info.get("id") or ""),
+    )
+    if decision == "next":
+        detail = f"单步放行：操作员点「下一步」继续（{title}）"
+    elif decision == "abort":
+        detail = f"操作员在单步暂停点选择中止（{title}）"
+    else:
+        detail = f"单步暂停超时（{timeout_s:.0f}s，按中止处理）：{title}"
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{now_str()}] 单步暂停 [{title}] -> {decision}（{detail}）\n")
     return decision, detail
 
 
@@ -1105,6 +1160,16 @@ def _run_tps_task(task_id: str) -> None:
             task["steps"][i - 1]["detail"] = detail
             task["steps"][i - 1]["duration"] = dt
             task["progress"] = int(i / total * 100)
+        # 单步执行（cmd_suit 条目 step=true）：本条已跑完，停在这里等操作员点「下一步」
+        if ok and not aborted and step.get("hold"):
+            hold_decision, hold_detail = _await_step_hold(task, step, log_path, total - i)
+            detail = f"{detail}\n{hold_detail}" if detail else hold_detail
+            with TPS_TASKS_LOCK:
+                task["steps"][i - 1]["detail"] = detail
+                task["steps"][i - 1]["hold"] = {"status": hold_decision}
+            if hold_decision != "next":
+                aborted = True
+                all_ok = False
         # 逐步追加测试日志
         with open(log_path, "a", encoding="utf-8") as lf:
             lf.write(
@@ -1227,24 +1292,32 @@ class ManualDecisionRequest(BaseModel):
 
 @app.post("/api/tps-tasks/{task_id}/manual")
 def tps_task_manual(task_id: str, req: ManualDecisionRequest):
-    """人工操作环节：操作员在弹窗里选择「继续下一步 next」或「中止测试 abort」"""
+    """等待操作员确认的暂停点：人工操作环节（type=manual）与单步暂停（step=true）
+
+    操作员选择「继续 next」或「中止 abort」；两者共用这一个接口与 task["manual"] 快照。
+    """
     raw = (req.decision or "").strip().lower()
     if raw not in ("next", "abort", "continue", "stop", "cancel"):
         return {"success": False, "message": "decision 只支持 next（继续）/ abort（中止）"}
     decision = "abort" if raw in ("abort", "stop", "cancel") else "next"
+    kind = "manual"
     with TPS_TASKS_LOCK:
         task = TPS_TASKS.get(task_id)
         if not task:
             return {"success": False, "message": "任务不存在"}
         manual = task.get("manual") or {}
         if manual.get("status") != "waiting":
-            return {"success": False, "message": "当前没有等待确认的人工操作环节"}
+            return {"success": False, "message": "当前没有等待操作员确认的暂停点"}
+        kind = str(manual.get("kind") or "manual")
         task["manual"] = {**manual, "decision": decision}
     event = MANUAL_WAITS.get(task_id)
     if event:
         event.set()
-    return {"success": True, "decision": decision,
-            "message": "已提交操作员选择：" + ("继续下一步" if decision == "next" else "中止测试")}
+    if decision == "next":
+        msg = "已提交：执行下一条" if kind == "step" else "已提交操作员选择：继续下一步"
+    else:
+        msg = "已提交：中止本轮测试"
+    return {"success": True, "decision": decision, "message": msg}
 
 
 @app.get("/api/tps/{tps_id}/resource/{name:path}")

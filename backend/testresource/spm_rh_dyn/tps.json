@@ -61,7 +61,8 @@
       "case": "testcase.power::power_on_voltage",
       "description": "供电 3.3V 后由数字万用表测量读头上电电压",
       "params": { "psu_alias": "psu", "dmm_alias": "dmm", "voltage": 3.3 },
-      "checks": { "VDD": "TC_VDD" }
+      "checks": { "VDD": "TC_VDD" },
+      "step": true
     },
     {
       "no": 2,
@@ -87,7 +88,8 @@
       "case": "testcase.comm::spin_speed",
       "description": "串口握手后设定 3600 rpm，回读实际转速与握手响应时间",
       "params": { "motion_alias": "spin", "rpm": 3600 },
-      "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" }
+      "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" },
+      "step": true
     },
     {
       "no": 5,

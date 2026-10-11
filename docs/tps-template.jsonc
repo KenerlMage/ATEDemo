@@ -1,7 +1,7 @@
 // ATE Runner · TPS 起手模板
 // 用法：整份复制为 <TPS 包目录>/tps.json，删注释后即为合法 JSON。包内还需要 testcase/（用例实现）与 resource/（配置与人工操作提示）。
 // 结构与字段说明：docs/uut.json-文件结构与设计.md · docs/TPS设计.md（§4 / §4.1）
-// 模板版本：2026-10-11（cmd_suit 增加人工操作环节 type=manual）
+// 模板版本：2026-10-11（cmd_suit 支持人工操作环节 type=manual 与单步执行 step=true）
 //
 // 落地差异（当前 Runner 已实现的字段）：schema / id / name / testconfig / device_config 为必填；
 // 下面 config / production_info / process_info / uut_info 属「身份 / 归属 / 追溯」目标结构，运行时原样保留但不消费；
@@ -90,7 +90,8 @@
     {
       "id": "T-02",
       "name": "工作电流测试",
-      "case": "testcase.power::test_idd"
+      "case": "testcase.power::test_idd",
+      "step": true                                    // 单步：本条跑完暂停，等操作员点「下一步」再继续下一条
     }
   ],
   "teardown": [
