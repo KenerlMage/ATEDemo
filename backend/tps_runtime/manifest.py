@@ -286,14 +286,14 @@ def steps_of(tps: dict) -> list[dict]:
                     "id": case["id"],
                     "resource": case.get("resource", ""),
                     "timeout_s": case.get("timeout_s"),
-                    "options": ["next", "abort"],
+                    "options": ["next", "abort", "cancel"],
                 }
             if case.get("step"):
                 # 单步暂停点：本条（测试用例）执行完毕后等待操作员放行
                 step["hold"] = {
                     "id": case["id"],
                     "timeout_s": case.get("hold_timeout_s"),
-                    "options": ["next", "abort"],
+                    "options": ["next", "abort", "cancel"],
                 }
             steps.append(step)
     return steps

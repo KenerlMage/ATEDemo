@@ -440,15 +440,16 @@
         </tbody>
       </table>
       <p class="note">编排上刻意只保留"顺序"这一件事：数组顺序即执行顺序，不引入排序、优先级、依赖、条件分支、
-        失败策略与重试。清单里能让流程停下来的只有两处：人工确认条目（<code>type: manual</code>）与单步执行标记（<code>step: true</code>）。</p>
+        失败策略与重试。清单里能让流程停下来的只有两处：人工确认条目（<code>type: manual</code>）与单步执行标记（<code>step: true</code>）。两类暂停点在等待操作员应答期间均允许取消本轮运行，取消后不再等待超时。</p>
       <h3>9.1 人工确认条目（<code>type: manual</code>）</h3>
       <p>需要操作员判断的步骤（外观检查、装夹确认、人工上下料）用 <code>type: manual</code> 表达：
-        运行时弹出确认窗口，操作员二选一。</p>
+        运行时弹出确认窗口，操作员在三个动作中选择一个。</p>
       <table>
         <thead><tr><th style="width:200px">选项</th><th>行为</th></tr></thead>
         <tbody>
           <tr><td class="k">继续下一步 next</td><td>关闭弹窗，执行清单里的下一条</td></tr>
-          <tr><td class="k">中止 abort</td><td>停止本轮测试，直接进入收尾与报告</td></tr>
+          <tr><td class="k">中止 abort</td><td>判定当前环节不通过，停止本轮测试，直接进入收尾与报告</td></tr>
+          <tr><td class="k">取消本轮 cancel</td><td>主动放弃本轮测试（例如装夹错误需要重装）：剩余测试条目全部跳过，收尾与报告照常进行</td></tr>
         </tbody>
       </table>
       <p>条目本身只写"用哪个名称"，弹窗内容不写在清单里：</p>
@@ -467,9 +468,11 @@
           <tr><td>到达条目</td><td>Runner 挂起本轮流程，把 <code>resource/&lt;名称&gt;</code> 的 Markdown 原文放进任务快照（<code>manual.status = waiting</code>），界面弹出提示窗口</td></tr>
           <tr><td>选「继续下一步」</td><td>该条目记为<b>通过</b>，接着执行清单里的下一条</td></tr>
           <tr><td>选「中止测试」</td><td>该条目记为<b>已中止</b>，后续测试条目全部跳过，<b>收尾段 <code>teardown</code> 照常执行</b>，报告结论为 NOK</td></tr>
+          <tr><td>选「取消本轮测试」</td><td>该条目记为<b>已取消</b>，后续测试条目全部跳过，收尾段照常执行，报告结论为 NOK。与「中止」的收尾路径一致，区别在语义与记录：中止用于判定当前环节不通过，取消用于主动放弃本轮运行</td></tr>
+          <tr><td>等待期间取消</td><td>等待操作员应答期间可随时取消本轮：任务立即结束等待并按上表路径收尾，不必等到超时；运行中（未处于等待）的任务同样可取消，此时剩余测试条目直接跳过</td></tr>
           <tr><td>无人应答</td><td>默认 1800 秒到点按中止处理；条目可用 <code>timeout_s</code> 覆盖等待时长</td></tr>
           <tr><td>追溯</td><td>运行日志与 HTML 报告把该条目类型显示为「人工操作」，并记录操作员的选择与时刻</td></tr>
-          <tr><td>接口</td><td>界面提交 <code>POST /api/tps-tasks/{task_id}/manual</code>，请求体 <code>{"decision": "next" | "abort"}</code>；进度查询 <code>GET /api/tps-tasks/{task_id}</code></td></tr>
+          <tr><td>接口</td><td>界面提交 <code>POST /api/tps-tasks/{task_id}/manual</code>，请求体 <code>{"decision": "next" | "abort" | "cancel"}</code>；取消本轮另可用 <code>POST /api/tps-tasks/{task_id}/cancel</code>，运行中与等待期间均有效；进度查询 <code>GET /api/tps-tasks/{task_id}</code></td></tr>
         </tbody>
       </table>
       <h3>9.3 单步执行（<code>step: true</code>）</h3>
@@ -489,6 +492,7 @@
           <tr><td>本条执行完</td><td>结果照常记录（通过 / 失败），随后挂起：步骤列表上方出现「单步暂停」横幅，该条目行内出现「下一步」按钮</td></tr>
           <tr><td>点「下一步」</td><td>放行，执行清单里的下一条；运行日志记 <code>单步暂停 [用例名] -&gt; next</code></td></tr>
           <tr><td>点「中止测试」</td><td>本条已得结果保留，后续测试条目全部跳过，收尾段照常执行，报告结论 NOK</td></tr>
+          <tr><td>点「取消本轮测试」</td><td>本条已得结果保留，后续测试条目全部跳过，收尾段照常执行，报告结论 NOK；等待期间也可直接取消本轮，无需等待超时</td></tr>
           <tr><td>无人应答</td><td>默认 1800 秒后按中止处理；条目可用 <code>timeout_s</code> 覆盖等待时长</td></tr>
           <tr><td>报告</td><td>该步骤类型显示「测试用例 · 单步」</td></tr>
         </tbody>
@@ -500,7 +504,8 @@
       <p class="note">只写在需要停的那一条上：整段逐条单步就每条都写，只在关键节点停就只写关键条目。
         与人工操作环节的区别：<code>step</code> 是「跑完再停」，提示由执行器生成，不需要 <code>resource/</code>；
         <code>type: manual</code> 是「执行前等人工动作做完」，提示文案与图片来自 <code>resource/</code>。
-        用例失败时不再停留：失败直接结束测试段，不会先弹单步暂停。</p>
+        用例失败时不再停留：失败直接结束测试段，不会先弹单步暂停。
+        等待期间均可取消：两类暂停点出现后，界面提供「取消本轮测试」与「中止测试」两个出口，取消或中止后剩余测试条目跳过、收尾段照常执行。</p>
       <h3>9.4 执行顺序与作用域</h3>
       <table>
         <thead><tr><th style="width:170px">项</th><th>含义</th></tr></thead>

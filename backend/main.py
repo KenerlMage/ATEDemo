@@ -739,10 +739,16 @@ def import_tps(req: TpsImportRequest):
 TPS_TASKS: dict[str, dict] = {}
 TPS_TASKS_LOCK = threading.Lock()
 
-# 人工操作环节（cmd_suit 里 type=manual 的条目）：等待操作员在界面选择「继续 / 中止」
+# 人工操作环节（cmd_suit 里 type=manual 的条目）与单步暂停：等待操作员在界面选择
+# 决定取值：next（继续）/ abort（中止本轮）/ cancel（取消本轮）/ timeout（无人应答，按中止处理）
+#   abort  = 操作员判定当前环节不通过，结束本轮
+#   cancel = 操作员主动放弃本轮（如装夹错误需重装），或由界面/接口发起取消
+# 两者的收尾路径一致（跳过剩余测试条目、照常执行收尾段），区别在语义与记录
+# 等待采用分段轮询（_WAIT_TICK_S），因此取消请求可在等待期间立即唤醒任务线程
 # 事件对象不进 task（task 会被 JSON 序列化返回给前端）
 MANUAL_WAITS: dict[str, threading.Event] = {}
 DEFAULT_MANUAL_TIMEOUT_S = 1800
+_WAIT_TICK_S = 1.0
 # 单步执行（cmd_suit 条目 step=true）：跑完一条后等操作员点「下一步」的最长等待
 DEFAULT_STEP_TIMEOUT_S = 1800
 
@@ -985,20 +991,40 @@ def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource
             "name": title,
             "resource": resource,
             "markdown": markdown,
-            "options": ["next", "abort"],
+            "options": ["next", "abort", "cancel"],
+            "cancellable": True,
             "requested_at": now_str(),
             "timeout_s": timeout_s,
             "source": source,
         }
     with open(log_path, "a", encoding="utf-8") as lf:
         lf.write(f"[{now_str()}] {log_label} [{title}] 等待操作员确认（{source or ('缺失 resource/' + resource) if resource else 'Runner 生成'}）\n")
-    answered = event.wait(timeout=timeout_s)
+    # 分段等待：既可被操作员决定唤醒，也可被取消请求（界面「取消运行」/ 接口）唤醒
+    import time as _t
+    deadline = _t.monotonic() + max(0.0, timeout_s)
+    answered = False
+    cancelled = False
+    while True:
+        answered = event.wait(timeout=min(_WAIT_TICK_S, max(0.0, deadline - _t.monotonic())))
+        if answered:
+            break
+        if task.get("cancel_requested"):
+            cancelled = True
+            break
+        if _t.monotonic() >= deadline:
+            break
     with TPS_TASKS_LOCK:
         MANUAL_WAITS.pop(task_id, None)
         snap = dict(task.get("manual") or {})
         decision = str(snap.get("decision") or "").lower()
-        if not answered or decision not in ("next", "abort"):
-            decision = "timeout" if not answered else "abort"
+        if decision in ("next", "abort", "cancel"):
+            pass                                   # 操作员在弹窗里的选择
+        elif cancelled or task.get("cancel_requested"):
+            decision = "cancel"                    # 等待期间被取消
+        elif not answered:
+            decision = "timeout"                   # 无人应答
+        else:
+            decision = "abort"                     # 防御分支：事件已置位但决定值非法
         snap.update(status="answered", decision=decision, answered_at=now_str(), markdown="")
         task["manual"] = snap
     return decision
@@ -1008,7 +1034,8 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
                   log_path: Path) -> tuple[str, str]:
     """执行一条人工操作条目：把弹窗内容写进任务快照 -> 阻塞等待操作员选择 -> 返回 (决定, 说明)
 
-    决定取值：`next`（继续下一步）/ `abort`（中止本轮）/ `timeout`（无人应答，按中止处理）
+    决定取值：`next`（继续下一步）/ `abort`（中止本轮）/ `cancel`（取消本轮，含等待期间取消）
+             / `timeout`（无人应答，按中止处理）
     """
     info = step.get("manual") or {}
     resource = str(info.get("resource") or "")
@@ -1030,6 +1057,8 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
         detail = f"操作员确认继续（{title}）"
     elif decision == "abort":
         detail = f"操作员选择中止（{title}）"
+    elif decision == "cancel":
+        detail = f"操作员取消本轮测试（{title}）"
     else:
         detail = f"等待操作员确认超时（{timeout_s:.0f}s，按中止处理）：{title}"
     with open(log_path, "a", encoding="utf-8") as lf:
@@ -1051,6 +1080,7 @@ def _await_step_hold(task: dict, step: dict, log_path: Path, remaining: int) -> 
         f"本条已执行完毕：**{title}**\n\n"
         f"- 点「下一步」继续执行清单里的下一条（后面还有 {remaining} 条）\n"
         f"- 点「中止测试」结束本轮，直接进入收尾与报告\n"
+        f"- 点「取消本轮测试」放弃本轮（剩余测试条目跳过，收尾动作照常执行）\n"
     )
     decision = _wait_operator(
         task, kind="step", title=title, markdown=markdown, resource="", source="",
@@ -1060,6 +1090,8 @@ def _await_step_hold(task: dict, step: dict, log_path: Path, remaining: int) -> 
         detail = f"单步放行：操作员点「下一步」继续（{title}）"
     elif decision == "abort":
         detail = f"操作员在单步暂停点选择中止（{title}）"
+    elif decision == "cancel":
+        detail = f"操作员在单步暂停点取消本轮测试（{title}）"
     else:
         detail = f"单步暂停超时（{timeout_s:.0f}s，按中止处理）：{title}"
     with open(log_path, "a", encoding="utf-8") as lf:
@@ -1127,19 +1159,28 @@ def _run_tps_task(task_id: str) -> None:
     with TPS_TASKS_LOCK:
         task["current_step"] = 0
     aborted = False
+    stop_label = "操作员选择中止"
     for i, step in enumerate(tps["steps"], 1):
         with TPS_TASKS_LOCK:
             task["current_step"] = i
             task["steps"][i - 1]["status"] = "running"
-        # 操作员已中止：后续测试条目全部跳过，但仍然执行收尾段（断电等安全动作）
+        # 运行期间收到取消请求（界面「取消运行」按钮或 POST /api/tps-tasks/{id}/cancel）
+        # 与中止走同一条收尾路径：剩余测试条目跳过，收尾段照常执行
+        if not aborted and task.get("cancel_requested"):
+            aborted = True
+            all_ok = False
+            stop_label = "收到取消请求"
+            with open(log_path, "a", encoding="utf-8") as lf:
+                lf.write(f"[{now_str()}] 收到取消请求：本轮剩余测试条目跳过，进入收尾\n")
+        # 操作员已中止/取消：后续测试条目全部跳过，但仍然执行收尾段（断电等安全动作）
         if aborted and step.get("type") == "test":
             with TPS_TASKS_LOCK:
                 task["steps"][i - 1]["status"] = "skipped"
-                task["steps"][i - 1]["detail"] = "操作员选择中止，未执行"
+                task["steps"][i - 1]["detail"] = f"{stop_label}，未执行"
                 task["steps"][i - 1]["duration"] = 0.0
                 task["progress"] = int(i / total * 100)
             with open(log_path, "a", encoding="utf-8") as lf:
-                lf.write(f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（已中止）\n")
+                lf.write(f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（{stop_label}）\n")
             continue
         t0 = _time.time()
         if step.get("manual"):
@@ -1147,10 +1188,14 @@ def _run_tps_task(task_id: str) -> None:
             decision, detail = _await_manual(task, step, stage, tps_dir, log_path)
             if decision == "next":
                 ok, step_status, mark = True, "passed", "CONFIRM"
+            elif decision == "cancel":
+                aborted, ok, step_status, mark = True, False, "aborted", "CANCEL"
+                stop_label = "操作员取消本轮测试"
             elif decision == "abort":
                 aborted, ok, step_status, mark = True, False, "aborted", "ABORT"
             else:
                 aborted, ok, step_status, mark = True, False, "failed", "TIMEOUT"
+                stop_label = "等待操作员确认超时，按中止处理"
         else:
             ok, detail = _run_tps_step(step, tps_dir, stage)
             step_status, mark = ("passed" if ok else "failed"), ("PASS" if ok else "FAIL")
@@ -1170,6 +1215,10 @@ def _run_tps_task(task_id: str) -> None:
             if hold_decision != "next":
                 aborted = True
                 all_ok = False
+                if hold_decision == "cancel":
+                    stop_label = "操作员取消本轮测试"
+                else:
+                    stop_label = "单步暂停未放行，按中止处理"
         # 逐步追加测试日志
         with open(log_path, "a", encoding="utf-8") as lf:
             lf.write(
@@ -1269,6 +1318,7 @@ def run_tps(tps_id: str, req: TpsRunRequest | None = None):
             "steps": [],
             "current_step": 0,
             "report": None,
+            "cancel_requested": False,
             "start_time": None,
             "end_time": None,
             "duration": None,
@@ -1287,19 +1337,25 @@ def tps_task_status(task_id: str):
 
 
 class ManualDecisionRequest(BaseModel):
-    decision: str = ""            # next（继续下一步）| abort（中止本轮测试）
+    decision: str = ""            # next（继续下一步）| abort（中止本轮测试）| cancel（取消本轮测试）
 
 
 @app.post("/api/tps-tasks/{task_id}/manual")
 def tps_task_manual(task_id: str, req: ManualDecisionRequest):
     """等待操作员确认的暂停点：人工操作环节（type=manual）与单步暂停（step=true）
 
-    操作员选择「继续 next」或「中止 abort」；两者共用这一个接口与 task["manual"] 快照。
+    操作员选择「继续 next」「中止 abort」或「取消 cancel」；三者共用这一个接口与
+    task["manual"] 快照。中止与取消的收尾路径一致，区别在语义与记录。
     """
     raw = (req.decision or "").strip().lower()
     if raw not in ("next", "abort", "continue", "stop", "cancel"):
-        return {"success": False, "message": "decision 只支持 next（继续）/ abort（中止）"}
-    decision = "abort" if raw in ("abort", "stop", "cancel") else "next"
+        return {"success": False, "message": "decision 只支持 next（继续）/ abort（中止）/ cancel（取消本轮）"}
+    if raw in ("abort", "stop"):
+        decision = "abort"
+    elif raw == "cancel":
+        decision = "cancel"
+    else:
+        decision = "next"
     kind = "manual"
     with TPS_TASKS_LOCK:
         task = TPS_TASKS.get(task_id)
@@ -1315,9 +1371,35 @@ def tps_task_manual(task_id: str, req: ManualDecisionRequest):
         event.set()
     if decision == "next":
         msg = "已提交：执行下一条" if kind == "step" else "已提交操作员选择：继续下一步"
+    elif decision == "cancel":
+        msg = "已提交：取消本轮测试（剩余测试条目跳过，收尾动作照常执行）"
     else:
         msg = "已提交：中止本轮测试"
     return {"success": True, "decision": decision, "message": msg}
+
+
+@app.post("/api/tps-tasks/{task_id}/cancel")
+def tps_task_cancel(task_id: str):
+    """取消本轮测试：运行中与等待操作员确认期间均可发起
+
+    取消后剩余测试条目跳过，收尾段（teardown）照常执行，整轮结论为 NOK；
+    处于等待状态的任务会被立即唤醒，不再等到超时。
+    """
+    with TPS_TASKS_LOCK:
+        task = TPS_TASKS.get(task_id)
+        if not task:
+            return {"success": False, "message": "任务不存在"}
+        if task.get("status") in ("completed", "failed"):
+            return {"success": False, "message": "任务已结束，无法取消"}
+        task["cancel_requested"] = True
+        task["cancel_at"] = now_str()
+        manual = task.get("manual") or {}
+        if manual.get("status") == "waiting":
+            task["manual"] = {**manual, "decision": "cancel", "cancel": True}
+    event = MANUAL_WAITS.get(task_id)
+    if event:
+        event.set()
+    return {"success": True, "message": "已提交取消：剩余测试条目将跳过，收尾动作照常执行"}
 
 
 @app.get("/api/tps/{tps_id}/resource/{name:path}")

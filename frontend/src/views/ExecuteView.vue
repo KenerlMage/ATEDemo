@@ -172,6 +172,25 @@ async function answerManual(decision) {
   }
 }
 
+// 取消本轮测试：等待确认期间与运行期间都可发起；取消后剩余测试条目跳过，收尾动作照常执行
+async function cancelRun() {
+  const id = currentTask.value?.id
+  if (!id || manualSubmitting.value) return
+  const ok = window.confirm('确定取消本轮测试？剩余测试条目将被跳过，收尾动作照常执行，本轮结论为 NOK。')
+  if (!ok) return
+  manualSubmitting.value = true
+  manualError.value = ''
+  try {
+    const res = await api.cancelTpsTask(id)
+    if (!res.success) manualError.value = res.message || '取消失败'
+    else await pollTask()
+  } catch (e) {
+    manualError.value = '取消失败：' + e.message
+  } finally {
+    manualSubmitting.value = false
+  }
+}
+
 const progress = computed(() => currentTask.value?.progress ?? 0)
 const taskStatusText = computed(() => {
   const s = currentTask.value?.status
@@ -570,6 +589,12 @@ onUnmounted(() => {
           <span class="badge" :class="taskStatusCls">{{ taskStatusText }}</span>
           <span class="task-id">任务 {{ currentTask.id }}</span>
           <span v-if="currentTask.duration != null" class="task-id">耗时 {{ currentTask.duration.toFixed(2) }}s</span>
+          <button
+            v-if="running"
+            class="btn ghost small"
+            :disabled="manualSubmitting"
+            @click="cancelRun()"
+          >取消运行</button>
         </div>
 
         <div class="progress-track">
@@ -585,6 +610,7 @@ onUnmounted(() => {
           <span class="step-hold-text">
             第 {{ currentTask.current_step }} 条「{{ manual.name }}」已执行完毕，点「下一步」放行后续用例。
           </span>
+          <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('cancel')">取消本轮测试</button>
           <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
           <button class="btn primary step-next" :disabled="manualSubmitting" @click="answerManual('next')">
             下一步 next
@@ -699,9 +725,10 @@ onUnmounted(() => {
         <div class="manual-foot">
           <span class="manual-hint">
             「继续下一步」执行清单里的下一条用例；「中止测试」停止本轮，直接进入收尾与报告。
-            <template v-if="manual.timeout_s">等待超时设为 {{ manual.timeout_s }} 秒，超时按中止处理。</template>
+            <template v-if="manual.timeout_s">等待超时设为 {{ manual.timeout_s }} 秒，超时按中止处理。「中止」用于判定当前环节不通过并结束本轮；「取消」用于主动放弃本轮（如装夹错误需重装）。</template>
           </span>
           <div class="manual-actions">
+            <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('cancel')">取消本轮测试</button>
             <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
             <button class="btn primary" :disabled="manualSubmitting" @click="answerManual('next')">继续下一步</button>
           </div>

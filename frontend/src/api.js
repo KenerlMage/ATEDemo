@@ -26,6 +26,8 @@ export const api = {
   // 人工操作环节（cmd_suit 里 type=manual）：提交操作员选择 next（继续）/ abort（中止）
   decideTpsManual: (taskId, decision) =>
     request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision }) }),
+  // 取消本轮测试：运行中与等待操作员确认期间均可发起（剩余测试条目跳过、收尾段照常执行）
+  cancelTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}/cancel`, { method: 'POST' }),
   // ---- 装备树 + 记录库 ----
   getTree: () => request('/api/tree'),
   // 历史测试记录: 支持 uut / 日期 / 项目 / 批次 组合过滤
