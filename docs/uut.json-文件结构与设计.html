@@ -113,7 +113,7 @@
     <a href="#s3"><b>03</b>使用方法：Runner 与 conftest</a>
     <a href="#s4"><b>04</b>执行流程</a>
     <a href="#s5"><b>05</b>metadata · 版本数据</a>
-    <a href="#s6"><b>06</b>adaptation · PN 白名单与信号源匹配</a>
+    <a href="#s6"><b>06</b>adaptation · 一拖多与件号白名单</a>
     <a href="#s7"><b>07</b>device · 设备信息</a>
     <a href="#s8"><b>08</b>threshold · 阈值与判定算法</a>
     <a href="#s9"><b>09</b>cmd_suit · 顺序 · 人工 · 单步</a>
@@ -131,7 +131,7 @@
         <thead><tr><th style="width:130px">约束</th><th>含义</th></tr></thead>
         <tbody>
           <tr><td>清单只声明，不实现</td><td>清单内不出现执行代码、连接参数、调用实参；测试动作全部由 <code>testcase/</code> 中的 Python 函数实现</td></tr>
-          <tr><td>单一事实源</td><td>用例顺序只写在 <code>cmd_suit</code>，判定算法与阈值只写在 <code>threshold</code>，设备引用只写在 <code>device</code>，被测对象适配范围只写在 <code>adaptation</code></td></tr>
+          <tr><td>单一事实源</td><td>用例顺序只写在 <code>cmd_suit</code>，判定算法与阈值只写在 <code>threshold</code>，设备引用只写在 <code>device</code>，一拖多的适配范围与通道归属只写在 <code>adaptation</code></td></tr>
           <tr><td>引用而非复制</td><td>清单只写设备别名与注册库编号，IP、端口、串口、波特率由执行器在运行时从注册库查询</td></tr>
           <tr><td>判定集中</td><td>通过/不通过只由用例调用判定接口产生，清单不承载判定表达式</td></tr>
         </tbody>
@@ -204,7 +204,7 @@
             <tbody>
               <tr><td class="num">0</td><td>在 workspace 下建临时副本 <code>run_&lt;task_id&gt;/</code>，把 TPS 内容整体复制进去</td><td>—</td></tr>
               <tr><td class="num">1</td><td>在副本内载入 <code>tps.json</code>，校验结构：schema、必填项、引用完整性</td><td>全量</td></tr>
-              <tr><td class="num">2</td><td>启动门禁：状态是否允许生产、件号是否在白名单、SN 形态是否匹配</td><td><code>metadata.status</code> / <code>adaptation</code></td></tr>
+              <tr><td class="num">2</td><td>启动门禁与槽位绑定：状态是否允许生产、件号是否在白名单、SN 形态是否匹配；扫到的 SN 数与槽位绑定（少扫按空位处理）</td><td><code>metadata.status</code> / <code>adaptation</code></td></tr>
               <tr><td class="num">3</td><td>解析设备与阈值：别名 → 注册库 → 连接参数；阈值键 → 算法与参数</td><td><code>device</code> / <code>threshold</code></td></tr>
               <tr><td class="num">4</td><td>按三段顺序展开执行序列，渲染执行入口与环境描述</td><td><code>cmd_suit</code> / <code>setup</code> / <code>teardown</code></td></tr>
               <tr><td class="num">5</td><td>逐条用例以独立 pytest 进程执行，收集判定明细；<code>manual</code> 条目弹窗等操作员选 next / abort</td><td>条目 <code>type</code> / <code>resource</code> / <code>parallel</code> / <code>exec.timeout_s</code></td></tr>
@@ -238,11 +238,11 @@
       <p class="sub">五个键按固定顺序被消费，形成从启动到报告的一条流程</p>
       <div class="flow">
         <div><span class="st">01</span><span class="nm">载入与校验</span><span class="ac">结构校验与引用完整性检查；不通过即中止</span></div>
-        <div><span class="st">02</span><span class="nm">启动门禁</span><span class="ac">状态是否允许生产、件号是否在白名单、SN 形态是否匹配；件号未命中白名单或 SN 形态不符时直接抛异常，流程中止</span></div>
-        <div><span class="st">03</span><span class="nm">位号绑定</span><span class="ac">每个位号的 SN 绑定信号源与物理通道 → 通道映射表，后续数据按此归属</span></div>
+        <div><span class="st">02</span><span class="nm">启动门禁</span><span class="ac">状态是否允许生产、件号是否在白名单、SN 形态是否匹配、扫到的 SN 数是否在 <code>count</code> 上限内且达到 <code>required</code>；件号未命中白名单、SN 形态不符或路数不足时直接抛异常，流程中止</span></div>
+        <div><span class="st">03</span><span class="nm">槽位绑定</span><span class="ac">扫到的 SN 与槽位绑定，确定每路输入的信号源与通道；未扫到的槽位记为空位 → 槽位 → 通道映射表 + 空位清单，后续数据按此归属</span></div>
         <div><span class="st">04</span><span class="nm">设备解析</span><span class="ac">别名 → 注册库 → 连接参数 → 设备实例，形成 <code>ate_devices</code> 夹具</span></div>
         <div><span class="st">05</span><span class="nm">阈值装载</span><span class="ac">按 <code>mode</code> 装载判定算法与参数，形成 <code>ate_thresholds</code> 夹具</span></div>
-        <div><span class="st">06</span><span class="nm">序列展开</span><span class="ac">三段按书写顺序展开；<code>per_sn</code> 条目逐位号展开，<code>manual</code> 条目插入等待点（next / abort）</span></div>
+        <div><span class="st">06</span><span class="nm">序列展开</span><span class="ac">三段按书写顺序展开；<code>per_sn</code> 条目在每个已扫槽位各展开一次（空位不展开），<code>manual</code> 条目插入等待点（next / abort）</span></div>
         <div><span class="st">07</span><span class="nm">执行与判定</span><span class="ac">每条用例独立进程执行，判定按算法取样本算值 → 判定明细、<code>run_result.json</code></span></div>
         <div><span class="st">08</span><span class="nm">收尾与报告</span><span class="ac">安全收尾必跑，汇总结果 → HTML 报告与运行记录</span></div>
       </div>
@@ -265,9 +265,11 @@
       </table>
     </section>
 
-    <section id="s6">
-      <h2>06 · adaptation · PN 白名单与多路 SN 信号源匹配</h2>
-      <p class="sub">这台 UUT 能不能用这份基线测；多路 SN 并行时，每个 SN 采到的数据属于哪个信号源</p>
+        <section id="s6">
+      <h2>06 · adaptation · 一拖多测量与件号白名单</h2>
+      <p class="sub">这份基线适配哪些件号；一次同时测几个 SN；某个 SN 的信号走哪几路通道</p>
+      <p><code>adaptation</code> 的存在前提是<b>一拖多</b>：一次装夹多个 SN（上线为多个），同一条测试序列在多个槽位上并行测量，
+        <b>每个 SN 对应一组输入</b>。所以这一键既声明"能不能测"，也声明"同时测几路、哪路归哪个 SN"。</p>
       <h3>6.1 PN 白名单机制</h3>
       <p>件号从 UUT 名称中按正则提取，再与白名单逐项比对；不在白名单内<b>直接抛异常，拒绝执行</b>。白名单是
         "这份基线适配哪些件号"的唯一声明处。</p>
@@ -284,30 +286,64 @@
           <tr><td class="k">part_number.whitelist_file</td><td>可选：白名单文件相对路径（如 <code>resource/pn_whitelist.json</code>），用于件号数量大、需独立维护的场景；与内联白名单合并生效</td></tr>
         </tbody>
       </table>
-      <h3>6.2 多路 SN 匹配信号源</h3>
-      <p><code>channels</code> 声明并行路数与"位号 → 信号源"的对应关系。几个 SN 同时测试时，每个位号的采集通道各接在一个信号源上；
-        这层关系不显式声明，就会出现 <b>数据串位</b>——A 位号采到 B 位号信号源的波形，报告把 A 判成合格或不合格。</p>
+      <h3>6.2 一拖多：数量上限、少扫可测与通道指定</h3>
+      <p><code>multi_up</code> 管一次运行覆盖几个 SN。<code>count</code> 是<b>输入数量上限</b>——工位一次能同时接几个 SN
+        （等于槽位数、等于输入组数），不是"必须扫满"的要求。</p>
       <table>
-        <thead><tr><th style="width:200px">字段</th><th>作用</th></tr></thead>
+        <thead><tr><th style="width:230px">字段</th><th>作用</th></tr></thead>
         <tbody>
-          <tr><td class="k">count</td><td>并行路数</td></tr>
-          <tr><td class="k">slots[].slot</td><td>位号（1..count），对应台架上第几个 SN 位</td></tr>
-          <tr><td class="k">slots[].signal_source</td><td>该位号 SN 采集数据所对应的信号源标识；判定与记录据此把数据归到正确的 SN</td></tr>
-          <tr><td class="k">slots[].source_channel</td><td>信号源上的物理输出通道，保证位号之间不落到同一个输出口</td></tr>
-          <tr><td class="k">slots[].fixture</td><td>可选：该位号使用的夹具编号</td></tr>
+          <tr><td class="k">multi_up.count</td><td>输入数量上限：一次最多同时测几个 SN（= 槽位数 = 输入组数）</td></tr>
+          <tr><td class="k">multi_up.required</td><td>最少要扫到几个 SN 才允许开测；缺省 1（少扫也能测）</td></tr>
+          <tr><td class="k">multi_up.allow_partial</td><td>是否允许少扫，缺省 <code>true</code>；写 <code>false</code> 等价于把 <code>required</code> 写成 <code>count</code>，即要求满员</td></tr>
+          <tr><td class="k">multi_up.slots[].slot</td><td>槽位编号（1..count），对应台架上第几个 SN 位</td></tr>
+          <tr><td class="k">multi_up.slots[].sn</td><td>可选：把该槽位钉给指定 SN——这就是"指定某个 SN 对应的信号通道"；留空则按扫码顺序落到空槽位</td></tr>
+          <tr><td class="k">multi_up.slots[].inputs[]</td><td>该 SN 对应的一组输入，每项 <code>{ signal_source, source_channel }</code>；同一信号源可服务多个槽位，通道不共用</td></tr>
+          <tr><td class="k">multi_up.slots[].fixture</td><td>可选：该槽位使用的夹具编号</td></tr>
         </tbody>
       </table>
+      <p>"上线为多个、但少扫一两个 SN"是正常工况，处置口径如下：</p>
+      <table>
+        <thead><tr><th style="width:250px">情形</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>扫到 <code>count</code> 个 SN</td><td>全部槽位参与测量</td></tr>
+          <tr><td>扫到 k 个，<code>required</code> ≤ k &lt; <code>count</code></td><td><b>照常测量</b>：未扫到的槽位记为空位，其输入组不采集、不判定，报告单列；整轮结论只看参与测量的 SN</td></tr>
+          <tr><td>扫到 k 个，k &lt; <code>required</code></td><td>抛异常，拒绝执行（没达到最少路数）</td></tr>
+          <tr><td>SN 已在 <code>slots[].sn</code> 里钉过槽位</td><td>精确匹配该槽位：扫码顺序变化也不会把数据串到别的 SN</td></tr>
+          <tr><td>SN 没钉槽位</td><td>按扫码顺序落到空槽位</td></tr>
+        </tbody>
+      </table>
+      <p class="note">空位必须显式留空，不能"顺位补一个 SN"：数据归属靠槽位 → 通道的映射，补位就会让 A 的波形进到 B 的判定里。</p>
       <div class="slots">
-        <div class="slot"><div class="pos">位号 1</div><div class="src">SIG-A · AWG-CH1</div></div>
-        <div class="slot"><div class="pos">位号 2</div><div class="src">SIG-A · AWG-CH2</div></div>
-        <div class="slot"><div class="pos">位号 3</div><div class="src">SIG-B · AWG-CH1</div></div>
-        <div class="slot"><div class="pos">位号 4</div><div class="src">SIG-B · AWG-CH2</div></div>
+        <div class="slot"><div class="pos">槽位 1 · SN 已指定</div><div class="src">SIG-A · AWG-CH1 / CH2</div></div>
+        <div class="slot"><div class="pos">槽位 2 · 按扫码落位</div><div class="src">SIG-B · AWG-CH1 / CH2</div></div>
+        <div class="slot"><div class="pos">槽位 3 · 空位（未扫码）</div><div class="src">SIG-B · AWG-CH3</div></div>
+        <div class="slot"><div class="pos">槽位 4 · 空位（未扫码）</div><div class="src">SIG-B · AWG-CH4</div></div>
       </div>
+      <pre>{
+  "multi_up": {
+    "count": 4,            <em>// 输入数量上限：一次最多同时测 4 个 SN</em>
+    "required": 1,       <em>// 至少扫到 1 个就允许开测</em>
+    "allow_partial": true,
+    "slots": [
+      { "slot": 1, "sn": "A1B2C3D4E5F6", "fixture": "FX-01",
+        "inputs": [ { "signal_source": "SIG-A", "source_channel": "AWG-CH1" },
+                    { "signal_source": "SIG-A", "source_channel": "AWG-CH2" } ] },
+      { "slot": 2, "fixture": "FX-02",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH1" },
+                    { "signal_source": "SIG-B", "source_channel": "AWG-CH2" } ] },
+      { "slot": 3, "fixture": "FX-03",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH3" } ] },
+      { "slot": 4, "fixture": "FX-04",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH4" } ] }
+    ]
+  }
+}/pre>
+      <p>槽位 1 把 SN 钉死了，槽位 2 留空等扫码结果落进来；槽位 3、4 本次没扫到，记为空位——通道已经声明好，只是不采集。</p>
       <figure>
-        <img src="assets/tps-slot-source-match.png" alt="位号 ↔ SN ↔ 信号源通道 匹配连线：4 个位号分属 SIG-A / SIG-B 两个信号源，各占一个独立输出口">
-        <figcaption>位号 ↔ SN ↔ 信号源通道 匹配：4 个位号分属两个信号源，每个位号占一个独立输出口，判定明细按 SN 归属。</figcaption>
+        <img src="assets/tps-slot-source-match.png" alt="一拖多：槽位 · SN · 信号通道，含空位；槽位 1、2 扫到 SN 参与测量，槽位 3、4 为空位不采集不判定">
+        <figcaption>一拖多：4 个槽位各有自己的一组输入通道（<code>count = 4</code>）；本次扫到 2 个 SN，槽位 3、4 记为空位——
+          不采集、不判定，报告单列，整轮结论只看参与测量的 SN。</figcaption>
       </figure>
-      <p class="note">同一信号源被多个位号共用是刻意设计：<code>signal_source</code> 相同、<code>source_channel</code> 不同，一眼可辨。</p>
       <h3>6.3 SN 形态</h3>
       <table>
         <thead><tr><th style="width:200px">字段</th><th>作用</th></tr></thead>
@@ -375,7 +411,7 @@
         <thead><tr><th style="width:126px">段</th><th>作用</th><th style="width:270px">执行方式</th></tr></thead>
         <tbody>
           <tr><td class="k">setup</td><td>环境初始化：上电、复位、装夹</td><td>按数组顺序逐条执行</td></tr>
-          <tr><td class="k">cmd_suit</td><td>测试套：全部测试用例</td><td>按数组顺序逐条执行；<code>parallel=per_sn</code> 的条目逐位号各跑一遍；<code>type: manual</code> 条目插入人工确认，<code>step: true</code> 条目跑完暂停等放行</td></tr>
+          <tr><td class="k">cmd_suit</td><td>测试套：全部测试用例</td><td>按数组顺序逐条执行；<code>parallel=per_sn</code> 的条目逐槽位各跑一遍；<code>type: manual</code> 条目插入人工确认，<code>step: true</code> 条目跑完暂停等放行</td></tr>
           <tr><td class="k">teardown</td><td>环境终止：断电、卸载、归档</td><td>收尾段，前面的段跑完必定执行</td></tr>
         </tbody>
       </table>
@@ -447,11 +483,11 @@
         <tbody>
           <tr><td>顺序</td><td>条目按数组顺序执行，上一条结束才开始下一条；失败记录后继续跑后续条目，整轮跑完再汇总</td></tr>
           <tr><td><code>serial</code>（默认）</td><td>这条用例跑一次</td></tr>
-          <tr><td><code>per_sn</code></td><td>每个位号各跑一次，数据按 <code>adaptation.channels</code> 的绑定归属到对应 SN</td></tr>
-          <tr><td><code>shared</code></td><td>所有位号共用一次执行（如整机总上电、总功耗）</td></tr>
+          <tr><td><code>per_sn</code></td><td>每个已扫槽位各跑一次（空位不跑），数据按 <code>adaptation.multi_up.slots</code> 的输入组归属到对应 SN</td></tr>
+          <tr><td><code>shared</code></td><td>所有槽位共用一次执行（如整机总上电、总功耗）</td></tr>
         </tbody>
       </table>
-      <p class="note"><code>parallel</code> 只决定这条用例在几个位号上跑，不改变先后顺序。</p>
+      <p class="note"><code>parallel</code> 只决定这条用例在几个槽位上跑，不改变先后顺序。</p>
       <h3>9.5 用例条目字段</h3>
       <table>
         <thead><tr><th style="width:190px">字段</th><th style="width:150px">必需</th><th>作用</th></tr></thead>
@@ -470,7 +506,7 @@
         <thead><tr><th style="width:250px">字段</th><th style="width:200px">为何不进清单</th><th>它的去处</th></tr></thead>
         <tbody>
           <tr><td class="k">params</td><td>调用实参不是基线数据</td><td>用例以自身默认值为准，调用形如 <code>fn(ctx)</code></td></tr>
-          <tr><td class="k">resources</td><td>资源信息不属于基线</td><td>位号与信号源的关系由 <code>adaptation.channels</code> 表达</td></tr>
+          <tr><td class="k">resources</td><td>资源信息不属于基线</td><td>槽位与信号源的关系由 <code>adaptation.multi_up.slots</code> 表达</td></tr>
           <tr><td class="k">name / description / no / tags</td><td>属用例自身属性</td><td>用例名与描述取自代码（<b>当前 <code>validate_v2</code> 仍要求 <code>name</code></b>，迁移中）</td></tr>
           <tr><td class="k">checks / optional</td><td>属判定逻辑</td><td>判定由用例调用判定接口完成</td></tr>
           <tr><td class="k">on_fail / retry / skip_when / always_run / depends_on</td><td>属编排策略，清单只保留"顺序"</td><td>跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 <code>abort</code> 或单步暂停点的中止表达</td></tr>
@@ -494,9 +530,19 @@
                      "whitelist": ["SPM1234567", "SPM1234568"],
                      "whitelist_file": "resource/pn_whitelist.json" },
     "sn": { "regex": "[A-Z0-9]{12}", "note": "12 位英数" },
-    "channels": { "count": 2, "slots": [
-      { "slot": 1, "signal_source": "SIG-A", "source_channel": "AWG-CH1", "fixture": "FX-01" },
-      { "slot": 2, "signal_source": "SIG-B", "source_channel": "AWG-CH1", "fixture": "FX-02" } ] }
+    "multi_up": {
+      "count": 2,            <em>// 输入数量上限 = 槽位数：一次最多同时测 2 个 SN</em>
+      "required": 1,         <em>// 至少扫到 1 个就允许开测（少扫一两个 SN 照常测）</em>
+      "allow_partial": true,
+      "slots": [
+        { "slot": 1, "sn": "A1B2C3D4E5F6", "fixture": "FX-01",
+          "inputs": [ { "signal_source": "SIG-A", "source_channel": "AWG-CH1" },
+                      { "signal_source": "SIG-A", "source_channel": "AWG-CH2" } ] },
+        { "slot": 2, "fixture": "FX-02",
+          "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH1" },
+                      { "signal_source": "SIG-B", "source_channel": "AWG-CH2" } ] }
+      ]
+    }
   },
 
   "device": {
@@ -536,7 +582,7 @@
       <table>
         <thead><tr><th style="width:210px">关注点</th><th>结论</th></tr></thead>
         <tbody>
-          <tr><td>五键边界</td><td><code>metadata</code> 只管版本、<code>adaptation</code> 只管能不能测与数据归属、<code>device</code> 只管设备引用、<code>threshold</code> 只管判定算法、<code>cmd_suit</code> 只管编排</td></tr>
+          <tr><td>五键边界</td><td><code>metadata</code> 只管版本、<code>adaptation</code> 只管能不能测、一次同时测几个 SN 与数据归属、<code>device</code> 只管设备引用、<code>threshold</code> 只管判定算法、<code>cmd_suit</code> 只管编排</td></tr>
           <tr><td>换台架</td><td>只改 <code>device</code> 引用或注册库记录，清单结构不动</td></tr>
           <tr><td>改判据</td><td>只改 <code>threshold</code>，用例实现不动</td></tr>
           <tr><td>加用例</td><td>只加 <code>testcase/</code> 模块与 <code>cmd_suit</code> 条目</td></tr>

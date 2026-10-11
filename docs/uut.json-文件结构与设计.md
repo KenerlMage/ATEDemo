@@ -12,7 +12,7 @@
 | 约束 | 含义 |
 | --- | --- |
 | 清单只声明，不实现 | 清单内不出现执行代码、连接参数、调用实参；测试动作全部由 `testcase/` 中的 Python 函数实现 |
-| 单一事实源 | 用例顺序只写在 `cmd_suit`，判定算法与阈值只写在 `threshold`，设备引用只写在 `device`，被测对象适配范围只写在 `adaptation`；同一信息只允许出现一次 |
+| 单一事实源 | 用例顺序只写在 `cmd_suit`，判定算法与阈值只写在 `threshold`，设备引用只写在 `device`，一拖多的适配范围与通道归属只写在 `adaptation`；同一信息只允许出现一次 |
 | 引用而非复制 | 清单只写设备别名与注册库编号，IP、端口、串口、波特率由执行器在运行时从注册库查询 |
 | 判定集中 | 通过/不通过只由用例调用判定接口产生，清单不承载判定表达式 |
 
@@ -78,7 +78,7 @@ Runner 不在源包上直接执行。每次运行它都在 workspace 下建一�
 | --- | --- | --- |
 | 0 | 在 workspace 下建临时副本 `run_<task_id>/`，把 TPS 内容整体复制进去 | — |
 | 1 | 在副本内载入 `tps.json`，校验结构：schema、必填项、引用完整性 | 全量 |
-| 2 | 启动门禁：状态是否允许生产、件号是否在白名单内、SN 形态是否匹配 | `metadata.status` / `adaptation.part_number` / `adaptation.sn` |
+| 2 | 启动门禁与槽位绑定：状态是否允许生产、件号是否在白名单、SN 形态是否匹配；扫到的 SN 数与槽位绑定（少扫按空位处理） | `metadata.status` / `adaptation` |
 | 3 | 解析设备与阈值：别名 → 注册库记录 → 连接参数；阈值键 → 算法与参数 | `device` / `threshold` |
 | 4 | 按 `cmd_suit` 三段顺序展开执行序列，渲染执行入口与环境描述 | `cmd_suit` / `setup` / `teardown` |
 | 5 | 逐条用例以独立 pytest 进程执行，收集判定明细；`manual` 条目弹窗等操作员选 next / abort | 条目的 `type` / `resource` / `parallel` / `exec.timeout_s` |
@@ -112,11 +112,11 @@ def test_vdd(ate_ctx, ate_devices):
 | 阶段 | 消费字段 | 动作 | 产物 |
 | --- | --- | --- | --- |
 | ① 载入与校验 | 全量 | 结构校验与引用完整性检查 | 校验结果；不通过即中止 |
-| ② 启动门禁 | `metadata.status` / `adaptation.part_number.whitelist` / `adaptation.sn.regex` | 状态是否允许生产、件号是否在白名单、SN 形态是否匹配 | 通过；件号未命中白名单或 SN 形态不符时直接抛异常，流程中止 |
-| ③ 位号绑定 | `adaptation.channels` | 每个位号的 SN 绑定信号源与物理通道 | 通道映射表，后续数据按此归属 |
+| ② 启动门禁 | `metadata.status` / `adaptation.part_number` / `adaptation.sn` / `adaptation.multi_up` | 状态是否允许生产、件号是否在白名单、SN 形态是否匹配、扫到的 SN 数是否在 `count` 上限内且达到 `required` | 通过；件号未命中白名单、SN 形态不符或路数不足时直接抛异常，流程中止 |
+| ③ 槽位绑定 | `adaptation.multi_up.slots` | 扫到的 SN 与槽位绑定，确定每路输入的信号源与通道；未扫到的槽位记为空位 | 槽位 → 通道映射表 + 空位清单，后续数据按此归属 |
 | ④ 设备解析 | `device` | 别名 → 注册库 → 连接参数 → 设备实例 | `ate_devices` 夹具 |
 | ⑤ 阈值装载 | `threshold` | 按 `mode` 装载判定算法与参数 | `ate_thresholds` 夹具 |
-| ⑥ 序列展开 | `cmd_suit` / `setup` / `teardown` | 三段按书写顺序展开；`per_sn` 条目逐位号展开，`manual` 条目插入等待点（next / abort） | 执行序列与执行入口 |
+| ⑥ 序列展开 | `cmd_suit` / `setup` / `teardown` | 三段按书写顺序展开；`per_sn` 条目在每个已扫槽位各展开一次（空位不展开），`manual` 条目插入等待点（next / abort） | 执行序列与执行入口 |
 | ⑦ 执行与判定 | 条目的 `exec`、阈值算法 | 每条用例独立进程执行，判定按算法取样本算值 | 判定明细、`run_result.json` |
 | ⑧ 收尾与报告 | `teardown` / `metadata` | 安全收尾必跑，汇总结果 | HTML 报告、运行记录 |
 
@@ -134,9 +134,11 @@ def test_vdd(ate_ctx, ate_devices):
 | `name` | string | 是 | 基线名称，报告标题与列表展示用 |
 | `applies_to` | string | 是 | 适用台架类型编号 |
 
-## 六、adaptation · PN 白名单与多路 SN 信号源匹配
+## 六、adaptation · 一拖多测量与件号白名单
 
-这一键回答两个问题：这台 UUT 能不能用这份基线测；多个 SN 并行时，每个 SN 采到的数据属于哪个信号源。
+这一键回答三个问题：这份基线适配哪些件号（PN 白名单）；一次同时测几个 SN（一拖多的输入数量上限）；某个 SN 的信号走哪几路通道（SN → 信号通道指定）。
+
+`adaptation` 的存在前提是**一拖多**：一次装夹多个 SN（上线为多个），同一条测试序列在多个槽位上并行测量，**每个 SN 对应一组输入**。所以这一键既声明"能不能测"，也声明"同时测几路、哪路归哪个 SN"。
 
 ### 6.1 PN 白名单机制
 
@@ -158,30 +160,58 @@ UUT 名称 / 登记信息
 
 白名单规模小时直接内联在清单里便于评审；件号成百上千时放 `resource/`，清单只留引用。
 
-### 6.2 多路 SN 匹配信号源
+### 6.2 一拖多：数量上限、少扫可测与通道指定
 
-`channels` 声明并行路数与"位号 → 信号源"的对应关系。几个 SN 同时测试时，每个位号的采集通道各接在一个信号源上；这层关系不显式声明，就会出现**数据串位**——A 位号采到 B 位号信号源的波形，报告把 A 判成合格或不合格。
+`multi_up` 管一次运行覆盖几个 SN。`count` 是**输入数量上限**——工位一次能同时接几个 SN（等于槽位数、等于输入组数），不是"必须扫满"的要求。
 
 | 字段 | 作用 |
 | --- | --- |
-| `count` | 并行路数 |
-| `slots[].slot` | 位号（1..count），对应台架上第几个 SN 位 |
-| `slots[].signal_source` | 该位号 SN 采集数据所对应的信号源标识；判定与记录据此把数据归到正确的 SN |
-| `slots[].source_channel` | 信号源上的物理输出通道，保证位号之间不落到同一个输出口 |
-| `slots[].fixture` | 可选：该位号使用的夹具编号 |
+| `multi_up.count` | 输入数量上限：一次最多同时测几个 SN（= 槽位数 = 输入组数） |
+| `multi_up.required` | 最少要扫到几个 SN 才允许开测；缺省 1（少扫也能测） |
+| `multi_up.allow_partial` | 是否允许少扫，缺省 `true`；写 `false` 等价于把 `required` 写成 `count`，即要求满员 |
+| `multi_up.slots[].slot` | 槽位编号（1..count），对应台架上第几个 SN 位 |
+| `multi_up.slots[].sn` | 可选：把该槽位钉给指定 SN——这就是"指定某个 SN 对应的信号通道"；留空则按扫码顺序落到空槽位 |
+| `multi_up.slots[].inputs[]` | 该 SN 对应的一组输入，每项 `{ signal_source, source_channel }`；同一信号源可服务多个槽位，通道不共用 |
+| `multi_up.slots[].fixture` | 可选：该槽位使用的夹具编号 |
 
-示例（4 路并行，两个信号源各带两个通道）：
+"上线为多个、但少扫一两个 SN"是正常工况，处置口径如下：
 
-| 位号 | 信号源 | 输出通道 |
-| --- | --- | --- |
-| 1 | `SIG-A` | `AWG-CH1` |
-| 2 | `SIG-A` | `AWG-CH2` |
-| 3 | `SIG-B` | `AWG-CH1` |
-| 4 | `SIG-B` | `AWG-CH2` |
+| 情形 | 行为 |
+| --- | --- |
+| 扫到 `count` 个 SN | 全部槽位参与测量 |
+| 扫到 k 个，`required` ≤ k < `count` | **照常测量**：未扫到的槽位记为空位，其输入组不采集、不判定，报告单列；整轮结论只看参与测量的 SN |
+| 扫到 k 个，k < `required` | 抛异常，拒绝执行（没达到最少路数） |
+| SN 已在 `slots[].sn` 里钉过槽位 | 精确匹配该槽位：扫码顺序变化也不会把数据串到别的 SN |
+| SN 没钉槽位 | 按扫码顺序落到空槽位 |
 
-![位号与信号源通道匹配](assets/tps-slot-source-match.png)
+空位必须显式留空，不能"顺位补一个 SN"：数据归属靠槽位 → 通道的映射，补位就会让 A 的波形进到 B 的判定里。
 
-同一信号源被多个位号共用是刻意设计：`signal_source` 相同、`source_channel` 不同，一眼可辨。
+示例（4 路一拖多，本次扫到 2 个 SN，槽位 3、4 为空位）：
+
+```jsonc
+{
+  "multi_up": {
+    "count": 4,            // 输入数量上限：一次最多同时测 4 个 SN
+    "required": 1,       // 至少扫到 1 个就允许开测
+    "allow_partial": true,
+    "slots": [
+      { "slot": 1, "sn": "A1B2C3D4E5F6", "fixture": "FX-01",
+        "inputs": [ { "signal_source": "SIG-A", "source_channel": "AWG-CH1" },
+                    { "signal_source": "SIG-A", "source_channel": "AWG-CH2" } ] },
+      { "slot": 2, "fixture": "FX-02",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH1" },
+                    { "signal_source": "SIG-B", "source_channel": "AWG-CH2" } ] },
+      { "slot": 3, "fixture": "FX-03",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH3" } ] },
+      { "slot": 4, "fixture": "FX-04",
+        "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH4" } ] }
+    ]
+  }
+}```
+
+槽位 1 把 SN 钉死了，槽位 2 留空等扫码结果落进来；槽位 3、4 本次没扫到，记为空位——通道已经声明好，只是不采集。
+
+![一拖多：槽位 · SN · 信号通道（含空位）](assets/tps-slot-source-match.png)
 
 ### 6.3 SN 形态
 
@@ -250,7 +280,7 @@ UUT 名称 / 登记信息
 | 段 | 作用 | 执行方式 |
 | --- | --- | --- |
 | `setup` | 环境初始化：上电、复位、装夹 | 按数组顺序逐条执行 |
-| `cmd_suit` | 测试套：全部测试用例 | 按数组顺序逐条执行；`parallel=per_sn` 的条目逐位号各跑一遍；`type: manual` 条目插入人工确认，`step: true` 条目跑完暂停等放行 |
+| `cmd_suit` | 测试套：全部测试用例 | 按数组顺序逐条执行；`parallel=per_sn` 的条目逐槽位各跑一遍；`type: manual` 条目插入人工确认，`step: true` 条目跑完暂停等放行 |
 | `teardown` | 环境终止：断电、卸载、归档 | 收尾段，前面的段跑完必定执行 |
 
 编排上刻意只保留"顺序"这一件事：数组顺序即执行顺序，不引入排序、优先级、依赖、条件分支、失败策略与重试。清单里能让流程停下来的只有两处：人工确认条目（`type: manual`）与单步执行标记（`step: true`）。
@@ -323,10 +353,10 @@ Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown
 ### 9.4 执行顺序与作用域
 
 - **顺序**：条目按数组顺序执行，上一条结束才开始下一条；失败记录后继续跑后续条目，整轮跑完再汇总。
-- **作用域 `parallel`**：只决定这条用例在几个位号上跑，不改变先后顺序。
+- **作用域 `parallel`**：只决定这条用例在几个槽位上跑，不改变先后顺序。
   - `serial`（默认）：跑一次。
-  - `per_sn`：每个位号各跑一次，数据按 `adaptation.channels` 的绑定归属到对应 SN。
-  - `shared`：所有位号共用一次执行（如整机总上电、总功耗）。
+  - `per_sn`：每个已扫槽位各跑一次（空位不跑），数据按 `adaptation.multi_up.slots` 的输入组归属到对应 SN。
+  - `shared`：所有槽位共用一次执行（如整机总上电、总功耗）。
 
 ### 9.5 用例条目字段
 
@@ -345,7 +375,7 @@ Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown
 | 字段 | 为何不进清单 | 它的去处 |
 | --- | --- | --- |
 | `params`（调用实参） | 调用实参不是基线数据 | 用例以自身默认值为准，调用形如 `fn(ctx)`；确实需要外部改动的量走 `threshold` 与 `adaptation` |
-| `resources`（资源占用声明） | 资源信息不属于基线 | 位号与信号源的关系由 `adaptation.channels` 表达 |
+| `resources`（资源占用声明） | 资源信息不属于基线 | 槽位与信号源的关系由 `adaptation.multi_up.slots` 表达 |
 | `name` / `description` / `no` / `tags` | 属用例自身属性 | 用例名与描述取自代码（**当前 `validate_v2` 仍要求 `name`，迁移中**） |
 | `checks` / `optional` | 属判定逻辑 | 判定由用例调用判定接口完成 |
 | `on_fail` / `retry` / `skip_when` / `always_run` / `depends_on` | 属编排策略，清单只保留"顺序" | 跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 `abort` 或单步暂停点的中止表达 |
@@ -376,11 +406,17 @@ Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown
       "whitelist_file": "resource/pn_whitelist.json"   // 可选，与内联合并
     },
     "sn": { "regex": "[A-Z0-9]{12}", "note": "12 位英数" },
-    "channels": {
-      "count": 2,
+    "multi_up": {
+      "count": 2,            // 输入数量上限 = 槽位数：一次最多同时测 2 个 SN
+      "required": 1,         // 至少扫到 1 个就允许开测（少扫一两个 SN 照常测）
+      "allow_partial": true,
       "slots": [
-        { "slot": 1, "signal_source": "SIG-A", "source_channel": "AWG-CH1", "fixture": "FX-01" },
-        { "slot": 2, "signal_source": "SIG-B", "source_channel": "AWG-CH1", "fixture": "FX-02" }
+        { "slot": 1, "sn": "A1B2C3D4E5F6", "fixture": "FX-01",   // 钉死 SN：该 SN 就走这组通道
+          "inputs": [ { "signal_source": "SIG-A", "source_channel": "AWG-CH1" },
+                      { "signal_source": "SIG-A", "source_channel": "AWG-CH2" } ] },
+        { "slot": 2, "fixture": "FX-02",                          // 留空：按扫码顺序落位
+          "inputs": [ { "signal_source": "SIG-B", "source_channel": "AWG-CH1" },
+                      { "signal_source": "SIG-B", "source_channel": "AWG-CH2" } ] }
       ]
     }
   },
@@ -421,7 +457,7 @@ Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown
 
 ## 十一、设计要点
 
-- 五键职责互不重叠：`metadata` 只管版本、`adaptation` 只管能不能测与数据归属、`device` 只管设备引用、`threshold` 只管判定算法、`cmd_suit` 只管编排。
+- 五键职责互不重叠：`metadata` 只管版本、`adaptation` 只管能不能测、一次同时测几个 SN 与数据归属、`device` 只管设备引用、`threshold` 只管判定算法、`cmd_suit` 只管编排。
 - 三类变化的改动面：换台架只改 `device` 引用或注册库记录；改判据只改 `threshold`；加用例只加 `testcase/` 模块与 `cmd_suit` 条目。
 - 编排只有顺序：`cmd_suit` 是按书写顺序执行的清单，人工确认条目是唯一的控制点，弹窗内容走 `resource/`，改文案不改清单。
 - 需要评审的内容集中在清单，需要维护的代码集中在 `testcase/`，需要随包分发的依赖集中在 `wheel/`，配置与数据集中在 `resource/`。
