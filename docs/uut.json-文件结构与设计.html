@@ -231,7 +231,31 @@
     dmm = ate_devices["dmm"]
     ate_ctx.expect("TC_VDD", dmm.read_voltage())   <em># 判定口径来自 threshold</em></pre>
       <p class="note">用例不读清单文件、不连设备、不判断阈值。</p>
-    </section>
+          <h3>3.1 · 运行模式：调试 / 生产（含仿真模式）</h3>
+      <p>Runner 右上角提供模式选择，模式决定三件事：要不要工单、测试记录留不留、能不能用仿真。</p>
+      <figure>
+        <img src="assets/tps-run-mode-flow.png" alt="运行模式与 lic 门禁：有 lic 时调试 / 生产都可选，无 lic 时直接运行在调试模式">
+        <figcaption>有 lic 时两种模式都可选；无 lic 时 Runner 直接运行在调试模式，生产模式入口不可选。</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th style="width:96px">维度</th><th>调试模式</th><th>生产模式</th></tr></thead>
+        <tbody>
+          <tr><td class="k">工单</td><td>不需要工单，随时可运行</td><td>必须由工单驱动；没有工单进不去</td></tr>
+          <tr><td class="k">测试记录</td><td>运行结果不上传（本机仍产出报告与日志）</td><td>测试数据记录并上传</td></tr>
+          <tr><td class="k">lic</td><td>无 lic 时 Runner 直接运行在调试模式</td><td>需要有效 lic；无 lic 时入口不可选</td></tr>
+          <tr><td class="k">仿真模式</td><td>可选：勾选后无需真实设备即可运行 TPS</td><td>不提供，必须接真实台架</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th style="width:170px">补充</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="k">lic 缺失 = 降级</td><td>校验不通过不是报错：Runner 直接以调试模式启动，生产模式入口不可选。</td></tr>
+          <tr><td class="k">仿真只换设备层</td><td>设备读取换成仿真响应，用例与判定逻辑照常执行，适合离线调试与用例验证。</td></tr>
+          <tr><td class="k">用例与判定同一套</td><td>两种模式共用同一套用例与判定逻辑，差别只在工单、测试记录上传与是否接真实设备。</td></tr>
+        </tbody>
+      </table>
+
+</section>
 
     <section id="s4">
       <h2>04 · 执行流程</h2>
