@@ -312,6 +312,8 @@ Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown
 | 无人应答 | 默认 1800 秒后按中止处理；条目可用 `timeout_s` 覆盖等待时长 |
 | 报告 | 该步骤类型显示「测试用例 · 单步」 |
 
+![cmd_suit 执行环上的两类暂停点：step 单步执行与 manual 人工操作环节](assets/tps-step-hold-flow.png)
+
 用法要点：
 
 - 只写在需要停的那一条上：整段逐条单步就每条都写，只在关键节点停就只写关键条目。

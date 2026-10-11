@@ -433,6 +433,10 @@
           <tr><td>报告</td><td>该步骤类型显示「测试用例 · 单步」</td></tr>
         </tbody>
       </table>
+      <figure>
+        <img src="assets/tps-step-hold-flow.png" alt="cmd_suit 执行环上的两类暂停点：step 单步执行与 manual 人工操作环节">
+        <figcaption>执行环上的两类暂停点：默认条目连续执行，<code>step: true</code> 在跑完后停、<code>type: manual</code> 在执行前停，两处都点「中止测试」则剩余测试条目跳过、收尾段照常执行。</figcaption>
+      </figure>
       <p class="note">只写在需要停的那一条上：整段逐条单步就每条都写，只在关键节点停就只写关键条目。
         与人工操作环节的区别：<code>step</code> 是「跑完再停」，提示由执行器生成，不需要 <code>resource/</code>；
         <code>type: manual</code> 是「执行前等人工动作做完」，提示文案与图片来自 <code>resource/</code>。
