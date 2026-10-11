@@ -269,15 +269,26 @@ UUT 名称 / 登记信息
 ```jsonc
 {
   "id": "M-01",
-  "case": "testcase.manual::appearance_check",
-  "type": "manual",
-  "resource": "appearance_check"        // resource/ 下的名称
+  "type": "manual",                     // 条目类型：人工操作环节
+  "name": "装夹与外观确认",              // 弹窗标题、步骤列表与报告里的显示名
+  "resource": "appearance_check.md"     // 提示文件：包内 resource/ 下的 Markdown 文件名
 }
 ```
 
-用例按 `resource` 名称到包内 `resource/` 目录取内容：文案取 `<名称>.md`（或 `.txt`），图片取同名文件（`.png` / `.jpg`），需要多张时用 `<名称>-1`、`<名称>-2`…。改文案、换示意图只改资源文件，不动受控清单。
+Runner 按 `resource` 到包内 `resource/` 目录取原文（`.md` / `.markdown` / `.txt`），把全文渲染进弹窗；同目录的图片可以在 Markdown 里用相对路径引用。改文案、换示意图只改资源文件，不动受控清单。
 
-### 9.2 执行顺序与作用域
+### 9.2 到达人工条目时会发生什么
+
+| 环节 | 行为 |
+| --- | --- |
+| 到达条目 | Runner 挂起本轮流程，把 `resource/<名称>` 的 Markdown 原文放进任务快照（`manual.status = waiting`），界面弹出提示窗口 |
+| 选「继续下一步」 | 该条目记为**通过**，接着执行清单里的下一条 |
+| 选「中止测试」 | 该条目记为**已中止**，后续测试条目全部跳过，**收尾段 `teardown` 照常执行**，报告结论为 NOK |
+| 无人应答 | 默认 1800 秒到点按中止处理；条目可用 `timeout_s` 覆盖等待时长 |
+| 追溯 | 运行日志与 HTML 报告把该条目类型显示为「人工操作」，并记录操作员的选择与时刻 |
+| 接口 | 界面提交 `POST /api/tps-tasks/{task_id}/manual`，请求体 `{"decision": "next" | "abort"}`；进度查询 `GET /api/tps-tasks/{task_id}` |
+
+### 9.3 执行顺序与作用域
 
 - **顺序**：条目按数组顺序执行，上一条结束才开始下一条；失败记录后继续跑后续条目，整轮跑完再汇总。
 - **作用域 `parallel`**：只决定这条用例在几个位号上跑，不改变先后顺序。
@@ -285,12 +296,12 @@ UUT 名称 / 登记信息
   - `per_sn`：每个位号各跑一次，数据按 `adaptation.channels` 的绑定归属到对应 SN。
   - `shared`：所有位号共用一次执行（如整机总上电、总功耗）。
 
-### 9.3 用例条目字段
+### 9.4 用例条目字段
 
 | 字段 | 必需 | 作用 |
 | --- | --- | --- |
 | `id` | 是 | 条目标识：报告主键、执行入口的用例 id、运行结果的续写键 |
-| `case` | 是 | `module::function` 用例引用，清单与代码 1:1 映射的唯一锚点 |
+| `case` | 除 `type: manual` 外必填 | `module::function` 用例引用，清单与代码 1:1 映射的唯一锚点 |
 | `type` | 否 | 条目类型：缺省为普通自动用例；`manual` 为人工确认条目 |
 | `resource` | `type: manual` 时必填 | `resource/` 下的名称，弹窗文案与图片按名取 |
 | `parallel` | 否 | 作用域：`serial`（默认）/ `per_sn` / `shared` |
@@ -302,7 +313,7 @@ UUT 名称 / 登记信息
 | --- | --- | --- |
 | `params`（调用实参） | 调用实参不是基线数据 | 用例以自身默认值为准，调用形如 `fn(ctx)`；确实需要外部改动的量走 `threshold` 与 `adaptation` |
 | `resources`（资源占用声明） | 资源信息不属于基线 | 位号与信号源的关系由 `adaptation.channels` 表达 |
-| `name` / `description` / `no` / `tags` | 属用例自身属性 | 用例名与描述取自代码 |
+| `name` / `description` / `no` / `tags` | 属用例自身属性 | 用例名与描述取自代码（**当前 `validate_v2` 仍要求 `name`，迁移中**） |
 | `checks` / `optional` | 属判定逻辑 | 判定由用例调用判定接口完成 |
 | `on_fail` / `retry` / `skip_when` / `always_run` / `depends_on` | 属编排策略，清单只保留"顺序" | 跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 `abort` 表达 |
 | `manual.message` / `expect` / `timeout_s` | 弹窗内容是资源，不是基线声明 | 按 `resource` 名称从包内 `resource/` 取 |

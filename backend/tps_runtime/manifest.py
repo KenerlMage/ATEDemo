@@ -21,6 +21,16 @@ TPS_V2_SCHEMA = "tps.v2"
 TPS_SCHEMA_V1 = "tps.v1"
 
 ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
+# 人工操作条目的提示文件（Markdown）：resource/ 下的文件名，可含一层子目录
+MANUAL_RESOURCE_RE = re.compile(r"^[A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*\.(?:md|markdown|txt)$", re.I)
+MANUAL_TYPES = {"manual", "人工", "human"}
+
+
+def is_manual_case(case: Any) -> bool:
+    """条目是否为人工操作环节（`"type": "manual"`）"""
+    if not isinstance(case, dict):
+        return False
+    return str(case.get("type") or case.get("kind") or "").strip().lower() in MANUAL_TYPES
 CASE_REF_RE = re.compile(r"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*::[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")
 
 CASE_KINDS = {"setup": ("init", "test_setup"), "test": ("test", "test_case"), "teardown": ("teardown", "test_teardown")}
@@ -132,6 +142,23 @@ def _validate_case(case: Any, index: int, testconfig: dict, seen_ids: set, prefi
             errors.append(f"{prefix}[{index}].id 重复: {case_id}")
         else:
             seen_ids.add(case_id)
+    if is_manual_case(case):
+        # 人工操作环节：弹窗由 Runner 执行，不需要用例实现，只声明提示文件
+        resource = str(case.get("resource") or "").strip()
+        if not resource:
+            errors.append(
+                f"{prefix}[{index}] 人工操作条目（type=manual）缺少 resource"
+                "（resource/ 目录下的 Markdown 文件名，如 fixture_check.md）"
+            )
+        elif not MANUAL_RESOURCE_RE.match(resource):
+            errors.append(
+                f"{prefix}[{index}].resource 只能是 resource/ 下的 .md/.txt 文件名"
+                f"（实际: {resource}）"
+            )
+        timeout = case.get("timeout_s")
+        if timeout is not None and (not isinstance(timeout, (int, float)) or isinstance(timeout, bool)):
+            errors.append(f"{prefix}[{index}].timeout_s 必须是数字（等待操作员确认的秒数）")
+        return errors
     ref = str(case.get("case") or "").strip()
     if not ref:
         errors.append(f"{prefix}[{index}] 缺少 case（用例实现引用，如 testcase.power::power_on_voltage）")
@@ -176,9 +203,12 @@ def case_entries(tps: dict) -> dict:
         kind, func = CASE_KINDS[section]
         for i, raw_case in enumerate(entries, 1):
             case = dict(raw_case or {})
+            manual = is_manual_case(case)
             case_id = str(case.get("id") or "").strip()
             if not case_id:
                 case_id = {"setup": f"SETUP{i:02d}", "test": f"TC{i:03d}", "teardown": f"TD{i:02d}"}[section]
+            if manual and not case.get("name"):
+                case["name"] = Path(str(case.get("resource") or "")).stem or case_id
             checks = case.get("checks")
             if isinstance(checks, list):
                 checks = {str(k): str(k) for k in checks}
@@ -189,13 +219,17 @@ def case_entries(tps: dict) -> dict:
                 "no": case.get("no", i),
                 "name": case.get("name") or case_id,
                 "kind": kind,
-                "func": func,
-                "case": str(case.get("case") or ""),
+                # 人工操作条目没有 pytest 入口，func 留空（由 Runner 弹窗执行）
+                "func": "" if manual else func,
+                "case": "" if manual else str(case.get("case") or ""),
                 "params": dict(case.get("params") or {}),
                 "checks": dict(checks or {}),
                 "config": str(case.get("config") or ""),
                 "optional": bool(case.get("optional")),
                 "description": case.get("description", ""),
+                "manual": manual,
+                "resource": str(case.get("resource") or "") if manual else "",
+                "timeout_s": case.get("timeout_s") if manual else None,
             })
     return out
 
@@ -206,8 +240,11 @@ def steps_of(tps: dict) -> list[dict]:
     steps: list[dict] = []
     for section in ("setup", "test", "teardown"):
         for case in entries[section]:
-            node = f"{tps.get('_generated', 'test_tps_generated.py')}::{case['func']}[{case['id']}]"
-            steps.append({
+            manual = bool(case.get("manual"))
+            node = "" if manual else (
+                f"{tps.get('_generated', 'test_tps_generated.py')}::{case['func']}[{case['id']}]"
+            )
+            step = {
                 "type": case["kind"],
                 "name": case["name"],
                 "description": case.get("description", ""),
@@ -220,8 +257,17 @@ def steps_of(tps: dict) -> list[dict]:
                     "config": case["config"],
                     "optional": case["optional"],
                     "node": node,
+                    "manual": manual,
                 },
-            })
+            }
+            if manual:
+                step["manual"] = {
+                    "id": case["id"],
+                    "resource": case.get("resource", ""),
+                    "timeout_s": case.get("timeout_s"),
+                    "options": ["next", "abort"],
+                }
+            steps.append(step)
     return steps
 
 
@@ -265,6 +311,7 @@ def summary_tps(tps: dict) -> dict:
         "project": tps.get("project", ""),
         "dut": tps.get("dut", ""),
         "cmd_suit_count": len(tps.get("cmd_suit") or []),
+        "manual_count": sum(1 for s in (tps.get("steps") or []) if s.get("manual")),
         "testconfig_count": len(tps.get("testconfig") or {}),
         "device_alias_count": len(tps.get("device_config") or {}),
         "bench": tps.get("bench", {}),

@@ -116,7 +116,7 @@
     <a href="#s6"><b>06</b>adaptation · PN 白名单与信号源匹配</a>
     <a href="#s7"><b>07</b>device · 设备信息</a>
     <a href="#s8"><b>08</b>threshold · 阈值与判定算法</a>
-    <a href="#s9"><b>09</b>cmd_suit · 执行顺序</a>
+    <a href="#s9"><b>09</b>cmd_suit · 执行顺序与人工环节</a>
     <a href="#s10"><b>10</b>完整骨架</a>
     <a href="#s11"><b>11</b>设计要点</a>
   </nav>
@@ -394,14 +394,25 @@
       <p>条目本身只写"用哪个名称"，弹窗内容不写在清单里：</p>
       <pre>{
   "id": "M-01",
-  "case": "testcase.manual::appearance_check",
-  "type": "manual",
-  "resource": "appearance_check"        <em>// resource/ 下的名称</em>
+  "type": "manual",                     <em>// 条目类型：人工操作环节</em>
+  "name": "装夹与外观确认",              <em>// 弹窗标题、步骤列表与报告里的显示名</em>
+  "resource": "appearance_check.md"     <em>// 包内 resource/ 下的 Markdown 文件名</em>
 }</pre>
-      <p>用例按 <code>resource</code> 名称到包内 <code>resource/</code> 目录取内容：文案取 <code>&lt;名称&gt;.md</code>（或 <code>.txt</code>），
-        图片取同名文件（<code>.png</code> / <code>.jpg</code>），需要多张时用 <code>&lt;名称&gt;-1</code>、<code>&lt;名称&gt;-2</code>…。
-        改文案、换示意图只改资源文件，不动受控清单。</p>
-      <h3>9.2 执行顺序与作用域</h3>
+      <p>Runner 按 <code>resource</code> 到包内 <code>resource/</code> 目录取原文（<code>.md</code> / <code>.markdown</code> / <code>.txt</code>），
+        把全文渲染进弹窗；同目录的图片可以在 Markdown 里用相对路径引用。改文案、换示意图只改资源文件，不动受控清单。</p>
+      <h3>9.2 到达人工条目时会发生什么</h3>
+      <table>
+        <thead><tr><th style="width:150px">环节</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>到达条目</td><td>Runner 挂起本轮流程，把 <code>resource/&lt;名称&gt;</code> 的 Markdown 原文放进任务快照（<code>manual.status = waiting</code>），界面弹出提示窗口</td></tr>
+          <tr><td>选「继续下一步」</td><td>该条目记为<b>通过</b>，接着执行清单里的下一条</td></tr>
+          <tr><td>选「中止测试」</td><td>该条目记为<b>已中止</b>，后续测试条目全部跳过，<b>收尾段 <code>teardown</code> 照常执行</b>，报告结论为 NOK</td></tr>
+          <tr><td>无人应答</td><td>默认 1800 秒到点按中止处理；条目可用 <code>timeout_s</code> 覆盖等待时长</td></tr>
+          <tr><td>追溯</td><td>运行日志与 HTML 报告把该条目类型显示为「人工操作」，并记录操作员的选择与时刻</td></tr>
+          <tr><td>接口</td><td>界面提交 <code>POST /api/tps-tasks/{task_id}/manual</code>，请求体 <code>{"decision": "next" | "abort"}</code>；进度查询 <code>GET /api/tps-tasks/{task_id}</code></td></tr>
+        </tbody>
+      </table>
+      <h3>9.3 执行顺序与作用域</h3>
       <table>
         <thead><tr><th style="width:170px">项</th><th>含义</th></tr></thead>
         <tbody>
@@ -412,12 +423,12 @@
         </tbody>
       </table>
       <p class="note"><code>parallel</code> 只决定这条用例在几个位号上跑，不改变先后顺序。</p>
-      <h3>9.3 用例条目字段</h3>
+      <h3>9.4 用例条目字段</h3>
       <table>
         <thead><tr><th style="width:190px">字段</th><th style="width:150px">必需</th><th>作用</th></tr></thead>
         <tbody>
           <tr><td class="k">id</td><td>是</td><td>条目标识：报告主键、执行入口的用例 id、运行结果的续写键</td></tr>
-          <tr><td class="k">case</td><td>是</td><td><code>module::function</code> 用例引用，清单与代码 1:1 映射的唯一锚点</td></tr>
+          <tr><td class="k">case</td><td>除 <code>type: manual</code> 外必填</td><td><code>module::function</code> 用例引用，清单与代码 1:1 映射的唯一锚点</td></tr>
           <tr><td class="k">type</td><td>否</td><td>条目类型：缺省为普通自动用例；<code>manual</code> 为人工确认条目</td></tr>
           <tr><td class="k">resource</td><td><code>type: manual</code> 时必填</td><td><code>resource/</code> 下的名称，弹窗文案与图片按名取</td></tr>
           <tr><td class="k">parallel</td><td>否</td><td>作用域：<code>serial</code>（默认）/ <code>per_sn</code> / <code>shared</code></td></tr>
@@ -430,7 +441,7 @@
         <tbody>
           <tr><td class="k">params</td><td>调用实参不是基线数据</td><td>用例以自身默认值为准，调用形如 <code>fn(ctx)</code></td></tr>
           <tr><td class="k">resources</td><td>资源信息不属于基线</td><td>位号与信号源的关系由 <code>adaptation.channels</code> 表达</td></tr>
-          <tr><td class="k">name / description / no / tags</td><td>属用例自身属性</td><td>用例名与描述取自代码</td></tr>
+          <tr><td class="k">name / description / no / tags</td><td>属用例自身属性</td><td>用例名与描述取自代码（<b>当前 <code>validate_v2</code> 仍要求 <code>name</code></b>，迁移中）</td></tr>
           <tr><td class="k">checks / optional</td><td>属判定逻辑</td><td>判定由用例调用判定接口完成</td></tr>
           <tr><td class="k">on_fail / retry / skip_when / always_run / depends_on</td><td>属编排策略，清单只保留"顺序"</td><td>跑完一条再跑下一条、失败记录后继续、收尾段必定执行；中止由人工确认条目的 <code>abort</code> 表达</td></tr>
           <tr><td class="k">manual.message / expect / timeout_s</td><td>弹窗内容是资源，不是基线声明</td><td>按 <code>resource</code> 名称从包内 <code>resource/</code> 取</td></tr>

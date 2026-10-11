@@ -23,6 +23,9 @@ export const api = {
   aiAnalyze: (apiUrl, apiKey, taskId) => request('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ api_url: apiUrl, api_key: apiKey, task_id: taskId }) }),
   runTps: (tpsId, uut) => request(`/api/tps/${tpsId}/run`, { method: 'POST', body: JSON.stringify({ uut }) }),
   getTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}`),
+  // 人工操作环节（cmd_suit 里 type=manual）：提交操作员选择 next（继续）/ abort（中止）
+  decideTpsManual: (taskId, decision) =>
+    request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision }) }),
   // ---- 装备树 + 记录库 ----
   getTree: () => request('/api/tree'),
   // 历史测试记录: 支持 uut / 日期 / 项目 / 批次 组合过滤

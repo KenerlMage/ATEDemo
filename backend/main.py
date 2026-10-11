@@ -739,6 +739,11 @@ def import_tps(req: TpsImportRequest):
 TPS_TASKS: dict[str, dict] = {}
 TPS_TASKS_LOCK = threading.Lock()
 
+# 人工操作环节（cmd_suit 里 type=manual 的条目）：等待操作员在界面选择「继续 / 中止」
+# 事件对象不进 task（task 会被 JSON 序列化返回给前端）
+MANUAL_WAITS: dict[str, threading.Event] = {}
+DEFAULT_MANUAL_TIMEOUT_S = 1800
+
 
 class TpsRunRequest(BaseModel):
     tps_id: str | None = None
@@ -835,14 +840,16 @@ def _generate_report(task: dict, tps: dict) -> str:
     for i, step in enumerate(tps.get("steps", []), 1):
         st = step_status.get(i, {})
         status = st.get("status", "pending")
-        status_label = {"pending": "未执行", "running": "执行中", "passed": "通过", "failed": "失败", "skipped": "跳过"}.get(status, status)
-        badge_cls = {"passed": "ok", "failed": "err", "running": "run", "skipped": "warn"}.get(status, "idle")
+        status_label = {"pending": "未执行", "running": "执行中", "passed": "通过", "failed": "失败",
+                        "skipped": "跳过", "aborted": "已中止"}.get(status, status)
+        badge_cls = {"passed": "ok", "failed": "err", "running": "run", "skipped": "warn",
+                     "aborted": "err"}.get(status, "idle")
         detail = (st.get("detail") or "").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
         duration = st.get("duration")
         dur_text = f"{duration:.2f}s" if duration is not None else "-"
         step_rows += f"""<tr>
           <td>{i}</td><td>{step.get('name', '')}</td>
-          <td>{'环境初始化' if step.get('type')=='init' else ('环境终止' if step.get('type')=='teardown' else '测试用例')}</td>
+          <td>{'人工操作' if step.get('manual') else ('环境初始化' if step.get('type')=='init' else ('环境终止' if step.get('type')=='teardown' else '测试用例'))}</td>
           <td><span class="badge {badge_cls}">{status_label}</span></td>
           <td>{dur_text}</td><td class="detail">{detail}</td>
         </tr>"""
@@ -921,6 +928,90 @@ th {{ color: #94a3b8; font-weight: 600; }}
     return html
 
 
+def _read_text_any(path: Path) -> str:
+    """读文本文件：UTF-8(BOM) 优先，回退 GBK（Windows 中文提示文件常见）"""
+    data = Path(path).read_bytes()
+    for enc in ("utf-8-sig", "utf-8", "gbk"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
+def _manual_md_path(stage_info: dict | None, resource: str, source_dir: Path | None = None) -> Path | None:
+    """定位人工操作条目的提示文件：运行副本 resource/ -> 运行副本根 -> 源 TPS 包 resource/"""
+    name = str(resource or "").strip()
+    if not name:
+        return None
+    roots = []
+    for base in ((stage_info or {}).get("run_dir"), (stage_info or {}).get("tps_dir")):
+        if base:
+            roots.append(Path(base))
+    if source_dir:
+        roots.append(Path(source_dir))
+    for root in roots:
+        for cand in (root / "resource" / name, root / name):
+            if cand.is_file():
+                return cand
+    return None
+
+
+def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: Path | None,
+                  log_path: Path) -> tuple[str, str]:
+    """执行一条人工操作条目：把弹窗内容写进任务快照 -> 阻塞等待操作员选择 -> 返回 (决定, 说明)
+
+    决定取值：`next`（继续下一步）/ `abort`（中止本轮）/ `timeout`（无人应答，按中止处理）
+    """
+    info = step.get("manual") or {}
+    resource = str(info.get("resource") or "")
+    title = step.get("name") or resource or "人工操作"
+    timeout_s = float(info.get("timeout_s") or DEFAULT_MANUAL_TIMEOUT_S)
+    md_path = _manual_md_path(stage_info, resource, source_dir)
+    if md_path:
+        markdown = _read_text_any(md_path)
+        source = str(md_path)
+    else:
+        markdown = (f"# 缺少提示文件\n\n未找到 `resource/{resource}`，"
+                    "请在 TPS 包内补齐该 Markdown 后重新执行。\n")
+        source = ""
+    task_id = task["id"]
+    event = threading.Event()
+    with TPS_TASKS_LOCK:
+        MANUAL_WAITS[task_id] = event
+        task["manual"] = {
+            "status": "waiting",
+            "id": info.get("id", ""),
+            "name": title,
+            "resource": resource,
+            "markdown": markdown,
+            "options": ["next", "abort"],
+            "requested_at": now_str(),
+            "timeout_s": timeout_s,
+            "source": source,
+        }
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{now_str()}] 人工操作 [{title}] 等待操作员确认（{source or '缺失 resource/' + resource}）\n")
+    answered = event.wait(timeout=timeout_s)
+    with TPS_TASKS_LOCK:
+        MANUAL_WAITS.pop(task_id, None)
+        snap = dict(task.get("manual") or {})
+        decision = str(snap.get("decision") or "").lower()
+        if not answered or decision not in ("next", "abort"):
+            decision = "timeout" if not answered else "abort"
+        snap.update(status="answered", decision=decision, answered_at=now_str(), markdown="")
+        task["manual"] = snap
+    if decision == "next":
+        detail = f"操作员确认继续（{title}）"
+    elif decision == "abort":
+        detail = f"操作员选择中止（{title}）"
+    else:
+        detail = f"等待操作员确认超时（{timeout_s:.0f}s，按中止处理）：{title}"
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{now_str()}] 人工操作 [{title}] -> {decision}（{detail}）\n")
+    return decision, detail
+
+
 def _run_tps_task(task_id: str) -> None:
     with TPS_TASKS_LOCK:
         task = TPS_TASKS[task_id]
@@ -980,15 +1071,37 @@ def _run_tps_task(task_id: str) -> None:
         lf.write("-" * 60 + "\n")
     with TPS_TASKS_LOCK:
         task["current_step"] = 0
+    aborted = False
     for i, step in enumerate(tps["steps"], 1):
         with TPS_TASKS_LOCK:
             task["current_step"] = i
             task["steps"][i - 1]["status"] = "running"
+        # 操作员已中止：后续测试条目全部跳过，但仍然执行收尾段（断电等安全动作）
+        if aborted and step.get("type") == "test":
+            with TPS_TASKS_LOCK:
+                task["steps"][i - 1]["status"] = "skipped"
+                task["steps"][i - 1]["detail"] = "操作员选择中止，未执行"
+                task["steps"][i - 1]["duration"] = 0.0
+                task["progress"] = int(i / total * 100)
+            with open(log_path, "a", encoding="utf-8") as lf:
+                lf.write(f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（已中止）\n")
+            continue
         t0 = _time.time()
-        ok, detail = _run_tps_step(step, tps_dir, stage)
+        if step.get("manual"):
+            # 人工操作环节：Runner 弹窗提示操作员，等 next / abort
+            decision, detail = _await_manual(task, step, stage, tps_dir, log_path)
+            if decision == "next":
+                ok, step_status, mark = True, "passed", "CONFIRM"
+            elif decision == "abort":
+                aborted, ok, step_status, mark = True, False, "aborted", "ABORT"
+            else:
+                aborted, ok, step_status, mark = True, False, "failed", "TIMEOUT"
+        else:
+            ok, detail = _run_tps_step(step, tps_dir, stage)
+            step_status, mark = ("passed" if ok else "failed"), ("PASS" if ok else "FAIL")
         dt = _time.time() - t0
         with TPS_TASKS_LOCK:
-            task["steps"][i - 1]["status"] = "passed" if ok else "failed"
+            task["steps"][i - 1]["status"] = step_status
             task["steps"][i - 1]["detail"] = detail
             task["steps"][i - 1]["duration"] = dt
             task["progress"] = int(i / total * 100)
@@ -996,16 +1109,17 @@ def _run_tps_task(task_id: str) -> None:
         with open(log_path, "a", encoding="utf-8") as lf:
             lf.write(
                 f"[{now_str()}] Step {i}/{total} [{step.get('name', step.get('type', '?'))}] "
-                f"-> {'PASS' if ok else 'FAIL'} ({dt:.2f}s)\n"
+                f"-> {mark} ({dt:.2f}s)\n"
             )
             if detail:
                 lf.write(f"    output: {detail[:400]}\n")
         if not ok:
             all_ok = False
-            with TPS_TASKS_LOCK:
-                for j in range(i, total):
-                    task["steps"][j]["status"] = "skipped"
-            break
+            if not aborted:
+                with TPS_TASKS_LOCK:
+                    for j in range(i, total):
+                        task["steps"][j]["status"] = "skipped"
+                break
 
     with TPS_TASKS_LOCK:
         task["status"] = "completed" if all_ok else "failed"
@@ -1105,6 +1219,49 @@ def tps_task_status(task_id: str):
         if not task:
             return {"success": False, "message": "任务不存在"}
         return {"success": True, **task}
+
+
+class ManualDecisionRequest(BaseModel):
+    decision: str = ""            # next（继续下一步）| abort（中止本轮测试）
+
+
+@app.post("/api/tps-tasks/{task_id}/manual")
+def tps_task_manual(task_id: str, req: ManualDecisionRequest):
+    """人工操作环节：操作员在弹窗里选择「继续下一步 next」或「中止测试 abort」"""
+    raw = (req.decision or "").strip().lower()
+    if raw not in ("next", "abort", "continue", "stop", "cancel"):
+        return {"success": False, "message": "decision 只支持 next（继续）/ abort（中止）"}
+    decision = "abort" if raw in ("abort", "stop", "cancel") else "next"
+    with TPS_TASKS_LOCK:
+        task = TPS_TASKS.get(task_id)
+        if not task:
+            return {"success": False, "message": "任务不存在"}
+        manual = task.get("manual") or {}
+        if manual.get("status") != "waiting":
+            return {"success": False, "message": "当前没有等待确认的人工操作环节"}
+        task["manual"] = {**manual, "decision": decision}
+    event = MANUAL_WAITS.get(task_id)
+    if event:
+        event.set()
+    return {"success": True, "decision": decision,
+            "message": "已提交操作员选择：" + ("继续下一步" if decision == "next" else "中止测试")}
+
+
+@app.get("/api/tps/{tps_id}/resource/{name:path}")
+def get_tps_resource(tps_id: str, name: str):
+    """读取 TPS 包 resource/ 目录下的文件（人工操作提示里的图片等）"""
+    from fastapi.responses import FileResponse
+
+    tps_path = next((p for p in _load_tps_files() if _read_tps(p) and _read_tps(p)["id"] == tps_id), None)
+    if not tps_path:
+        return {"success": False, "message": f"TPS 不存在: {tps_id}"}
+    root = (tps_path.parent / "resource").resolve()
+    target = (root / name).resolve()
+    if target != root and root not in target.parents:
+        return {"success": False, "message": "非法的资源路径"}
+    if not target.is_file():
+        return {"success": False, "message": f"资源不存在: resource/{name}"}
+    return FileResponse(str(target))
 
 
 @app.get("/api/reports/{filename}")

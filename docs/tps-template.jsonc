@@ -1,0 +1,103 @@
+// ATE Runner · TPS 起手模板
+// 用法：整份复制为 <TPS 包目录>/tps.json，删注释后即为合法 JSON。包内还需要 testcase/（用例实现）与 resource/（配置与人工操作提示）。
+// 结构与字段说明：docs/uut.json-文件结构与设计.md · docs/TPS设计.md（§4 / §4.1）
+// 模板版本：2026-10-11（cmd_suit 增加人工操作环节 type=manual）
+//
+// 落地差异（当前 Runner 已实现的字段）：schema / id / name / testconfig / device_config 为必填；
+// 下面 config / production_info / process_info / uut_info 属「身份 / 归属 / 追溯」目标结构，运行时原样保留但不消费；
+// threshold 现名 testconfig、parameter 现名 params，迁移前请按现名书写（可运行样例：backend/testresource/spm_rh_dyn/tps.json）。
+
+{
+  // ① 身份 / 归属 / 追溯 —— 默认值可直接沿用，按实际情况改
+  "config": {
+    "tpsname": "spm-wsec-static-v1.0.0-tps-v1.0.0",   // 命名规则：子系统-测试台-ATE版本-TPS-TPS版本
+    "tpsversion": "v1.0.0",                           // TPS 版本
+    "author": "f010392",                              // 作者
+    "date": "2026-10-08",
+    "ateversion": "tps.v2"                            // 解析器版本
+  },
+  "production_info": {
+    "machineID": "1000D-1",
+    "subsystem": "spm",
+    "uutcategory": "module",                          // UUT 等级：module 模块 / component 部件
+    "testbenchNumber": "ate001"
+  },
+  "process_info": {
+    "testbenchtype": "wsec-static",                   // 测试台类型（默认 wsec-static）
+    "processName": "静态读头测试",
+    "processnumber": "OP111111111"                    // 工序号
+  },
+
+  // 清单标识（当前 Runner 必填）
+  "schema": "tps.v2",
+  "id": "spm-wsec-static",                            // 编号：英文 / 数字 / 下划线 / 点 / 短横线（1-64 位）
+  "name": "SPM 静态读头测试",
+  "version": "1.0.0",
+  "description": "这份 TPS 跑哪些用例、在什么环境下跑",
+
+  // ② PN 白名单 + 多路 SN 信号源匹配
+  "uut_info": {
+    "supported_PN": [                                 // 物料信息
+      {
+        "discriber": "WSEC",
+        "PN": { "regex": "(?P<pn>[A-Z0-9]{10})" },
+        "channel": ["channel1", "channel1"]
+      }
+    ]
+  },
+
+  // ③ 设备信息：只写引用，不写连接参数（IP / 端口 / 串口在注册库）
+  "device_config": {
+    "psu": { "device_id": "DEV-PSU-01", "category": "power_supply" },
+    "scope": { "device_id": "DEV-SCOPE-03", "category": "oscilloscope" },
+    "dmm": { "device_id": "DEV-DMM-02", "category": "multimeter" }
+  },
+
+  // ④ 判定算法与阈值（清单只给值和算法，判定由用例调用接口触发）
+  "threshold": {
+    "TC_VDD": { "mode": "minmax", "min": 3.135, "max": 3.465, "label": "供电电压", "unit": "V" }
+  },
+
+  // ⑤ 三段：环境初始化 / 测试套 / 环境终止
+  "setup": [
+    {
+      "id": "S-01",
+      "name": "环境初始化",
+      "case": "testcase.env_setup::power_on",
+      "exec": { "timeout_s": 60 }
+    }
+  ],
+  "cmd_suit": [
+    {
+      "id": "T-01",
+      "name": "上电电压测试",
+      "case": "testcase.power::test_vdd",
+      "parallel": "per_sn",
+      "parameter": {}                                 // parameter 中可以存放任意形式的参数
+    },
+
+    // ---- 人工操作环节：Runner 弹出提示窗口，操作员选「继续下一步」或「中止测试」----
+    // resource 是包内 resource/ 目录下的 Markdown 文件名（*.md / *.markdown / *.txt）；
+    // 弹窗正文就是该文件全文，改文案不用动这张清单；可选 timeout_s 覆盖默认等待时长（1800 秒）。
+    {
+      "id": "M-01",
+      "type": "manual",
+      "name": "读头装夹与外观确认",
+      "resource": "fixture_check.md",
+      "description": "操作员确认装夹、外观与探针接触后继续"
+    },
+
+    {
+      "id": "T-02",
+      "name": "工作电流测试",
+      "case": "testcase.power::test_idd"
+    }
+  ],
+  "teardown": [
+    {
+      "id": "E-01",
+      "name": "环境终止",
+      "case": "testcase.env_setup::power_off"
+    }
+  ]
+}

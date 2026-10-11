@@ -65,6 +65,14 @@
     },
     {
       "no": 2,
+      "id": "M-01",
+      "type": "manual",
+      "name": "读头装夹与外观确认",
+      "resource": "fixture_check.md",
+      "description": "人工操作环节：弹出提示，操作员确认装夹与外观后选择「继续下一步」或「中止测试」"
+    },
+    {
+      "no": 3,
       "id": "TC002",
       "name": "读头工作电流测试",
       "case": "testcase.power::read_head_current",
@@ -73,7 +81,7 @@
       "checks": { "IDD": "TC_IDD" }
     },
     {
-      "no": 3,
+      "no": 4,
       "id": "TC003",
       "name": "转速闭环测试",
       "case": "testcase.comm::spin_speed",
@@ -82,7 +90,15 @@
       "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" }
     },
     {
-      "no": 4,
+      "no": 5,
+      "id": "M-02",
+      "type": "manual",
+      "name": "示波器探头接入确认",
+      "resource": "probe_check.md",
+      "description": "人工操作环节：回放信号测试前，操作员确认示波器探头接线后选择「继续下一步」或「中止测试」"
+    },
+    {
+      "no": 6,
       "id": "TC004",
       "name": "回放信号幅度与频率测试",
       "case": "testcase.comm::playback_signal",
@@ -91,7 +107,7 @@
       "checks": { "VPP": "TC_SIG_VPP", "FREQ": "TC_SIG_FREQ" }
     },
     {
-      "no": 5,
+      "no": 7,
       "id": "TC005",
       "name": "负载端电压测试",
       "case": "testcase.comm::load_voltage",

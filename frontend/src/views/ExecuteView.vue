@@ -82,6 +82,91 @@ const stepState = computed(() => {
   for (const s of currentTask.value?.steps || []) map[s.index] = s
   return map
 })
+// ---- 人工操作环节（TPS 清单 cmd_suit 里 type=manual 的条目）----
+const manual = computed(() => currentTask.value?.manual || null)
+const manualOpen = computed(() => manual.value?.status === 'waiting')
+const manualSubmitting = ref(false)
+const manualError = ref('')
+// 提示内容由后端从 TPS 包 resource/ 目录读出并随任务快照下发
+const manualHtml = computed(() => renderMarkdown(manual.value?.markdown || '', selectedTpsId.value))
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function inlineMd(s) {
+  return escapeHtml(s)
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img src="$2" alt="$1" />')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<span class="md-link">$1</span>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+}
+
+// 极简 Markdown 渲染（标题 / 列表 / 引用 / 分隔线 / 粗体 / 行内代码 / 图片），先转义再套格式
+function renderMarkdown(md, tpsId) {
+  const lines = String(md || '').replace(/\r\n/g, '\n').split('\n')
+  const out = []
+  let list = null
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null } }
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    if (!line.trim()) { closeList(); continue }
+    let m
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      closeList()
+      const lvl = Math.min(m[1].length + 1, 6)
+      out.push(`<h${lvl}>${inlineMd(m[2])}</h${lvl}>`)
+      continue
+    }
+    if ((m = line.match(/^\s*[-*+]\s+(.*)$/))) {
+      if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul' }
+      out.push(`<li>${inlineMd(m[1])}</li>`)
+      continue
+    }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+      if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol' }
+      out.push(`<li>${inlineMd(m[1])}</li>`)
+      continue
+    }
+    if ((m = line.match(/^\s*>\s?(.*)$/))) {
+      closeList(); out.push(`<blockquote>${inlineMd(m[1])}</blockquote>`); continue
+    }
+    if (/^\s*([-*_]\s*){3,}$/.test(line)) { closeList(); out.push('<hr />'); continue }
+    closeList(); out.push(`<p>${inlineMd(line)}</p>`)
+  }
+  closeList()
+  let html = out.join('\n')
+  // 提示里的图片按 TPS 包 resource/ 取（相对路径 -> 后端资源接口）
+  if (tpsId) {
+    html = html.replace(/src="([^"]+)"/g, (whole, src) => {
+      if (/^(https?:|data:|\/)/.test(src)) return whole
+      return `src="/api/tps/${encodeURIComponent(tpsId)}/resource/${src}"`
+    })
+  }
+  return html
+}
+
+async function answerManual(decision) {
+  const id = currentTask.value?.id
+  if (!id || manualSubmitting.value) return
+  manualSubmitting.value = true
+  manualError.value = ''
+  try {
+    const res = await api.decideTpsManual(id, decision)
+    if (!res.success) manualError.value = res.message || '提交失败'
+    else await pollTask()
+  } catch (e) {
+    manualError.value = '提交失败：' + e.message
+  } finally {
+    manualSubmitting.value = false
+  }
+}
+
 const progress = computed(() => currentTask.value?.progress ?? 0)
 const taskStatusText = computed(() => {
   const s = currentTask.value?.status
@@ -502,7 +587,7 @@ onUnmounted(() => {
               </div>
               <div class="step-desc">{{ st.description }}</div>
               <div class="step-meta">
-                <span class="step-type">{{ { init: '环境初始化', test: '测试用例', teardown: '环境终止' }[st.type] || st.type }}</span>
+                <span class="step-type" :class="{ 'step-type-manual': st.manual }">{{ st.manual ? '人工操作' : ({ init: '环境初始化', test: '测试用例', teardown: '环境终止' }[st.type] || st.type) }}</span>
                 <span v-if="stepState[i + 1]?.duration != null" class="step-dur">
                   耗时 {{ stepState[i + 1].duration.toFixed(2) }}s
                 </span>
@@ -573,6 +658,29 @@ onUnmounted(() => {
           @error="onReportError"
         ></iframe>
       </section>
+    </div>
+
+    <!-- 人工操作环节弹窗：内容取自 TPS 包 resource/ 下清单里标注的 Markdown -->
+    <div v-if="manualOpen" class="manual-mask">
+      <div class="manual-card">
+        <div class="manual-head">
+          <span class="manual-tag">人工操作</span>
+          <h3 class="manual-title">{{ manual.name }}</h3>
+          <span class="manual-res">resource/{{ manual.resource }}</span>
+        </div>
+        <div class="manual-body" v-html="manualHtml"></div>
+        <div v-if="manualError" class="tip err manual-err">{{ manualError }}</div>
+        <div class="manual-foot">
+          <span class="manual-hint">
+            「继续下一步」执行清单里的下一条用例；「中止测试」停止本轮，直接进入收尾与报告。
+            <template v-if="manual.timeout_s">等待超时设为 {{ manual.timeout_s }} 秒，超时按中止处理。</template>
+          </span>
+          <div class="manual-actions">
+            <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
+            <button class="btn primary" :disabled="manualSubmitting" @click="answerManual('next')">继续下一步</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -937,6 +1045,38 @@ onUnmounted(() => {
   border-radius: 10px;
   background: #f4f1fd;
 }
+
+/* ---- 人工操作弹窗 ---- */
+.manual-mask {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(11, 18, 32, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.manual-card {
+  width: min(720px, 100%); max-height: 88vh;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(11, 18, 32, 0.28);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.manual-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.manual-tag { background: rgba(var(--accent-2-rgb), 0.14); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+.manual-title { margin: 0; font-size: 15px; color: var(--text); }
+.manual-res { margin-left: auto; font-family: var(--mono, ui-monospace, Consolas, monospace); font-size: 11.5px; color: var(--muted); }
+.manual-body { padding: 16px 18px; overflow: auto; font-size: 13px; line-height: 1.75; color: var(--text); }
+.manual-body h1, .manual-body h2 { font-size: 15px; margin: 0 0 8px; }
+.manual-body h3 { font-size: 13.5px; margin: 12px 0 6px; }
+.manual-body p { margin: 6px 0; }
+.manual-body ul, .manual-body ol { margin: 6px 0 6px 20px; padding: 0; }
+.manual-body li { margin: 3px 0; }
+.manual-body code { font-family: var(--mono, ui-monospace, Consolas, monospace); font-size: 12px; background: rgba(var(--accent-rgb), 0.08); padding: 1px 5px; border-radius: 4px; }
+.manual-body blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--accent); background: rgba(var(--accent-rgb), 0.05); color: var(--muted); font-size: 12.5px; }
+.manual-body img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+.manual-body hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.manual-foot { padding: 12px 18px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.manual-hint { font-size: 12px; color: var(--muted); flex: 1; min-width: 220px; }
+.manual-actions { display: flex; gap: 10px; }
+.manual-err { margin: 0 18px; }
+.step-type-manual { color: var(--accent); font-weight: 600; }
 
 @media (max-width: 900px) {
   .tps-wrap { grid-template-columns: 1fr; padding: 14px; }
