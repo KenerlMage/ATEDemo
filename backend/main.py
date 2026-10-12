@@ -36,6 +36,7 @@ from pydantic import BaseModel
 import license_utils
 
 import ate_db              # 注册库 -> SQLite 投影（设备 driver 配置）
+import cloud_db           # 云端数据库（演示）上报通道：生产模式结果上报
 import tps_runtime        # TPS 运行环境（workspace / 公共 conftest）
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -413,6 +414,11 @@ _RECORD_EXTRA_COLUMNS = {
     "operator": "TEXT DEFAULT ''",
     "equipment_serial": "TEXT DEFAULT ''",
     "result": "TEXT DEFAULT ''",
+    # 运行档位: 工单号 / 调试-生产 / 设备连接 / 云端上报状态
+    "work_order": "TEXT DEFAULT ''",
+    "run_mode": "TEXT DEFAULT 'debug'",
+    "device_mode": "TEXT DEFAULT ''",
+    "cloud_status": "TEXT DEFAULT ''",
 }
 
 
@@ -441,7 +447,11 @@ def _init_db():
                 part_no TEXT DEFAULT '',
                 operator TEXT DEFAULT '',
                 equipment_serial TEXT DEFAULT '',
-                result TEXT DEFAULT ''
+                result TEXT DEFAULT '',
+                work_order TEXT DEFAULT '',
+                run_mode TEXT DEFAULT 'debug',
+                device_mode TEXT DEFAULT '',
+                cloud_status TEXT DEFAULT ''
             )"""
         )
         # 旧库迁移: 已存在的表缺少规范字段时补齐
@@ -459,6 +469,28 @@ _init_db()
 
 UUT_RE = re.compile(r"^[A-Za-z0-9]{12}$")
 
+# ---- 运行档位（调试 / 生产）--------------------------------------------------
+# 生产模式: 必须输入 12 位工单号才能执行, 设备走真机, 收尾后上报「云端数据库」;
+# 调试模式: 免工单, 可切「仿真模式」(不连接真实设备), 数据只落本地记录库。
+RUN_MODE_DEBUG = "debug"
+RUN_MODE_PRODUCTION = "production"
+RUN_MODES = (RUN_MODE_DEBUG, RUN_MODE_PRODUCTION)
+WORK_ORDER_RE = re.compile(r"^[0-9A-Za-z]{12}$")
+WORK_ORDER_LEN = 12
+DEVICE_MODES = ("simulate", "real")
+
+
+def _normalize_run_mode(value: str | None) -> str:
+    """运行档位归一化: 未知值一律按调试模式处理, 避免误判成生产模式"""
+    raw = str(value or "").strip().lower()
+    return RUN_MODE_PRODUCTION if raw == RUN_MODE_PRODUCTION else RUN_MODE_DEBUG
+
+
+def _normalize_device_mode(value: str | None) -> str:
+    """设备连接方式归一化: simulate(不连设备) / real(真机)"""
+    raw = str(value or "").strip().lower()
+    return "real" if raw == "real" else "simulate"
+
 
 def _save_record(record: dict):
     with DB_LOCK:
@@ -467,21 +499,28 @@ def _save_record(record: dict):
                 """INSERT INTO test_records
                 (task_id, uut, project, dut, tps_id, tps_name, status, passed, failed,
                  skipped, total, duration, report_file, start_time, end_time, created_at,
-                 batch, part_no, operator, equipment_serial, result)
+                 batch, part_no, operator, equipment_serial, result,
+                 work_order, run_mode, device_mode, cloud_status)
                 VALUES (:task_id, :uut, :project, :dut, :tps_id, :tps_name, :status, :passed,
                         :failed, :skipped, :total, :duration, :report_file, :start_time, :end_time, :created_at,
-                        :batch, :part_no, :operator, :equipment_serial, :result)""",
+                        :batch, :part_no, :operator, :equipment_serial, :result,
+                        :work_order, :run_mode, :device_mode, :cloud_status)""",
                 record,
             )
             conn.commit()
 
 
-def _fetch_records(uut: str | None = None, limit: int = 100, date: str | None = None, project: str | None = None, batch: str | None = None) -> list[dict]:
-    """查询测试记录; 支持按 UUT / 日期(YYYY-MM-DD) / 项目(含 TPS 名, 模糊) / 批次(模糊) 过滤"""
+def _fetch_records(uut: str | None = None, limit: int = 100, date: str | None = None,
+                   project: str | None = None, batch: str | None = None,
+                   work_order: str | None = None) -> list[dict]:
+    """查询测试记录; 支持 UUT / 日期 / 项目 / 批次 / 工单号(模糊) 过滤"""
     where, params = [], []
     if uut:
         where.append("uut = ?")
         params.append(uut)
+    if work_order:
+        where.append("work_order LIKE ?")
+        params.append(f"%{work_order}%")
     if date:
         # 日期按 start_time 前缀匹配 (YYYY-MM-DD)
         where.append("start_time LIKE ?")
@@ -538,8 +577,9 @@ def get_uut_profile(sn: str):
 
 
 @app.get("/api/records")
-def list_records(uut: str | None = None, date: str | None = None, project: str | None = None, batch: str | None = None, limit: int = 100):
-    """查询测试记录; 支持按 UUT(12位英数) / 日期(YYYY-MM-DD) / 项目 / 批次 组合过滤"""
+def list_records(uut: str | None = None, date: str | None = None, project: str | None = None,
+                 batch: str | None = None, work_order: str | None = None, limit: int = 100):
+    """查询测试记录; 支持按 UUT(12位英数) / 日期 / 项目 / 批次 / 工单号 组合过滤"""
     limit = max(1, min(int(limit), 500))
     if uut is not None:
         uut = uut.strip()
@@ -548,8 +588,10 @@ def list_records(uut: str | None = None, date: str | None = None, project: str |
     date = (date or "").strip()
     project = (project or "").strip()
     batch = (batch or "").strip()
+    work_order = (work_order or "").strip()
     try:
-        records = _fetch_records(uut or None, limit, date or None, project or None, batch or None)
+        records = _fetch_records(uut or None, limit, date or None, project or None, batch or None,
+                                 work_order or None)
         return {"success": True, "count": len(records), "records": records}
     except Exception as e:
         return {"success": False, "message": f"查询记录失败: {e}", "records": []}
@@ -757,7 +799,9 @@ class TpsRunRequest(BaseModel):
     tps_id: str | None = None
     uut: str = ""
     bench_id: str = ""            # 指定测试台（不填则按 TPS 清单 bench 自动匹配）
-    mode: str = "simulate"        # simulate(默认, 无硬件) | real(真机)
+    mode: str = "simulate"        # 设备连接: simulate(默认, 不连设备) | real(真机)
+    run_mode: str = "debug"       # 运行档位: debug(调试, 免工单) | production(生产, 需工单+上报云端)
+    work_order: str = ""          # 生产模式工单号(12 位)；调试模式留空
 
 
 def _decode_output(data: bytes) -> str:
@@ -886,6 +930,19 @@ def _generate_report(task: dict, tps: dict) -> str:
     part_no = uut[:10] if len(uut) >= 10 else uut
     result = "OK" if task["status"] == "completed" else "NOK"
     report_link = f"reports/tps_{task.get('id', '')}.html"
+    # ---- 运行档位字段（调试/生产 · 工单 · 设备连接 · 云端上报）----
+    run_mode = task.get("run_mode") or RUN_MODE_DEBUG
+    run_mode_label = "生产模式" if run_mode == RUN_MODE_PRODUCTION else "调试模式"
+    device_mode_label = "真机" if (task.get("mode") or "").lower() == "real" else "仿真"
+    cloud = task.get("cloud") or {}
+    if run_mode != RUN_MODE_PRODUCTION:
+        cloud_text = "不适用（调试模式不上报）"
+    elif cloud.get("ok"):
+        cloud_text = f"已上报 · cloud_id={cloud.get('cloud_id')} · {cloud.get('uploaded_at', '')}"
+    elif cloud:
+        cloud_text = f"上报失败（待重传）· {cloud.get('message', '')}"
+    else:
+        cloud_text = "待上报"
     # 测试详情: 各步骤名称 + 输出摘要 (原始输出/阈值/尝试次数等见步骤表)
     step_names = "、".join(s.get("name", "") for s in tps.get("steps", []))
     html = f"""<!DOCTYPE html>
@@ -926,6 +983,9 @@ th {{ color: #94a3b8; font-weight: 600; }}
 <tr><td>设备编号（测试台）</td><td>{equip_serial or '-'}（{equip_title}）</td></tr>
 <tr><td>UUT 类型（PN 号）</td><td>{part_no}</td></tr>
 <tr><td>操作员工号</td><td>{OPERATOR_ID}</td></tr>
+<tr><td>工单号</td><td>{task.get('work_order') or '-'}</td></tr>
+<tr><td>运行档位</td><td><span class="badge {'warn' if run_mode=='production' else 'idle'}">{run_mode_label}</span> · 设备连接 {device_mode_label}</td></tr>
+<tr><td>云端上报</td><td>{cloud_text}</td></tr>
 <tr><td>测试结果</td><td><span class="badge {'ok' if result=='OK' else 'err'}">{result}</span></td></tr>
 <tr><td>测试耗时（秒）</td><td>{task.get('duration', 0):.2f}</td></tr>
 <tr><td>测试详情</td><td>详见下方执行步骤表（执行结果 / 原始输出 / 阈值 / 尝试次数）</td></tr>
@@ -934,7 +994,7 @@ th {{ color: #94a3b8; font-weight: 600; }}
 <div class="card"><h2>结论</h2>
 <div class="summary"><span class="conclusion {'pass' if conclusion=='PASS' else 'fail'}">{conclusion}</span><span>通过 {passed} / {total}</span><span>失败 {failed}</span><span>跳过 {skipped}</span><span>总耗时 {task.get('duration', 0):.2f}s</span></div></div>
 <div class="card"><h2>装备信息</h2>
-<div class="summary"><span class="kv"><b>项目</b>{project}</span><span class="kv"><b>测试对象 DUT</b>{dut}</span><span class="kv"><b>UUT 编号</b>{uut}</span><span class="kv"><b>设备编号</b>{equip_serial or '-'}</span><span class="kv"><b>测试台</b>{bench_text}</span><span class="kv"><b>运行模式</b>{task.get('mode', 'simulate')}</span></div></div>
+<div class="summary"><span class="kv"><b>项目</b>{project}</span><span class="kv"><b>测试对象 DUT</b>{dut}</span><span class="kv"><b>UUT 编号</b>{uut}</span><span class="kv"><b>设备编号</b>{equip_serial or '-'}</span><span class="kv"><b>测试台</b>{bench_text}</span><span class="kv"><b>设备连接</b>{device_mode_label}</span><span class="kv"><b>运行档位</b>{run_mode_label}</span><span class="kv"><b>工单号</b>{task.get('work_order') or '-'}</span></div></div>
 <div class="card"><h2>运行环境 (workspace)</h2><table><tr><td>临时副本目录</td><td class="detail">{task.get('workspace') or '-'}</td></tr><tr><td>公共 conftest</td><td class="detail">{tps_runtime.workspace_root(False) / 'conftest.py'}</td></tr><tr><td>TPS 清单</td><td class="detail">{tps.get('schema', 'tps.v1')} · cmd_suit {len(tps.get('cmd_suit') or [])} 条 · 阈值 {len(tps.get('testconfig') or {})} 项 · 设备别名 {len(tps.get('device_config') or {})} 个</td></tr></table></div>
 <div class="card"><h2>测试环境</h2><table>{env_rows}</table></div>
 <div class="card"><h2>执行步骤</h2><table><thead><tr><th>#</th><th>步骤</th><th>类型</th><th>状态</th><th>耗时</th><th>输出</th></tr></thead><tbody>{step_rows}</tbody></table></div>
@@ -1153,6 +1213,9 @@ def _run_tps_task(task_id: str) -> None:
         lf.write(f"Workspace: {task.get('workspace') or '-'}\n")
         lf.write(f"Bench    : {(task.get('bench') or {}).get('title', '-')} / {(task.get('bench') or {}).get('serial', '-')}\n")
         lf.write(f"Mode     : {task.get('mode', 'simulate')}\n")
+        lf.write(f"RunMode  : {task.get('run_mode', RUN_MODE_DEBUG)}"
+                 f"{' (生产模式)' if task.get('run_mode') == RUN_MODE_PRODUCTION else ' (调试模式)'}\n")
+        lf.write(f"WorkOrder: {task.get('work_order') or '-'}\n")
         if task.get("bench_warning"):
             lf.write(f"Warning  : {task['bench_warning']}\n")
         lf.write("-" * 60 + "\n")
@@ -1235,11 +1298,38 @@ def _run_tps_task(task_id: str) -> None:
                         task["steps"][j]["status"] = "skipped"
                 break
 
+    # ---- 收尾 1/3: 先算耗时; 生产模式在此把本轮结果上报「云端数据库」----
+    # 演示库落在 backend/cloud_demo.db; 上报刻意排在「状态定稿」之前 —— 界面轮询到
+    # completed 的那一刻 cloud 字段就已经就绪, 不用再补一次请求。上报失败不影响本轮
+    # 测试结论, 记录库标记 pending, 可事后 POST /api/cloud/upload/{task_id} 手动重传。
+    _elapsed = _time.time() - task.get("_t0", _time.time())
+    upload = None
+    if (task.get("run_mode") or RUN_MODE_DEBUG) == RUN_MODE_PRODUCTION:
+        with TPS_TASKS_LOCK:
+            _cloud_snapshot = dict(task)
+        _cloud_snapshot["duration"] = _elapsed
+        _cloud_snapshot["status"] = "completed" if all_ok else "failed"
+        _cloud_snapshot["end_time"] = now_str()
+        _cloud_snapshot["report"] = f"reports/tps_{task_id}.html"
+        upload = _upload_to_cloud(_cloud_snapshot, tps)
+        with open(log_path, "a", encoding="utf-8") as lf:
+            lf.write(
+                f"[{now_str()}] 云端上报: {'成功' if upload.get('ok') else '失败'}"
+                f" cloud_id={upload.get('cloud_id') or '-'} {upload.get('message', '')}\n"
+            )
+
+    # ---- 收尾 2/3: 状态定稿 (与 cloud 同一次加锁写入, 界面一次读到完整结果) ----
     with TPS_TASKS_LOCK:
         task["status"] = "completed" if all_ok else "failed"
         task["progress"] = 100
         task["end_time"] = now_str()
-        task["duration"] = _time.time() - task.pop("_t0", _time.time())
+        task["duration"] = _elapsed
+        task.pop("_t0", None)
+        if upload is not None:
+            task["cloud"] = upload
+
+    # ---- 收尾 3/3: 生成报告 (报告里带云端上报结果) ----
+    with TPS_TASKS_LOCK:
         try:
             report_html = _generate_report(task, tps)
             report_name = f"tps_{task_id}.html"
@@ -1291,6 +1381,11 @@ def _run_tps_task(task_id: str) -> None:
                 "operator": OPERATOR_ID,
                 "equipment_serial": _equip.get("serial", "") if _equip.get("success") else "",
                 "result": "OK" if task["status"] == "completed" else "NOK",
+                # ---- 运行档位: 工单号 / 调试-生产 / 设备连接 / 云端上报状态 ----
+                "work_order": task.get("work_order", ""),
+                "run_mode": task.get("run_mode", RUN_MODE_DEBUG),
+                "device_mode": task.get("mode", ""),
+                "cloud_status": _cloud_status_text(task),
             }
         )
     except Exception:
@@ -1305,6 +1400,20 @@ def run_tps(tps_id: str, req: TpsRunRequest | None = None):
     uut = (req.uut if req else "").strip()
     if not UUT_RE.match(uut):
         return {"success": False, "message": "UUT 名称必须为 12 位英文与数字组合（如 ABC123DEF456）"}
+    # ---- 运行档位: 生产模式必须带 12 位工单号, 且设备固定走真机 ----
+    run_mode = _normalize_run_mode(req.run_mode if req else None)
+    work_order = (req.work_order if req else "").strip().upper()
+    if run_mode == RUN_MODE_PRODUCTION:
+        if not WORK_ORDER_RE.match(work_order):
+            return {
+                "success": False,
+                "message": f"生产模式必须输入 {WORK_ORDER_LEN} 位工单号（数字/字母）后才能执行",
+                "code": "WORK_ORDER_REQUIRED",
+            }
+        device_mode = "real"
+    else:
+        work_order = ""
+        device_mode = _normalize_device_mode(req.mode if req else None)
     task_id = uuid.uuid4().hex[:12]
     with TPS_TASKS_LOCK:
         TPS_TASKS[task_id] = {
@@ -1313,6 +1422,10 @@ def run_tps(tps_id: str, req: TpsRunRequest | None = None):
             "tps_id": tps_id,
             "tps_name": _read_tps(tps_path).get("name", tps_id),
             "uut": uut,
+            "run_mode": run_mode,
+            "work_order": work_order,
+            "mode": device_mode,
+            "bench_id": (req.bench_id if req else "") or "",
             "status": "pending",
             "progress": 0,
             "steps": [],
@@ -1324,7 +1437,18 @@ def run_tps(tps_id: str, req: TpsRunRequest | None = None):
             "duration": None,
         }
     threading.Thread(target=_run_tps_task, args=(task_id,), daemon=True).start()
-    return {"success": True, "task_id": task_id, "message": f"已启动 TPS 执行: {tps_id} (UUT={uut})"}
+    mode_note = (
+        f"生产模式 · 工单 {work_order}" if run_mode == RUN_MODE_PRODUCTION
+        else f"调试模式 · 设备 {device_mode}"
+    )
+    return {
+        "success": True,
+        "task_id": task_id,
+        "message": f"已启动 TPS 执行: {tps_id} (UUT={uut}) · {mode_note}",
+        "run_mode": run_mode,
+        "work_order": work_order,
+        "device_mode": device_mode,
+    }
 
 
 @app.get("/api/tps-tasks/{task_id}")
@@ -1400,6 +1524,179 @@ def tps_task_cancel(task_id: str):
     if event:
         event.set()
     return {"success": True, "message": "已提交取消：剩余测试条目将跳过，收尾动作照常执行"}
+
+
+def _cloud_payload(task: dict, tps: dict) -> dict:
+    """把一轮测试任务整理成「云端数据库」上报载荷"""
+    steps = task.get("steps") or []
+    uut = task.get("uut", "")
+    profile = load_uut_profile(uut) or {}
+    equip = load_equipment()
+    return {
+        "task_id": task.get("id", ""),
+        "work_order": task.get("work_order", ""),
+        "uut": uut,
+        "project": tps.get("project", ""),
+        "dut": tps.get("dut", ""),
+        "tps_id": tps.get("id", ""),
+        "tps_name": tps.get("name", ""),
+        "result": "OK" if task.get("status") == "completed" else "NOK",
+        "status": task.get("status", ""),
+        "passed": sum(1 for s in steps if s.get("status") == "passed"),
+        "failed": sum(1 for s in steps if s.get("status") == "failed"),
+        "skipped": sum(1 for s in steps if s.get("status") == "skipped"),
+        "total": len(steps),
+        "duration": round(task.get("duration", 0) or 0, 2),
+        "operator": OPERATOR_ID,
+        "equipment_serial": equip.get("serial", "") if equip.get("success") else "",
+        "batch": profile.get("batch", ""),
+        "part_no": uut[:10] if len(uut) >= 10 else uut,
+        "run_mode": task.get("run_mode", RUN_MODE_DEBUG),
+        "device_mode": task.get("mode", ""),
+        "report_file": task.get("report") or "",
+        "started_at": task.get("start_time", ""),
+        "ended_at": task.get("end_time", ""),
+    }
+
+
+def _upload_payload_to_cloud(payload: dict, *, source: str = "auto") -> dict:
+    """上报载荷 -> 云端; 失败只记状态, 不抛异常、不影响本轮结论"""
+    try:
+        return cloud_db.upload_record(payload, source=source)
+    except Exception as e:  # 演示/现场任何异常都不应影响测试结论
+        return {"ok": False, "cloud_id": None, "uploaded_at": None,
+                "endpoint": cloud_db.endpoint(), "message": f"上报异常: {e}"}
+
+
+def _upload_to_cloud(task: dict, tps: dict, *, source: str = "auto") -> dict:
+    """生产模式收尾上报「云端数据库」"""
+    return _upload_payload_to_cloud(_cloud_payload(task, tps), source=source)
+
+
+def _fetch_record_by_task(task_id: str) -> dict | None:
+    """按 task_id 取本地测试记录（后端重启后云端补传时用）"""
+    try:
+        with DB_LOCK:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    "SELECT * FROM test_records WHERE task_id = ? ORDER BY id DESC LIMIT 1", (task_id,)
+                ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _mark_record_cloud_status(task_id: str, status: str) -> None:
+    """补传成功后回写本地记录的云端状态（界面「待重传」-> 「已上报」）"""
+    try:
+        with DB_LOCK:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute("UPDATE test_records SET cloud_status = ? WHERE task_id = ?", (status, task_id))
+                conn.commit()
+    except Exception:
+        pass
+
+
+def _record_to_cloud_payload(rec: dict) -> dict:
+    """内存任务已丢失（后端重启）: 用本地记录库的行重建云端上报载荷"""
+    return {
+        "task_id": rec.get("task_id", ""),
+        "work_order": rec.get("work_order", ""),
+        "uut": rec.get("uut", ""),
+        "project": rec.get("project", ""),
+        "dut": rec.get("dut", ""),
+        "tps_id": rec.get("tps_id", ""),
+        "tps_name": rec.get("tps_name", ""),
+        "result": rec.get("result", ""),
+        "status": rec.get("status", ""),
+        "passed": rec.get("passed", 0),
+        "failed": rec.get("failed", 0),
+        "skipped": rec.get("skipped", 0),
+        "total": rec.get("total", 0),
+        "duration": rec.get("duration", 0),
+        "operator": rec.get("operator", ""),
+        "equipment_serial": rec.get("equipment_serial", ""),
+        "batch": rec.get("batch", ""),
+        "part_no": rec.get("part_no", ""),
+        "run_mode": rec.get("run_mode", RUN_MODE_DEBUG),
+        "device_mode": rec.get("device_mode", ""),
+        "report_file": rec.get("report_file", ""),
+        "started_at": rec.get("start_time", ""),
+        "ended_at": rec.get("end_time", ""),
+    }
+
+
+def _cloud_status_text(task: dict) -> str:
+    """记录库里的云端上报状态: uploaded / pending / not_required"""
+    if (task.get("run_mode") or RUN_MODE_DEBUG) != RUN_MODE_PRODUCTION:
+        return "not_required"
+    cloud = task.get("cloud") or {}
+    return "uploaded" if cloud.get("ok") else "pending"
+
+
+@app.get("/api/cloud/status")
+def cloud_status():
+    """云端数据库（演示）连接状态与入库统计"""
+    try:
+        return cloud_db.stats()
+    except Exception as e:
+        return {"success": False, "message": f"云端状态读取失败: {e}"}
+
+
+@app.get("/api/cloud/records")
+def cloud_records(work_order: str | None = None, uut: str | None = None,
+                  result: str | None = None, limit: int = 100):
+    """查询「云端数据库」已入库的测试记录（演示看板）"""
+    limit = max(1, min(int(limit), 500))
+    try:
+        rows = cloud_db.list_records(
+            limit=limit,
+            work_order=(work_order or "").strip(),
+            uut=(uut or "").strip(),
+            result=(result or "").strip(),
+        )
+        return {"success": True, "count": len(rows), "records": rows,
+                "endpoint": cloud_db.endpoint(), "db_path": str(cloud_db.cloud_db_path())}
+    except Exception as e:
+        return {"success": False, "message": f"云端记录查询失败: {e}", "records": []}
+
+
+@app.post("/api/cloud/upload/{task_id}")
+def cloud_upload(task_id: str):
+    """手动（重新）上报某一轮测试结果到「云端数据库」; 幂等, 可反复重传
+
+    优先用内存里的任务快照; 后端重启后内存任务丢失, 退化为按 task_id 从本地记录库
+    (test_records) 重建载荷, 保证标记为 pending 的记录仍能补传。
+    """
+    with TPS_TASKS_LOCK:
+        task = TPS_TASKS.get(task_id)
+        if task is not None and task.get("status") not in ("completed", "failed"):
+            return {"success": False, "message": "任务尚未结束，无法上报"}
+        snapshot = dict(task) if task else None
+
+    if snapshot is not None:
+        tps = snapshot.get("tps") or {}
+        if not tps:
+            tps_path = next(
+                (p for p in _load_tps_files() if _read_tps(p) and _read_tps(p)["id"] == snapshot.get("tps_id")),
+                None,
+            )
+            tps = (_read_tps(tps_path) or {}) if tps_path else {}
+        payload = _cloud_payload(snapshot, tps)
+    else:
+        row = _fetch_record_by_task(task_id)
+        if not row:
+            return {"success": False, "message": "任务不存在，且本地记录库中也查不到该 task_id"}
+        payload = _record_to_cloud_payload(row)
+
+    upload = _upload_payload_to_cloud(payload, source="manual")
+    with TPS_TASKS_LOCK:
+        if task_id in TPS_TASKS:
+            TPS_TASKS[task_id]["cloud"] = upload
+    if upload.get("ok"):
+        _mark_record_cloud_status(task_id, "uploaded")
+    return {"success": bool(upload.get("ok")), **upload}
 
 
 @app.get("/api/tps/{tps_id}/resource/{name:path}")

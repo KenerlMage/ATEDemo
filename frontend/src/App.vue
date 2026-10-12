@@ -6,6 +6,17 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from './api'
+// 运行档位: 生产(需工单·真机·上报云端) / 调试(免工单·可仿真) —— 全局共享状态
+import {
+  runMode,
+  isProduction,
+  simulate,
+  workOrder,
+  workOrderValid,
+  RUN_MODE_META,
+  setRunMode,
+  toggleSimulate
+} from './runmode'
 
 const router = useRouter()
 const route = useRoute()
@@ -130,6 +141,39 @@ function logout() {
           <span class="station-label">当前测试台</span>
           <span class="station-name">{{ stationTitle }}</span>
           <span class="station-serial">{{ stationSerial }}</span>
+        </div>
+
+        <!-- 运行档位: 生产 / 调试（与「测试执行」页共用同一份状态） -->
+        <div class="mode-switch" :class="runMode">
+          <div class="mode-head">
+            <span class="mode-label">运行档位</span>
+            <span class="mode-current">{{ RUN_MODE_META[runMode].icon }} {{ RUN_MODE_META[runMode].label }}</span>
+          </div>
+          <div class="mode-btns">
+            <button
+              class="mode-btn"
+              :class="{ active: isProduction }"
+              title="生产模式：需 12 位工单号，设备走真机，本轮结果上报云端数据库"
+              @click="setRunMode('production')"
+            >🏭 生产模式</button>
+            <button
+              class="mode-btn"
+              :class="{ active: !isProduction }"
+              title="调试模式：免工单号，可切换仿真（不连接真实设备），数据只落本地记录库"
+              @click="setRunMode('debug')"
+            >🛠 调试模式</button>
+          </div>
+          <div v-if="isProduction" class="mode-extra">
+            <span class="mode-wo" :class="{ ok: workOrderValid }">工单 {{ workOrder || '未填' }}</span>
+            <span class="mode-tip" :class="workOrderValid ? 'ok' : 'warn'">
+              {{ workOrderValid ? '可执行 · 上报云端' : '需 12 位工单' }}
+            </span>
+          </div>
+          <div v-else class="mode-extra">
+            <button class="sim-btn" :class="{ on: simulate }" @click="toggleSimulate">
+              {{ simulate ? '仿真模式 已开启' : '仿真模式 已关闭' }}
+            </button>
+          </div>
         </div>
 
         <!-- 垂直导航 -->
@@ -361,6 +405,64 @@ function logout() {
 .side-version { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
 .btn.ghost.side-logout { width: 100%; }
 
+/* ================= 运行档位开关（生产 / 调试） ================= */
+.mode-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-left: 3px solid var(--accent);
+}
+.mode-switch.production { border-left-color: #d97706; }
+.mode-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mode-label { font-size: 10px; letter-spacing: 1px; color: var(--muted); font-weight: 700; }
+.mode-current { font-size: 11.5px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.mode-switch.production .mode-current { color: #b45309; }
+.mode-btns { display: flex; gap: 4px; }
+.mode-btn {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mode-switch.production .mode-btn.active { background: #d97706; border-color: #d97706; }
+.mode-extra { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.mode-wo { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.mode-wo.ok { color: var(--ok); font-weight: 700; }
+.mode-tip { font-size: 10.5px; }
+.mode-tip.ok { color: var(--ok); }
+.mode-tip.warn { color: var(--warn); }
+.sim-btn {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px dashed var(--border-strong);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sim-btn.on {
+  border-style: solid;
+  border-color: #0ea5e9;
+  color: #0369a1;
+  background: rgba(14, 165, 233, 0.1);
+}
+
 /* 右侧内容区 */
 .app-main { flex: 1; min-width: 0; display: flex; }
 
@@ -386,6 +488,11 @@ function logout() {
   }
   .side-top-rule { display: none; }
   .brand-sub, .station-chip, .side-desc, .side-code, .side-version { display: none; }
+  /* 运行档位在窄屏收敛成两个小按钮 */
+  .mode-switch { flex-direction: row; align-items: center; gap: 6px; padding: 4px 6px; border-left-width: 1px; }
+  .mode-head, .mode-extra { display: none; }
+  .mode-btns { gap: 3px; }
+  .mode-btn { padding: 4px 7px; font-size: 11px; }
   .brand-name { font-size: 15px; }
   .brand-mark { width: 30px; height: 30px; flex: 0 0 30px; font-size: 15px; }
   .side-nav { flex-direction: row; gap: 4px; overflow: visible; }

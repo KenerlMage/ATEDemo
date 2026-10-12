@@ -21,13 +21,39 @@ export const api = {
   getTpsByUut: (uut) => request(`/api/tps/by-uut?uut=${encodeURIComponent(uut)}`),
   importTps: (content, name) => request('/api/tps/import', { method: 'POST', body: JSON.stringify({ content, name }) }),
   aiAnalyze: (apiUrl, apiKey, taskId) => request('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ api_url: apiUrl, api_key: apiKey, task_id: taskId }) }),
-  runTps: (tpsId, uut) => request(`/api/tps/${tpsId}/run`, { method: 'POST', body: JSON.stringify({ uut }) }),
+  // 运行档位: run_mode=production 时必须带 12 位 work_order;
+  // mode=real 连真机 / simulate 不连接真实设备（调试模式的「仿真模式」）
+  runTps: (tpsId, uut, opts = {}) =>
+    request(`/api/tps/${tpsId}/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        uut,
+        bench_id: opts.bench_id || '',
+        mode: opts.mode || 'simulate',
+        run_mode: opts.run_mode || 'debug',
+        work_order: opts.work_order || ''
+      })
+    }),
   getTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}`),
   // 人工操作环节（cmd_suit 里 type=manual）：提交操作员选择 next（继续）/ abort（中止）
   decideTpsManual: (taskId, decision) =>
     request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision }) }),
   // 取消本轮测试：运行中与等待操作员确认期间均可发起（剩余测试条目跳过、收尾段照常执行）
   cancelTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}/cancel`, { method: 'POST' }),
+  // ---- 云端数据库（演示）：生产模式的测试结果上报 ----
+  // 云端连接状态 + 工单维度入库统计
+  getCloudStatus: () => request('/api/cloud/status'),
+  // 已入库的云端测试记录（filters: {work_order, uut, result, limit}）
+  getCloudRecords: (filters = {}) => {
+    const q = new URLSearchParams()
+    for (const [k, v] of Object.entries(filters)) {
+      if (v) q.set(k, v)
+    }
+    const s = q.toString()
+    return request(s ? `/api/cloud/records?${s}` : '/api/cloud/records')
+  },
+  // 手动（重新）上报某一轮结果到云端；幂等，可反复重传
+  uploadToCloud: (taskId) => request(`/api/cloud/upload/${taskId}`, { method: 'POST', body: JSON.stringify({}) }),
   // ---- 装备树 + 记录库 ----
   getTree: () => request('/api/tree'),
   // 历史测试记录: 支持 uut / 日期 / 项目 / 批次 组合过滤

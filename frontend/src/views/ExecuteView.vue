@@ -1,6 +1,25 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { api } from '../api'
+// 运行档位（全局共享）: 生产模式需 12 位工单号 + 真机 + 上报云端;
+// 调试模式免工单, 可切「仿真模式」不连接真实设备。
+import {
+  runMode,
+  isProduction,
+  simulate,
+  workOrder,
+  workOrderValid,
+  normalizedWorkOrder,
+  deviceModeText,
+  WORK_ORDER_LEN,
+  RUN_MODE_META,
+  setRunMode,
+  toggleSimulate,
+  runOptions
+} from '../runmode'
+
+// 切换仿真开关时的过渡态（保留给后续接后端设备自检用）
+const simulateBusy = ref(false)
 
 // ---- 状态 ----
 const tree = ref([])
@@ -17,6 +36,48 @@ const currentTask = ref(null)
 const reportUrl = ref('')
 const reportLoaded = ref(false)
 const reportError = ref('')
+// ---- 云端上报（生产模式）----
+const cloud = ref(null)            // 当前任务的云端上报结果
+const cloudError = ref('')
+const cloudReuploading = ref(false)
+const cloudStatus = ref(null)      // 云端（演示）连接状态与入库统计
+const cloudRecords = ref([])       // 云端库已入库记录
+
+async function loadCloudStatus() {
+  try {
+    const res = await api.getCloudStatus()
+    cloudStatus.value = res && res.success !== false ? res : null
+  } catch {
+    cloudStatus.value = null
+  }
+}
+
+async function loadCloudRecords() {
+  try {
+    const res = await api.getCloudRecords({ limit: 20 })
+    cloudRecords.value = res && res.success ? res.records || [] : []
+  } catch {
+    cloudRecords.value = []
+  }
+}
+
+// 云端不可达时记录留 pending, 这里手动重传（幂等, 可反复点）
+async function reuploadCloud() {
+  const id = currentTask.value?.id
+  if (!id || cloudReuploading.value) return
+  cloudReuploading.value = true
+  cloudError.value = ''
+  try {
+    const res = await api.uploadToCloud(id)
+    cloud.value = res
+    if (!res.success) cloudError.value = res.message || '重传失败'
+    else await Promise.all([loadCloudStatus(), loadCloudRecords()])
+  } catch (e) {
+    cloudError.value = '重传失败：' + e.message
+  } finally {
+    cloudReuploading.value = false
+  }
+}
 // ---- AI 测试分析 ----
 const aiConfigOpen = ref(false)
 const aiApiUrl = ref(localStorage.getItem('ate_ai_api_url') || '')
@@ -385,7 +446,14 @@ async function startRun() {
     uutError.value = 'UUT 名称必须为 12 位英文与数字组合'
     return
   }
+  // 生产模式闸门: 工单号必须 12 位, 否则不予执行（后端同样会拦截）
+  if (isProduction.value && !workOrderValid.value) {
+    uutError.value = `生产模式必须先输入 ${WORK_ORDER_LEN} 位工单号（数字/字母）才能执行`
+    return
+  }
   uutError.value = ''
+  cloudError.value = ''
+  cloud.value = null
   running.value = true
   reportUrl.value = ''
   reportLoaded.value = false
@@ -403,7 +471,7 @@ async function startRun() {
     duration: null
   }
   try {
-    const res = await api.runTps(selectedTpsId.value, uut)
+    const res = await api.runTps(selectedTpsId.value, uut, runOptions())
     if (!res.success) throw new Error(res.message || '启动失败')
     currentTask.value.id = res.task_id
     pollTimer = setInterval(pollTask, 600)
@@ -421,6 +489,7 @@ async function pollTask() {
     const res = await api.getTpsTask(id)
     if (!res.success) return
     currentTask.value = { ...currentTask.value, ...res }
+    if (res.cloud) cloud.value = res.cloud
     await nextTick()
     if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
     if (res.status === 'completed' || res.status === 'failed') {
@@ -446,6 +515,8 @@ function onReportError() {
 // ---- 生命周期 ----
 onMounted(async () => {
   await loadTree()
+  await loadCloudStatus()
+  await loadCloudRecords()
 })
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
@@ -466,6 +537,53 @@ onUnmounted(() => {
             </span>
             <button class="btn ghost small" :disabled="loadingTree || running" @click="loadTree">刷新</button>
           </div>
+        </div>
+
+        <!-- ===== 装备树上方: 运行档位区 ===== -->
+        <!-- 生产模式: 工单号闸门（12 位才能执行, 结果上报云端） -->
+        <div v-if="isProduction" class="wo-box">
+          <div class="wo-head">
+            <span class="wo-tag">🏭 生产模式</span>
+            <span class="wo-note">需 {{ WORK_ORDER_LEN }} 位工单号</span>
+          </div>
+          <div class="wo-row">
+            <input
+              v-model="workOrder"
+              class="input mono"
+              :placeholder="`请输入 ${WORK_ORDER_LEN} 位工单号`"
+              :maxlength="WORK_ORDER_LEN"
+              :disabled="running"
+              @keyup.enter="startRun"
+            />
+            <span class="wo-count" :class="{ ok: workOrderValid }">{{ workOrder.length }}/{{ WORK_ORDER_LEN }}</span>
+          </div>
+          <div class="wo-hint" :class="workOrderValid ? 'ok' : 'warn'">
+            <template v-if="workOrderValid">✓ 工单号有效 · 设备连接：真机 · 结果上报云端数据库</template>
+            <template v-else>○ 输入 {{ WORK_ORDER_LEN }} 位数字或字母工单号后才能执行 TPS</template>
+          </div>
+          <button class="btn ghost small block" @click="setRunMode('debug')">切换到调试模式</button>
+        </div>
+
+        <!-- 调试模式: 免工单 + 仿真模式开关（不连接真实设备） -->
+        <div v-else class="dbg-box">
+          <div class="dbg-head">
+            <span class="dbg-tag">🛠 调试模式</span>
+            <span class="dbg-note">免工单</span>
+          </div>
+          <button
+            class="sim-btn"
+            :class="{ on: simulate }"
+            :disabled="running || simulateBusy"
+            @click="toggleSimulate"
+          >
+            <span class="sim-dot"></span>
+            <span class="sim-label">仿真模式</span>
+            <span class="sim-state">{{ simulate ? '已开启 · 不连接真实设备' : '已关闭 · 将连接真实设备' }}</span>
+          </button>
+          <div class="dbg-hint">
+            调试模式不校验工单号，数据只落本地记录库（不上传云端）；当前设备连接：{{ deviceModeText }}。
+          </div>
+          <button class="btn ghost small block" @click="setRunMode('production')">切换到生产模式</button>
         </div>
 
         <!-- UUT 查询 TPS -->
@@ -578,17 +696,32 @@ onUnmounted(() => {
             maxlength="12"
             :disabled="running"
           />
-          <button class="btn primary" :disabled="running || !steps.length" @click="startRun">
-            {{ running ? '执行中…' : '执行 TPS' }}
+          <button
+            class="btn primary"
+            :disabled="running || !steps.length || (isProduction && !workOrderValid)"
+            :title="isProduction && !workOrderValid ? `生产模式需先输入 ${WORK_ORDER_LEN} 位工单号` : ''"
+            @click="startRun"
+          >
+            {{ running ? '执行中…' : `执行 TPS（${RUN_MODE_META[runMode].short}）` }}
           </button>
         </div>
         <div v-if="uutError" class="tip err">{{ uutError }}</div>
+        <div v-if="cloudError" class="tip err">☁ {{ cloudError }}</div>
 
         <div v-if="currentTask" class="task-status-row">
           <span class="status-label">任务状态</span>
           <span class="badge" :class="taskStatusCls">{{ taskStatusText }}</span>
           <span class="task-id">任务 {{ currentTask.id }}</span>
           <span v-if="currentTask.duration != null" class="task-id">耗时 {{ currentTask.duration.toFixed(2) }}s</span>
+          <span v-if="isProduction && workOrderValid" class="task-id">工单 {{ normalizedWorkOrder }}</span>
+          <span v-if="isProduction" class="cloud-chip" :class="cloud ? (cloud.ok ? 'ok' : 'err') : 'idle'">
+            <template v-if="!cloud">☁ 云端待上报</template>
+            <template v-else-if="cloud.ok">☁ 已上传云端 #{{ cloud.cloud_id }}</template>
+            <template v-else>☁ 云端上报失败（待重传）</template>
+            <button v-if="cloud && !cloud.ok" class="cloud-retry" :disabled="cloudReuploading" @click="reuploadCloud">
+              {{ cloudReuploading ? '重传中…' : '重传' }}
+            </button>
+          </span>
           <button
             v-if="running"
             class="btn ghost small"
@@ -708,6 +841,30 @@ onUnmounted(() => {
           title="测试报告"
           @error="onReportError"
         ></iframe>
+
+        <!-- 云端数据库（演示）: 生产模式上报结果一览 -->
+        <div class="cloud-panel">
+          <div class="cloud-panel-head">
+            <span class="cloud-panel-title">☁ 云端数据库（演示）</span>
+            <span class="cloud-panel-state" :class="cloudStatus && cloudStatus.online ? 'ok' : 'err'">
+              {{ cloudStatus ? (cloudStatus.online ? '● 在线' : '● 离线') : '● 未知' }}
+            </span>
+            <button class="btn ghost small" @click="loadCloudRecords">刷新记录</button>
+          </div>
+          <div class="cloud-panel-meta">
+            接口：{{ (cloudStatus && cloudStatus.endpoint) || '—' }}<br />
+            云端库：{{ (cloudStatus && cloudStatus.db_path) || '—' }} · 已入库 {{ (cloudStatus && cloudStatus.record_count) ?? 0 }} 条
+          </div>
+          <div v-if="cloudRecords.length" class="cloud-records">
+            <div v-for="r in cloudRecords" :key="r.cloud_id" class="cloud-rec">
+              <span class="cr-wo">{{ r.work_order || '—' }}</span>
+              <span class="cr-uut">{{ r.uut }}</span>
+              <span class="cr-result" :class="r.result === 'OK' ? 'ok' : 'err'">{{ r.result }}</span>
+              <span class="cr-time">{{ r.uploaded_at }}</span>
+            </div>
+          </div>
+          <div v-else class="cloud-empty">云端暂无记录（生产模式跑完一轮 TPS 后自动入库）</div>
+        </div>
       </section>
     </div>
 
@@ -1156,6 +1313,99 @@ onUnmounted(() => {
 .step-hold-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .step-hold-hint { font-size: 11.5px; color: var(--accent); }
 .step-next { padding: 4px 12px; font-size: 12px; }
+
+/* ---- 装备树上方: 运行档位区（生产工单闸门 / 调试仿真开关） ---- */
+.wo-box, .dbg-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+}
+.wo-box { border-left-color: #d97706; background: rgba(217, 119, 6, 0.06); }
+.dbg-box { border-left-color: #0ea5e9; background: rgba(14, 165, 233, 0.05); }
+.wo-head, .dbg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wo-tag { font-size: 12px; font-weight: 700; color: #b45309; }
+.dbg-tag { font-size: 12px; font-weight: 700; color: #0369a1; }
+.wo-note, .dbg-note { font-size: 10.5px; color: var(--muted); }
+.wo-row { display: flex; align-items: center; gap: 8px; }
+.wo-row .input { flex: 1; min-width: 0; font-size: 13px; letter-spacing: 1px; }
+.wo-count { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: none; }
+.wo-count.ok { color: var(--ok); font-weight: 700; }
+.wo-hint, .dbg-hint { font-size: 11px; line-height: 1.5; }
+.wo-hint.ok { color: var(--ok); }
+.wo-hint.warn { color: var(--warn); }
+.dbg-hint { color: var(--muted); }
+.sim-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-strong);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+.sim-btn.on { border-style: solid; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.1); }
+.sim-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.sim-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.sim-btn.on .sim-dot { background: #0ea5e9; box-shadow: 0 0 8px rgba(14, 165, 233, 0.7); }
+.sim-label { font-size: 12px; font-weight: 700; color: var(--text); }
+.sim-state { font-size: 11px; color: var(--muted); }
+
+/* ---- 云端上报状态 ---- */
+.cloud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.cloud-chip.ok { color: var(--ok); border-color: rgba(21, 128, 61, 0.4); background: rgba(21, 128, 61, 0.1); }
+.cloud-chip.err { color: var(--err); border-color: rgba(220, 38, 38, 0.4); background: rgba(220, 38, 38, 0.1); }
+.cloud-retry {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+.cloud-retry:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ---- 云端数据库面板（演示） ---- */
+.cloud-panel {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.cloud-panel-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cloud-panel-title { font-size: 12.5px; font-weight: 700; }
+.cloud-panel-state { font-size: 11px; font-weight: 700; margin-left: auto; }
+.cloud-panel-state.ok { color: var(--ok); }
+.cloud-panel-state.err { color: var(--err); }
+.cloud-panel-meta { margin-top: 6px; font-size: 11px; color: var(--muted); font-family: var(--mono); word-break: break-all; line-height: 1.6; }
+.cloud-records { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow: auto; }
+.cloud-rec { display: flex; align-items: center; gap: 10px; font-size: 11.5px; font-family: var(--mono); }
+.cr-wo { font-weight: 700; color: var(--accent); }
+.cr-uut { color: var(--text); }
+.cr-result.ok { color: var(--ok); font-weight: 700; }
+.cr-result.err { color: var(--err); font-weight: 700; }
+.cr-time { margin-left: auto; color: var(--muted); }
+.cloud-empty { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
 
 @media (max-width: 900px) {
   .tps-wrap { grid-template-columns: 1fr; padding: 14px; }

@@ -15,6 +15,7 @@
 | 测试日志 | 每次 TPS 运行自动生成 `backend/logs/test_logs/tps_<task>.log`（TPS/UUT/逐步 PASS/FAIL/耗时/pytest 输出） |
 | AI 失败分析 | 右下角报告区可配置 AI API 地址与 Key（存本机浏览器），一键将测试日志+报告发给 AI 分析失败原因与排查建议（OpenAI 兼容 /chat/completions） |
 | 用例执行 | 输入 12 位 UUT 名称后执行，后端按 TPS 步骤顺序运行（环境初始化 → 测试用例 → 环境终止） |
+| 运行档位（调试 / 生产） | 左侧导航栏顶部与「测试执行」页共用的一档开关：**生产模式**——装备树上方出现工单号输入框，必须填满 **12 位工单号**（数字/字母）才能执行，设备固定走真机，本轮结果收尾后**自动上报云端数据库**（演示落 `backend/cloud_demo.db`）；**调试模式**——免工单，页面上多一个「仿真模式」开关（默认开，**不连接真实设备**），数据只落本地记录库。档位与工单号记在本机浏览器，切页不丢；生产模式结果带 工单号/运行档位/设备连接/云端上报状态，报告与「测试记录」页同步展示 |
 | 进度反馈 | 前端 600ms 轮询，逐步展示每步 待执行/执行中/通过/失败/跳过 状态、进度条、实时日志 |
 | 测试报告 | 每次运行生成 HTML 报告（含装备树字段：项目/DUT/UUT），右下角内嵌显示 |
 | 记录库 | 运行记录存入 SQLite (`backend/ate.db`)，支持按 UUT 名称查询历史测试记录 |
@@ -143,14 +144,17 @@ powershell -ExecutionPolicy Bypass -File packaging\build_package.ps1 -Version 1.
 | POST | `/api/license/import` | 导入 License 文件内容（Ed25519 验签 + 有效期 + 可选设备绑定） |
 | POST | `/api/login` | 登录（无有效 License 时拒绝，返回 license_required） |
 | GET | `/api/testcases` | 获取可执行用例列表（pytest --collect-only） |
-| POST | `/api/tps/{id}/run` | 执行 TPS（需 12 位英数 UUT 名称），返回 task_id；v2 包会先在 workspace 生成临时副本再逐步执行，支持 `bench_id`（指定测试台）与 `mode`（`simulate` 离线仿真 / `real` 真机） |
+| POST | `/api/tps/{id}/run` | 执行 TPS（需 12 位英数 UUT 名称），返回 task_id；v2 包会先在 workspace 生成临时副本再逐步执行。支持 `bench_id`（指定测试台）、`mode`（`simulate` 不连设备 / `real` 真机）与 `run_mode` + `work_order`：**生产模式**（`run_mode=production`）必须带 12 位工单号，否则返回 `code=WORK_ORDER_REQUIRED`，且设备固定走真机、结果收尾后上报云端 |
 | GET | `/api/tps-tasks/{id}` | 查询 TPS 执行进度 / 逐步状态 / 报告路径 |
 | GET | `/api/reports/{file}` | 获取生成的测试报告 HTML |
 | GET | `/api/tree` | 装备树（项目 → DUT → TPS 三级） |
 | GET | `/api/tps/by-uut?uut=` | 按 UUT 名称查询最近一次使用的 TPS（记录库匹配） |
 | POST | `/api/tps/import` | 导入 TPS JSON 文件（校验结构后保存到 testresource 立即生效） |
 | POST | `/api/ai/analyze` | AI 测试失败分析：读取任务测试日志+报告，调用配置的 AI API（OpenAI 兼容）返回分析 |
-| GET | `/api/records?uut=&date=&project=&batch=` | 查询测试记录：支持按 UUT（12 位英数）/ 日期（YYYY-MM-DD）/ 项目或 TPS 名称（模糊）/ 批次（模糊）组合过滤，数据存于 SQLite |
+| GET | `/api/records?uut=&date=&project=&batch=&work_order=` | 查询测试记录：支持按 UUT（12 位英数）/ 日期（YYYY-MM-DD）/ 项目或 TPS 名称（模糊）/ 批次（模糊）/ 工单号（模糊）组合过滤，数据存于 SQLite；记录含 运行档位 / 设备连接 / 云端上报状态 |
+| GET | `/api/cloud/status` | 云端数据库（演示）连接状态与统计：接口地址 / 落盘路径 / 是否离线演练 / 入库条数 / 按工单汇总 |
+| GET | `/api/cloud/records?work_order=&uut=&result=&limit=` | 查询「云端数据库」已入库的测试记录（演示看板） |
+| POST | `/api/cloud/upload/{task_id}` | 手动（重新）上报某一轮测试结果到云端；**幂等**（同 task_id 只更新不重复插入）；后端重启后内存任务丢失时会退回按 `task_id` 从本地记录库重建载荷，保证 `pending` 记录可补传 |
 | GET | `/api/equipment` | 测试装备清单：测试台 title/serial（SPMTS+12位数字）+ 硬件列表（易损件含剩余天数） |
 | GET | `/api/uut/{sn}` | 按 SN 查询 UUT 属性（批次号等；当前预置 `uut_profiles.json`，后续可切远端） |
 | GET | `/api/testbench/presets` | 预设测试台类型列表（含标准 BOM 概览：设备数/可编程数/网口数/串口数） |
@@ -199,6 +203,41 @@ powershell -ExecutionPolicy Bypass -File packaging\build_package.ps1 -Version 1.
 | GET | `/api/metadata/device-catalog` | 设备模板库（全部 BOM 按类别+型号+厂商去重汇总） |
 | POST | `/api/metadata/reseed?mode=merge\|reset` | 从预设文件补齐 / 全量重建 tree 数据 |
 | GET | `/api/health` | 健康检查 |
+
+## 运行档位（调试模式 / 生产模式）
+
+同一套 TPS，两种用法：现场调试时不想被工单和真机绑住，量产时又要堵住「没工单就开工」和「数据不上云」。
+
+档位开关放在左侧导航栏顶部（品牌区、当前测试台下方），与「测试执行」页的工单/仿真控件读写**同一份状态**（`frontend/src/runmode.js`），记在本机浏览器里，切页面、刷新都不丢。
+
+| | 生产模式 | 调试模式 |
+| --- | --- | --- |
+| 工单号 | **必需** 12 位数字/字母，装备树上方输入，填满才能点「执行 TPS」 | 不需要 |
+| 设备连接 | 固定 **真机**（`mode=real`；界面传入的 `simulate` 会被忽略） | 可选 **仿真模式**（`mode=simulate`，不连接任何真实设备） |
+| 数据去向 | 本地记录库 **+ 上报云端数据库** | 只落本地记录库 |
+| 典型用途 | 产线量产、需要工单追溯 | 台架调试、无硬件演练、复现问题 |
+
+**生产模式的工单闸门**是前后端双保险：界面按钮在工单号不足 12 位时直接禁用并给出提示；即使绕过界面直接调接口，后端 `POST /api/tps/{id}/run` 也会以 `code=WORK_ORDER_REQUIRED` 拒绝。
+
+**云端上报（演示）**：现场部署时把 `backend/cloud_db.py` 的 `_do_upload()` 换成真实 MES / 云端 HTTP 调用即可，其余逻辑（幂等键、失败不阻断、待重传标记）不用改。演示版有三条特性：
+
+- **幂等**：以 `task_id` 为业务主键，同一轮测试重复上报只更新、不产生重复行（手动重传可反复点）；
+- **失败不阻断**：云端不可达时本轮结论照常出（不会因为上报失败把 OK 判成 NOK），记录库把该条标成 `pending`，界面直接出现「重传」按钮；
+- **可重启补传**：后端重启后内存任务会丢，补传接口会退回按 `task_id` 从本地记录库重建载荷，`pending` 的记录不会因为重启永久卡住。
+
+上报动作刻意排在「状态定稿」之前——界面轮询到 `completed` 的那一刻，`cloud` 字段就已经就绪，不需要再补一次请求。
+
+演练断网：设 `ATE_CLOUD_OFFLINE=1` 启动后端，生产模式跑一轮即可看到「☁ 云端上报失败（待重传）」；去掉该变量再点「重传」即可补上，本地记录同步从 `pending` 变为 `uploaded`。
+
+配置项（环境变量）：
+
+| 变量 | 作用 | 默认 |
+| --- | --- | --- |
+| `ATE_CLOUD_ENDPOINT` | 云端接口地址（界面展示用；演示版不发真实网络请求） | `https://cloud.ate-demo.local/api/v1/test-records` |
+| `ATE_CLOUD_OFFLINE` | 置 `1` 强制模拟「云端不可达」，用于演练断网路径 | 未设 |
+| `ATE_CLOUD_DB_PATH` | 演示「云端库」落盘位置 | `backend/cloud_demo.db` |
+
+演示「云端库」表结构与本地记录库对齐，额外记录 `work_order` / `run_mode` / `device_mode` / `uploaded_at` / `source`；「测试执行」页报告区下方有只读面板可直接看到已入库记录。
 
 ## License 授权方案
 采用 **Ed25519 非对称签名** 离线授权，适合工控机/内网环境：
@@ -362,6 +401,7 @@ D:\ATE
 │   ├── instrument_tools.py   # 装备助手模块（工具卡片 + 示波器 SCPI 控制 + 仿真信号源）
 │   ├── metadata_registry.py  # 元数据管理模块（装备树 产品→子系统→类型 + 测试台 BOM，落盘 backend/tree/）
 │   ├── ate_db.py            # 注册库 → SQLite 投影（设备 driver 配置，TPS 运行时读取源）
+│   ├── cloud_db.py          # 云端数据库（演示）上报通道（生产模式结果上报 / 幂等 / 断网不阻断 / 可重启补传）
 │   ├── drivers/             # 仪器驱动层（传输层 / 通用 SCPI / 示波器 / 万用表 / 电源 / 负载 / 信号源 / 运动控制 + 工厂）
 │   ├── tps_runtime/         # TPS 运行环境模块（workspace 临时副本 / 公共 conftest / 清单校验 / 运行路由）
 │   ├── license_utils.py     # License 校验模块（Ed25519 公钥验证）
@@ -391,7 +431,8 @@ D:\ATE
 │   ├── package.json
 │   ├── vite.config.js       # /api 代理配置
 │   └── src/
-│       ├── api.js           # 后端接口封装（含 License/TPS/记录）
+│       ├── api.js           # 后端接口封装（含 License/TPS/记录/云端）
+│       ├── runmode.js       # 运行档位全局状态（调试/生产 + 仿真开关 + 工单号，localStorage 持久化）
 │       ├── router/          # 路由 + 登录守卫
 │       ├── views/
 │       │   ├── LoginView.vue    # 登录/注册（License 导入）页

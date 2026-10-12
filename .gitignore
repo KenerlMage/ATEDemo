@@ -16,6 +16,7 @@ frontend/dist/
 backend/tools/private_key.pem
 backend/license.dat
 backend/ate.db
+backend/cloud_demo.db
 *.lic
 *.pem
 *.key

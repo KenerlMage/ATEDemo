@@ -13,6 +13,7 @@ const filterDate = ref('')      // YYYY-MM-DD
 const filterProject = ref('')   // 项目 / TPS 名称 (模糊)
 const filterBatch = ref('')     // 批次 (模糊)
 const filterUut = ref('')       // UUT (12 位英数)
+const filterWorkOrder = ref('') // 工单号（生产模式，模糊匹配）
 
 // 通过/不通过: 颜色差异化 (OK 绿 / NOK 红)
 const resultBadge = (r) => {
@@ -39,7 +40,8 @@ async function load() {
       uut: uut || undefined,
       date: filterDate.value || undefined,
       project: filterProject.value.trim() || undefined,
-      batch: filterBatch.value.trim() || undefined
+      batch: filterBatch.value.trim() || undefined,
+      work_order: filterWorkOrder.value.trim() || undefined
     }
     const res = await api.getRecords(filters)
     if (!res.success) throw new Error(res.message || '查询失败')
@@ -57,6 +59,7 @@ function resetFilters() {
   filterProject.value = ''
   filterBatch.value = ''
   filterUut.value = ''
+  filterWorkOrder.value = ''
   load()
 }
 
@@ -92,6 +95,10 @@ onMounted(load)
           <span class="filter-label">UUT</span>
           <input v-model="filterUut" class="input mono" placeholder="12 位英数" maxlength="12" :disabled="querying" @keyup.enter="load" />
         </label>
+        <label class="filter-field">
+          <span class="filter-label">工单号</span>
+          <input v-model="filterWorkOrder" class="input mono" placeholder="生产工单号" maxlength="12" :disabled="querying" @keyup.enter="load" />
+        </label>
         <div class="filter-actions">
           <button class="btn primary" :disabled="querying" @click="load">
             {{ querying ? '查询中…' : '查询' }}
@@ -114,12 +121,15 @@ onMounted(load)
           <tr>
             <th>日期</th>
             <th>批次</th>
+            <th>工单号</th>
             <th>测试项目（TPS）</th>
             <th>项目（用例）</th>
             <th>设备编号</th>
             <th>UUT</th>
             <th>UUT 类型（PN）</th>
             <th>操作员工号</th>
+            <th>运行档位</th>
+            <th>云端</th>
             <th>结果</th>
             <th>耗时(s)</th>
             <th>报告</th>
@@ -129,6 +139,7 @@ onMounted(load)
           <tr v-for="r in records" :key="r.id">
             <td class="td-date">{{ (r.start_time || '').slice(0, 10) }}</td>
             <td class="td-mono">{{ r.batch || '—' }}</td>
+            <td class="td-mono">{{ r.work_order || '—' }}</td>
             <td>
               <div class="td-main">{{ r.tps_name }}</div>
               <div class="td-sub">{{ r.tps_id }}</div>
@@ -138,6 +149,12 @@ onMounted(load)
             <td class="td-mono td-uut">{{ r.uut }}</td>
             <td class="td-mono">{{ r.part_no || r.uut.slice(0, 10) }}</td>
             <td class="td-mono">{{ r.operator || '—' }}</td>
+            <td class="td-mono">{{ r.run_mode === 'production' ? '生产' : '调试' }}</td>
+            <td>
+              <span v-if="r.run_mode !== 'production'" class="td-muted">—</span>
+              <span v-else-if="r.cloud_status === 'uploaded'" class="cloud-badge ok">已上报</span>
+              <span v-else class="cloud-badge warn">待重传</span>
+            </td>
             <td>
               <span class="st-badge" :class="resultBadge(r).cls">{{ resultBadge(r).text }}</span>
             </td>
@@ -198,7 +215,7 @@ onMounted(load)
 .query-row .input { width: 300px; max-width: 60vw; }
 
 .records-table-wrap { padding: 0; overflow-x: auto; }
-.records-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1080px; }
+.records-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1280px; }
 .records-table th, .records-table td {
   text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -217,6 +234,10 @@ onMounted(load)
 /* 通过/不通过: 字体颜色差异化 (OK 绿色加粗 / NOK 红色加粗) */
 .st-ok { color: var(--ok, #15803d); background: rgba(21, 128, 61, 0.12); border: 1px solid rgba(21, 128, 61, 0.35); }
 .st-nok { color: var(--err, #dc2626); background: rgba(220, 38, 38, 0.12); border: 1px solid rgba(220, 38, 38, 0.35); }
+/* 云端上报状态（生产模式） */
+.cloud-badge { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+.cloud-badge.ok { color: var(--ok, #15803d); background: rgba(21, 128, 61, 0.12); border: 1px solid rgba(21, 128, 61, 0.35); }
+.cloud-badge.warn { color: var(--warn, #b45309); background: rgba(180, 83, 9, 0.12); border: 1px solid rgba(180, 83, 9, 0.35); }
 
 .report-link {
   color: var(--accent);
