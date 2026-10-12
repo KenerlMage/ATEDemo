@@ -35,6 +35,15 @@ export const api = {
       })
     }),
   getTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}`),
+  // 按等级读取任务日志: levels 为逗号分隔（error,warning,info）；errorsOnly 等价于只看 error
+  getTpsTaskLogs: (taskId, { levels = '', errorsOnly = false, limit = 0 } = {}) => {
+    const qs = new URLSearchParams()
+    if (levels) qs.set('levels', levels)
+    if (errorsOnly) qs.set('errors_only', 'true')
+    if (limit) qs.set('limit', String(limit))
+    const q = qs.toString()
+    return request(`/api/tps-tasks/${taskId}/logs${q ? '?' + q : ''}`)
+  },
   // 人工操作环节（cmd_suit 里 type=manual）：提交操作员选择 next（继续）/ abort（中止）
   decideTpsManual: (taskId, decision) =>
     request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision }) }),

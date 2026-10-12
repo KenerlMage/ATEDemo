@@ -286,7 +286,8 @@ def _run_task(task_id: str) -> None:
         with TASKS_LOCK:
             task = TASKS[task_id]
             if len(task["output"]) < 500:
-                task["output"].append(line)
+                # 行首加 [LEVEL] 等级描述，与 TPS 运行日志保持一致
+                task["output"].append(f"{_level_prefix(_classify_log_level(line))} {line}")
             if ".py::" in line:
                 if re.search(r"\bPASSED\b", line):
                     task["passed"] += 1
@@ -828,6 +829,97 @@ def _decode_output(data: bytes) -> str:
     return "".join(out_lines)
 
 
+# ==================== 测试日志等级（warning / info / error） ====================
+# 用例输出与 Runner 平台输出的每一行统一标注等级：
+#   * 落盘时行首加 [LEVEL]（[ERROR] / [WARNING] / [INFO]）
+#   * 同时写入任务快照 task["logs"]，供执行界面按等级筛选，便于在海量日志中定位报错
+LOG_LEVELS = ("error", "warning", "info")
+
+# 命中 -> error（失败/异常/断言/超时/崩溃等）
+_LOG_ERROR_PAT = re.compile(
+    r"(\b(error|fail|failed|failure|errors|fatal|critical|exception|traceback|assert\w*|"
+    r"crash(ed)?|refused|unreachable|aborted)\b|"
+    r"错误|失败|异常|报错|崩溃|故障|无法|致命|断言)",
+    re.IGNORECASE,
+)
+# 命中 -> warning（警告/跳过/超时/取消/中止/缺失/降级等）
+_LOG_WARN_PAT = re.compile(
+    r"(\b(warn(ing)?|warnings|skip(ped)?|deprecated|missing|ignored|retry(ing)?|"
+    r"degraded|timeout|timed out|cancel(led|ling)?|abort(ed)?|hold|suspend(ed)?)\b|"
+    r"警告|注意|跳过|超时|取消|中止|中断|放弃|暂停|缺|降级|重试|未执行|默认|等待)",
+    re.IGNORECASE,
+)
+
+
+# 零计数干扰项：像 "failed': 0" / "warning: 0" / "skipped: 0" 这种统计摘要
+# 不应被当成真正的报错/告警，匹配前先剔除。
+_LOG_ZERO_PAT = re.compile(
+    r"['\"]?\b(?:error|errors|fail|failed|failure|warn|warning|warnings|"
+    r"skip|skipped|abort|aborted)s?\b['\"]?\s*[:=]\s*0\b|"
+    r"(?:错误|失败|警告|告警|跳过|中止)\s*[:=]\s*0",
+    re.IGNORECASE,
+)
+
+
+def _classify_log_level(text: str) -> str:
+    """按关键字把一行日志归为 error / warning / info（error 优先级最高）"""
+    t = str(text or "")
+    probe = _LOG_ZERO_PAT.sub("0", t)   # 剔除 "failed': 0" 这类零计数，避免误判
+    if _LOG_ERROR_PAT.search(probe):
+        return "error"
+    if _LOG_WARN_PAT.search(probe):
+        return "warning"
+    return "info"
+
+
+def _level_prefix(level: str) -> str:
+    """日志行首的等级描述：info -> [INFO]"""
+    lvl = str(level or "info").lower()
+    if lvl not in LOG_LEVELS:
+        lvl = "info"
+    return f"[{lvl.upper()}]"
+
+
+def _append_task_log(task: dict | None, text: str, level: str | None = None) -> None:
+    """把日志写入任务快照的 logs 列表（执行界面据此按等级筛选）。
+
+    多行文本逐行拆分、逐行判定等级；最多保留 5000 行（超出丢弃最旧的）。
+    注意：调用方不得持有 TPS_TASKS_LOCK（本函数内部会获取）。
+    """
+    if task is None:
+        return
+    raw_lines = str(text if text is not None else "").splitlines() or [""]
+    with TPS_TASKS_LOCK:
+        buf = task.setdefault("logs", [])
+        for ln in raw_lines:
+            lvl = (level or _classify_log_level(ln)).lower()
+            if lvl not in LOG_LEVELS:
+                lvl = "info"
+            buf.append({"level": lvl, "text": ln})
+        if len(buf) > 5000:
+            del buf[: len(buf) - 5000]
+
+
+def _tps_log(task: dict | None, log_path: Path | None, text: str, level: str | None = None) -> None:
+    """统一测试日志出口：逐行加 [LEVEL] 前缀后落盘，并同步写入任务快照。
+
+    * 传 level 时整段按该等级；不传时逐行自动判定
+    * task 为 None 时只落盘（无任务快照的兜底场景）
+    """
+    lines = str(text if text is not None else "").splitlines() or [""]
+    if log_path is not None:
+        try:
+            with open(log_path, "a", encoding="utf-8") as lf:
+                for ln in lines:
+                    lvl = (level or _classify_log_level(ln)).lower()
+                    if lvl not in LOG_LEVELS:
+                        lvl = "info"
+                    lf.write(f"{_level_prefix(lvl)} {ln}\n")
+        except Exception:
+            pass
+    _append_task_log(task, text, level)
+
+
 def _run_tps_step(step: dict, tps_dir: Path, stage: dict | None = None) -> tuple[bool, str]:
     """执行单个 TPS 步骤, 返回 (是否成功, 输出摘要)
 
@@ -1057,8 +1149,12 @@ def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource
             "timeout_s": timeout_s,
             "source": source,
         }
-    with open(log_path, "a", encoding="utf-8") as lf:
-        lf.write(f"[{now_str()}] {log_label} [{title}] 等待操作员确认（{source or ('缺失 resource/' + resource) if resource else 'Runner 生成'}）\n")
+    _tps_log(
+        task, log_path,
+        f"[{now_str()}] {log_label} [{title}] 等待操作员确认"
+        f"（{source or ('缺失 resource/' + resource) if resource else 'Runner 生成'}）",
+        level="warning",
+    )
     # 分段等待：既可被操作员决定唤醒，也可被取消请求（界面「取消运行」/ 接口）唤醒
     import time as _t
     deadline = _t.monotonic() + max(0.0, timeout_s)
@@ -1121,8 +1217,7 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
         detail = f"操作员取消本轮测试（{title}）"
     else:
         detail = f"等待操作员确认超时（{timeout_s:.0f}s，按中止处理）：{title}"
-    with open(log_path, "a", encoding="utf-8") as lf:
-        lf.write(f"[{now_str()}] 人工操作 [{title}] -> {decision}（{detail}）\n")
+    _tps_log(task, log_path, f"[{now_str()}] 人工操作 [{title}] -> {decision}（{detail}）")
     return decision, detail
 
 
@@ -1154,8 +1249,7 @@ def _await_step_hold(task: dict, step: dict, log_path: Path, remaining: int) -> 
         detail = f"操作员在单步暂停点取消本轮测试（{title}）"
     else:
         detail = f"单步暂停超时（{timeout_s:.0f}s，按中止处理）：{title}"
-    with open(log_path, "a", encoding="utf-8") as lf:
-        lf.write(f"[{now_str()}] 单步暂停 [{title}] -> {decision}（{detail}）\n")
+    _tps_log(task, log_path, f"[{now_str()}] 单步暂停 [{title}] -> {decision}（{detail}）")
     return decision, detail
 
 
@@ -1194,31 +1288,43 @@ def _run_tps_task(task_id: str) -> None:
             except Exception as e:
                 task["status"] = "failed"
                 task["end_time"] = now_str()
-                task["error"] = f"运行环境准备失败: {e}"
-                with open(TEST_LOG_DIR / f"tps_{task_id}.log", "w", encoding="utf-8") as lf:
-                    lf.write(f"运行环境准备失败: {e}\n")
+                msg = f"运行环境准备失败: {e}"
+                task["error"] = msg
+                # 此处仍持有 TPS_TASKS_LOCK，直接写快照（不走 _tps_log，避免重复加锁）
+                task["logs"] = [{"level": "error", "text": msg}]
+                try:
+                    with open(TEST_LOG_DIR / f"tps_{task_id}.log", "w", encoding="utf-8") as lf:
+                        lf.write(f"{_level_prefix('error')} {msg}\n")
+                except Exception:
+                    pass
                 return
 
     total = len(tps["steps"])
     all_ok = True
     log_path = TEST_LOG_DIR / f"tps_{task_id}.log"
-    with open(log_path, "w", encoding="utf-8") as lf:
-        lf.write(f"===== ATE Runner 测试日志 =====\n")
-        lf.write(f"TPS      : {tps_id} ({tps.get('name', tps_id)})\n")
-        lf.write(f"UUT      : {task.get('uut', '')}\n")
-        lf.write(f"Project  : {tps.get('project', '')}\n")
-        lf.write(f"DUT      : {tps.get('dut', '')}\n")
-        lf.write(f"Start    : {task['start_time']}\n")
-        lf.write(f"Steps    : {total}\n")
-        lf.write(f"Workspace: {task.get('workspace') or '-'}\n")
-        lf.write(f"Bench    : {(task.get('bench') or {}).get('title', '-')} / {(task.get('bench') or {}).get('serial', '-')}\n")
-        lf.write(f"Mode     : {task.get('mode', 'simulate')}\n")
-        lf.write(f"RunMode  : {task.get('run_mode', RUN_MODE_DEBUG)}"
-                 f"{' (生产模式)' if task.get('run_mode') == RUN_MODE_PRODUCTION else ' (调试模式)'}\n")
-        lf.write(f"WorkOrder: {task.get('work_order') or '-'}\n")
-        if task.get("bench_warning"):
-            lf.write(f"Warning  : {task['bench_warning']}\n")
-        lf.write("-" * 60 + "\n")
+    try:
+        log_path.write_text("", encoding="utf-8")   # 每次运行重置日志文件
+    except Exception:
+        pass
+    header_lines = [
+        "===== ATE Runner 测试日志 =====",
+        f"TPS      : {tps_id} ({tps.get('name', tps_id)})",
+        f"UUT      : {task.get('uut', '')}",
+        f"Project  : {tps.get('project', '')}",
+        f"DUT      : {task.get('dut', '')}",
+        f"Start    : {task['start_time']}",
+        f"Steps    : {total}",
+        f"Workspace: {task.get('workspace') or '-'}",
+        f"Bench    : {(task.get('bench') or {}).get('title', '-')} / {(task.get('bench') or {}).get('serial', '-')}",
+        f"Mode     : {task.get('mode', 'simulate')}",
+        f"RunMode  : {task.get('run_mode', RUN_MODE_DEBUG)}"
+        f"{' (生产模式)' if task.get('run_mode') == RUN_MODE_PRODUCTION else ' (调试模式)'}",
+        f"WorkOrder: {task.get('work_order') or '-'}",
+    ]
+    if task.get("bench_warning"):
+        header_lines.append(f"Warning  : {task['bench_warning']}")
+    header_lines.append("-" * 60)
+    _tps_log(task, log_path, "\n".join(header_lines))
     with TPS_TASKS_LOCK:
         task["current_step"] = 0
     aborted = False
@@ -1233,8 +1339,7 @@ def _run_tps_task(task_id: str) -> None:
             aborted = True
             all_ok = False
             stop_label = "收到取消请求"
-            with open(log_path, "a", encoding="utf-8") as lf:
-                lf.write(f"[{now_str()}] 收到取消请求：本轮剩余测试条目跳过，进入收尾\n")
+            _tps_log(task, log_path, f"[{now_str()}] 收到取消请求：本轮剩余测试条目跳过，进入收尾", level="warning")
         # 操作员已中止/取消：后续测试条目全部跳过，但仍然执行收尾段（断电等安全动作）
         if aborted and step.get("type") == "test":
             with TPS_TASKS_LOCK:
@@ -1242,8 +1347,7 @@ def _run_tps_task(task_id: str) -> None:
                 task["steps"][i - 1]["detail"] = f"{stop_label}，未执行"
                 task["steps"][i - 1]["duration"] = 0.0
                 task["progress"] = int(i / total * 100)
-            with open(log_path, "a", encoding="utf-8") as lf:
-                lf.write(f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（{stop_label}）\n")
+            _tps_log(task, log_path, f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（{stop_label}）", level="warning")
             continue
         t0 = _time.time()
         if step.get("manual"):
@@ -1283,13 +1387,14 @@ def _run_tps_task(task_id: str) -> None:
                 else:
                     stop_label = "单步暂停未放行，按中止处理"
         # 逐步追加测试日志
-        with open(log_path, "a", encoding="utf-8") as lf:
-            lf.write(
-                f"[{now_str()}] Step {i}/{total} [{step.get('name', step.get('type', '?'))}] "
-                f"-> {mark} ({dt:.2f}s)\n"
-            )
-            if detail:
-                lf.write(f"    output: {detail[:400]}\n")
+        _tps_log(
+            task, log_path,
+            f"[{now_str()}] Step {i}/{total} [{step.get('name', step.get('type', '?'))}] "
+            f"-> {mark} ({dt:.2f}s)",
+        )
+        if detail:
+            # 用例输出可能多行：交给 _tps_log 逐行判定等级（FAILED / ERROR / assert -> error）
+            _tps_log(task, log_path, f"    output: {detail[:800]}")
         if not ok:
             all_ok = False
             if not aborted:
@@ -1312,11 +1417,12 @@ def _run_tps_task(task_id: str) -> None:
         _cloud_snapshot["end_time"] = now_str()
         _cloud_snapshot["report"] = f"reports/tps_{task_id}.html"
         upload = _upload_to_cloud(_cloud_snapshot, tps)
-        with open(log_path, "a", encoding="utf-8") as lf:
-            lf.write(
-                f"[{now_str()}] 云端上报: {'成功' if upload.get('ok') else '失败'}"
-                f" cloud_id={upload.get('cloud_id') or '-'} {upload.get('message', '')}\n"
-            )
+        _tps_log(
+            task, log_path,
+            f"[{now_str()}] 云端上报: {'成功' if upload.get('ok') else '失败'}"
+            f" cloud_id={upload.get('cloud_id') or '-'} {upload.get('message', '')}",
+            level="info" if upload.get("ok") else "warning",
+        )
 
     # ---- 收尾 2/3: 状态定稿 (与 cloud 同一次加锁写入, 界面一次读到完整结果) ----
     with TPS_TASKS_LOCK:
@@ -1338,11 +1444,15 @@ def _run_tps_task(task_id: str) -> None:
         except Exception:
             task["report"] = None
     # 日志收尾
-    with open(log_path, "a", encoding="utf-8") as lf:
-        lf.write("-" * 60 + "\n")
-        lf.write(f"End      : {task['end_time']}\n")
-        lf.write(f"Result   : {'ALL PASS' if all_ok else 'FAILED (中止执行)'}\n")
-        lf.write(f"Duration : {task.get('duration', 0):.2f}s\n")
+    _tps_log(
+        task, log_path,
+        "\n".join([
+            "-" * 60,
+            f"End      : {task['end_time']}",
+            f"Result   : {'ALL PASS' if all_ok else 'FAILED (中止执行)'}",
+            f"Duration : {task.get('duration', 0):.2f}s",
+        ]),
+    )
 
     with open(LOG_DIR / "execution.log", "a", encoding="utf-8") as f:
         with TPS_TASKS_LOCK:
@@ -1435,6 +1545,7 @@ def run_tps(tps_id: str, req: TpsRunRequest | None = None):
             "start_time": None,
             "end_time": None,
             "duration": None,
+            "logs": [],                # 分级日志（warning / info / error），执行界面据此筛选
         }
     threading.Thread(target=_run_tps_task, args=(task_id,), daemon=True).start()
     mode_note = (
@@ -1458,6 +1569,37 @@ def tps_task_status(task_id: str):
         if not task:
             return {"success": False, "message": "任务不存在"}
         return {"success": True, **task}
+
+
+@app.get("/api/tps-tasks/{task_id}/logs")
+def tps_task_logs(task_id: str, levels: str = "", errors_only: bool = False, limit: int = 0):
+    """按等级读取任务日志（日志面板也可直接读 /api/tps-tasks/{id} 快照里的 logs 字段）。
+
+    * levels: 逗号分隔的等级过滤，如 `error,warning`；留空返回全部
+    * errors_only: 便捷开关，等价于 levels=error（只看报错）
+    * limit: 仅返回最近 N 条（0 = 全部）
+    """
+    with TPS_TASKS_LOCK:
+        task = TPS_TASKS.get(task_id)
+        if not task:
+            return {"success": False, "message": "任务不存在"}
+        all_logs = [dict(x) for x in (task.get("logs") or [])]
+    counts = {lv: 0 for lv in LOG_LEVELS}
+    for x in all_logs:
+        lv = str(x.get("level") or "info")
+        counts[lv] = counts.get(lv, 0) + 1
+    want = {"error"} if errors_only else {s.strip().lower() for s in str(levels or "").split(",") if s.strip()}
+    logs = [x for x in all_logs if x.get("level") in want] if want else all_logs
+    if limit and limit > 0:
+        logs = logs[-limit:]
+    return {
+        "success": True,
+        "task_id": task_id,
+        "levels": list(LOG_LEVELS),
+        "counts": counts,
+        "count": len(logs),
+        "logs": logs,
+    }
 
 
 class ManualDecisionRequest(BaseModel):

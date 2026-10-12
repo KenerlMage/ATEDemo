@@ -88,6 +88,43 @@ const aiAnalysis = ref('')
 const aiError = ref('')
 const logEl = ref(null)
 
+// ---- 执行日志等级筛选 ----
+// 后端把每条日志标注为 error / warning / info，并在行首加 [LEVEL] 前缀；
+// 这里按等级筛选，便于在海量日志中只看报错。
+const LOG_DISPLAY_MAX = 1500
+const levelOn = ref({ error: true, warning: true, info: true })
+const taskLogs = computed(() => currentTask.value?.logs || [])
+const logCounts = computed(() => {
+  const c = { error: 0, warning: 0, info: 0 }
+  for (const l of taskLogs.value) {
+    const lv = l?.level
+    if (lv === 'error' || lv === 'warning' || lv === 'info') c[lv] += 1
+    else c.info += 1
+  }
+  return c
+})
+const filteredLogs = computed(() => {
+  const out = []
+  for (const l of taskLogs.value) {
+    if (levelOn.value[l?.level] !== false) out.push(l)
+  }
+  return out.length > LOG_DISPLAY_MAX ? out.slice(-LOG_DISPLAY_MAX) : out
+})
+const onlyErrorMode = computed(
+  () => levelOn.value.error && !levelOn.value.warning && !levelOn.value.info
+)
+function toggleLevel(lv) {
+  levelOn.value = { ...levelOn.value, [lv]: !levelOn.value[lv] }
+}
+function showAllLevels() {
+  levelOn.value = { error: true, warning: true, info: true }
+}
+function onlyErrors() {
+  levelOn.value = onlyErrorMode.value
+    ? { error: true, warning: true, info: true }
+    : { error: true, warning: false, info: false }
+}
+
 function toggleAiConfig() {
   aiConfigOpen.value = !aiConfigOpen.value
 }
@@ -468,8 +505,10 @@ async function startRun() {
     uut,
     start_time: null,
     end_time: null,
-    duration: null
+    duration: null,
+    logs: []
   }
+  showAllLevels()
   try {
     const res = await api.runTps(selectedTpsId.value, uut, runOptions())
     if (!res.success) throw new Error(res.message || '启动失败')
@@ -491,7 +530,11 @@ async function pollTask() {
     currentTask.value = { ...currentTask.value, ...res }
     if (res.cloud) cloud.value = res.cloud
     await nextTick()
-    if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
+    // 日志面板自动滚到底部（用户上翻查看历史时不打扰）
+    if (logEl.value) {
+      const el = logEl.value
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight
+    }
     if (res.status === 'completed' || res.status === 'failed') {
       clearInterval(pollTimer)
       pollTimer = null
@@ -787,6 +830,57 @@ onUnmounted(() => {
           :class="currentTask.status"
         >
           {{ currentTask.status === 'completed' ? '✓ 全部步骤执行完成' : '✗ 执行中止：存在失败步骤，已生成报告' }}
+        </div>
+      </section>
+
+      <!-- 右下: 执行日志（按等级 [ERROR]/[WARNING]/[INFO] 筛选） -->
+      <section class="log-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">
+            执行日志
+            <span class="log-count">（{{ filteredLogs.length }} / {{ taskLogs.length }} 条）</span>
+          </h2>
+          <div class="log-filters">
+            <button
+              class="log-chip error"
+              :class="{ off: !levelOn.error }"
+              title="显示 / 隐藏 ERROR 级别日志"
+              @click="toggleLevel('error')"
+            >ERROR {{ logCounts.error }}</button>
+            <button
+              class="log-chip warning"
+              :class="{ off: !levelOn.warning }"
+              title="显示 / 隐藏 WARNING 级别日志"
+              @click="toggleLevel('warning')"
+            >WARNING {{ logCounts.warning }}</button>
+            <button
+              class="log-chip info"
+              :class="{ off: !levelOn.info }"
+              title="显示 / 隐藏 INFO 级别日志"
+              @click="toggleLevel('info')"
+            >INFO {{ logCounts.info }}</button>
+            <button
+              class="log-chip plain"
+              :class="{ active: onlyErrorMode }"
+              title="只看报错 / 恢复全部"
+              @click="onlyErrors"
+            >{{ onlyErrorMode ? '显示全部' : '只看报错' }}</button>
+          </div>
+        </div>
+        <div ref="logEl" class="log-body">
+          <p v-if="!taskLogs.length" class="panel-tip">
+            执行 TPS 后在此查看分级日志：每条日志以 [ERROR] / [WARNING] / [INFO] 开头，可按等级筛选
+          </p>
+          <p v-else-if="!filteredLogs.length" class="panel-tip">当前筛选条件下没有日志</p>
+          <div
+            v-for="(l, i) in filteredLogs"
+            :key="i"
+            class="log-line"
+            :class="'lv-' + (l.level || 'info')"
+          >
+            <span class="log-badge">[{{ (l.level || 'info').toUpperCase() }}]</span>
+            <span class="log-text">{{ l.text }}</span>
+          </div>
         </div>
       </section>
 
@@ -1255,6 +1349,50 @@ onUnmounted(() => {
   border-radius: 10px;
   background: #f4f1fd;
 }
+
+/* ---- 执行日志（按等级筛选） ---- */
+.log-panel { display: flex; flex-direction: column; }
+.log-count { color: var(--muted); font-size: 12px; font-weight: 400; }
+.log-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.log-chip {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.log-chip:hover { border-color: var(--accent); }
+.log-chip.error { color: var(--err); border-color: rgba(220, 38, 38, 0.45); background: rgba(220, 38, 38, 0.08); }
+.log-chip.warning { color: var(--warn); border-color: rgba(180, 83, 9, 0.45); background: rgba(180, 83, 9, 0.08); }
+.log-chip.info { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.07); }
+.log-chip.plain.active { color: var(--text); border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+.log-chip.off { opacity: 0.35; filter: grayscale(0.6); }
+.log-body {
+  margin-top: 4px;
+  background: #faf9ff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.log-line { display: flex; gap: 6px; align-items: flex-start; padding: 1px 0; }
+.log-badge { flex: none; font-weight: 700; }
+.log-text { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
+.log-line.lv-error { color: var(--err); }
+.log-line.lv-warning { color: var(--warn); }
+.log-line.lv-info { color: #4b4468; }
+.log-line.lv-error .log-badge { color: var(--err); }
+.log-line.lv-warning .log-badge { color: var(--warn); }
+.log-line.lv-info .log-badge { color: var(--muted); }
 
 /* ---- 人工操作弹窗 ---- */
 .manual-mask {
