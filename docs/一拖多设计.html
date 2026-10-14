@@ -141,23 +141,7 @@
           <tr><td>汇聚点</td><td>各测试工控机下发的命令，实际都发给了同一个 GPB 上的设备管理服务</td></tr>
         </tbody>
       </table>
-      <p>上表六个环节各自对应页面上的一个图标：设备 BOM、工位实例、通道配置、参数注入、连接方式、汇聚点。以下两张取自 ATE Runner 的实际数据（只读导出，未作改写）：</p>
-      <figure>
-        <img src="assets/tps-multi-bench-bom.png" alt="真实测试台 BOM：SPM-RH-DYN-01 的 7 台设备清单，含型号、接口与协议、地址与必需标记">
-        <figcaption>真实测试台 BOM：SPM-RH-DYN-01 的 7 台设备清单，含型号、接口与协议、地址与必需标记</figcaption>
-      </figure>
-      <figure>
-        <img src="assets/tps-multi-bench-db.png" alt="装备属性配置模块：bench_registry 工位实例与 device_registry 通道/驱动配置的真实表与取值">
-        <figcaption>装备属性配置模块：bench_registry 工位实例与 device_registry 通道/驱动配置的真实表与取值</figcaption>
-      </figure>
-      <table>
-        <thead><tr><th>实际数据</th><th>出处</th><th>页面上的读法</th></tr></thead>
-        <tbody>
-          <tr><td>测试台 BOM（7 台设备）</td><td><code>backend/tree/bom/SPM-RH-DYN-01.json</code>，由元数据管理 · 测试台 BOM 管理维护</td><td>设备 BOM 是注册工位实例的依据，多台测试台共用同一份清单</td></tr>
-          <tr><td>工位实例记录</td><td><code>backend/ate.db</code> · 表 <code>bench_registry</code>（id、preset_id、serial、station）</td><td>同一 preset_id 可注册多个工位实例，每个实例有自己的执行页面</td></tr>
-          <tr><td>通道与驱动配置</td><td><code>backend/ate.db</code> · 表 <code>device_registry</code>（interface、protocol、host、port、channel、driver）</td><td>各台测试台不同的通道配置写入该表，执行时由 pytest 注入用例</td></tr>
-        </tbody>
-      </table>
+      <p>上表六个环节各自对应页面上的一个图标：设备 BOM、工位实例、通道配置、参数注入、连接方式、汇聚点；页面右侧为完整的一拖多架构拓扑图。</p>
       <h3>2.2 与当前方案的差别</h3>
       <table>
         <thead><tr><th>对比项</th><th>当前方案</th><th>正式方案（ATE Runner）</th></tr></thead>
