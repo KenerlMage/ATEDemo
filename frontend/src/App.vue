@@ -6,6 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from './api'
+import UpdateBadge from './components/UpdateBadge.vue'
 // 运行档位: 生产(需工单·真机·上报云端) / 调试(免工单·可仿真) —— 全局共享状态
 import {
   runMode,
@@ -210,9 +211,9 @@ function logout() {
 
         <!-- 底部：用户 + 退出 -->
         <div class="side-foot">
+          <UpdateBadge />
           <div class="side-user">
             <span class="user-chip">{{ username }}</span>
-            <span class="side-version">ATE RUNNER v1.0</span>
           </div>
           <button class="btn ghost side-logout" @click="logout">退出登录</button>
         </div>

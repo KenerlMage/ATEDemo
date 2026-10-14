@@ -1,0 +1,27 @@
+{
+  "channel": "stable",
+  "server": "local-update-server",
+  "min_supported": "1.0.0",
+  "force": false,
+  "releases": [
+    {
+      "version": "1.1.260113",
+      "title": "ATE Runner 1.1.260113",
+      "released_at": "2026-10-14",
+      "kind": "feature",
+      "highlights": [
+        "版本升级通道上线",
+        "升级继承本地数据",
+        "支持回滚"
+      ],
+      "release_note": "# ATE Runner 1.1.260113\n\n- 新增版本升级通道: 远端发布 → 客户端拉取 → 界面通知 → 一键升级\n- 升级过程自动继承本地测试记录、运行目录与授权文件\n- 升级完成后重启生效, 支持回滚至上一版本\n",
+      "package": {
+        "name": "ATERunner-1.1.260113.zip",
+        "size": 965,
+        "sha256": "36ab92ddb13a0067ea63ed7d1455aad7d90f7c6ff182a74c8cf117936871b99b",
+        "url": "packages/ATERunner-1.1.260113.zip"
+      }
+    }
+  ],
+  "updated_at": "2026-10-14T09:41:22"
+}

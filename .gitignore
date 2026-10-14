@@ -63,3 +63,8 @@ workspace/**/run_result.json.bak
 /ATE_DIST/
 **/payload/
 **/*_work/
+
+# Runner 升级运行目录（下载/暂存/备份/状态）
+updates/
+.selftest_runner/
+

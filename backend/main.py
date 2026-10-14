@@ -318,6 +318,8 @@ def _run_task(task_id: str) -> None:
 
 @app.post("/api/execute")
 def execute(req: ExecuteRequest):
+    if updater.manager().upgrade_in_progress():
+        return {"success": False, "message": "升级流程进行中，已暂停启动新的测试执行"}
     task_id = uuid.uuid4().hex[:12]
     with TASKS_LOCK:
         TASKS[task_id] = {
@@ -1504,6 +1506,8 @@ def _run_tps_task(task_id: str) -> None:
 
 @app.post("/api/tps/{tps_id}/run")
 def run_tps(tps_id: str, req: TpsRunRequest | None = None):
+    if updater.manager().upgrade_in_progress():
+        return {"success": False, "message": "升级流程进行中，已暂停启动新的 TPS 执行"}
     tps_path = next((p for p in _load_tps_files() if _read_tps(p) and _read_tps(p)["id"] == tps_id), None)
     if not tps_path:
         return {"success": False, "message": f"TPS 不存在: {tps_id}"}
@@ -2114,6 +2118,37 @@ try:
     ate_db.sync_from_registry()
 except Exception:
     pass
+
+
+# ==================== Runner 版本升级 (发布 -> 推送 -> 通知 -> 升级) ====================
+# 接口: GET  /api/runner/version, /api/updates/status, /api/updates/check,
+#            /api/updates/release-note/{version}
+#       POST /api/updates/download, /api/updates/apply, /api/updates/rollback,
+#            /api/updates/ack-note
+# 说明: 升级只做"准备"(下载 + 校验 + 登记待替换清单), 目录替换由 ATE_Launcher
+#       在下次启动时执行; 测试任务执行期间禁止升级。
+import updater  # noqa: E402
+import updater_api  # noqa: E402
+
+
+def _active_test_tasks() -> list:
+    """正在执行的测试任务列表(供升级互斥判定)。"""
+    active = []
+    with TASKS_LOCK:
+        for tid, t in TASKS.items():
+            if t.get("status") == "running":
+                active.append({"kind": "testcase", "task_id": tid,
+                               "name": t.get("testcase_id") or tid})
+    with TPS_TASKS_LOCK:
+        for tid, t in TPS_TASKS.items():
+            if t.get("status") in ("running", "waiting"):
+                active.append({"kind": "tps", "task_id": tid,
+                               "name": t.get("tps_name") or t.get("tps_id") or tid})
+    return active
+
+
+updater.register_activity_probe(_active_test_tasks)
+updater_api.install_routes(app)
 
 
 # ==================== 前端静态托管 (assets + SPA 兜底) ====================
