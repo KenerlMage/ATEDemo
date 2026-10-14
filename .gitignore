@@ -68,3 +68,10 @@ workspace/**/run_result.json.bak
 updates/
 .selftest_runner/
 
+# Runner 运行副本（每次运行生成的临时工程目录，不入库）
+workspace/**/run_*/
+
+# git 操作临时文件
+/.git_commit_msg.txt
+/.git_diff_tmp.txt
+
