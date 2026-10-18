@@ -21,7 +21,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "用于接收灵敏度与解调性能测试"
+      "note": "用于接收灵敏度与解调性能测试",
+      "device_type": "generic-awg"
     },
     {
       "id": "rs-fsw26",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "26.5GHz，建议加装前置放大器"
+      "note": "26.5GHz，建议加装前置放大器",
+      "device_type": "generic-scpi"
     },
     {
       "id": "tek-mso64b",
@@ -59,7 +61,8 @@
       "default_address": "TCPIP0::192.168.20.33::inst0::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "配差分探头用于包络与调制时序"
+      "note": "配差分探头用于包络与调制时序",
+      "device_type": "tektronix-mso5"
     },
     {
       "id": "keysight-e36313a",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "三路低噪声输出"
+      "note": "三路低噪声输出",
+      "device_type": "generic-psu"
     },
     {
       "id": "rf-switch-matrix",
@@ -97,7 +101,8 @@
       "default_address": "USB0::0x1234::0x5678::RFMX01::INSTR",
       "default_channel": "",
       "required": false,
-      "note": "USB 接口不支持网络探测，需按自检清单人工确认"
+      "note": "USB 接口不支持网络探测，需按自检清单人工确认",
+      "device_type": "generic-scpi"
     },
     {
       "id": "uart-ctrl",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-scpi"
     },
     {
       "id": "shield-box",
@@ -135,7 +141,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "无程控接口"
+      "note": "无程控接口",
+      "device_type": "passive-device"
     }
   ]
 }

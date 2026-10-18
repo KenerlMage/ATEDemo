@@ -21,7 +21,8 @@
       "default_address": "TCPIP0::192.168.10.41::inst0::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口"
+      "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
+      "device_type": "tektronix-mso5"
     },
     {
       "id": "rh-dmm",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "6.5 位；作读头阻值与偏置电压的测量基准，建议每年送检"
+      "note": "6.5 位；作读头阻值与偏置电压的测量基准，建议每年送检",
+      "device_type": "generic-dmm"
     },
     {
       "id": "rh-psu",
@@ -59,7 +61,8 @@
       "default_address": "",
       "default_channel": "CH1",
       "required": true,
-      "note": "双路 0-30V/6A；CH1 供读头本体，CH2 供前置放大电路"
+      "note": "双路 0-30V/6A；CH1 供读头本体，CH2 供前置放大电路",
+      "device_type": "generic-psu"
     },
     {
       "id": "rh-eload",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "150V/30A/300W，用于动态拉载与纹波测试"
+      "note": "150V/30A/300W，用于动态拉载与纹波测试",
+      "device_type": "generic-eload"
     },
     {
       "id": "rh-awg",
@@ -97,7 +101,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "20 MHz；扫频与脉冲激励，配合示波器做动态响应分析"
+      "note": "20 MHz；扫频与脉冲激励，配合示波器做动态响应分析",
+      "device_type": "generic-awg"
     },
     {
       "id": "rh-spin",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "用于转速扫描下的输出一致性验证；转速范围 0-12000 rpm"
+      "note": "用于转速扫描下的输出一致性验证；转速范围 0-12000 rpm",
+      "device_type": "serial-motion"
     },
     {
       "id": "rh-fixture",
@@ -135,7 +141,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "易损件，建议 180 天更换并登记寿命"
+      "note": "易损件，建议 180 天更换并登记寿命",
+      "device_type": "passive-device"
     }
   ]
 }

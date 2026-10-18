@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-"""驱动工厂：按注册库里的设备信息挑选驱动实现
+"""驱动工厂：按测试台注册时选定的设备类型直接取驱动实现
 
-选择顺序（先具体、后兜底）：
-1. 具体型号规格（如 `model` 含 `mso5` -> 泰克 MSO5 系列示波器驱动）
-2. 类别规格（万用表 / 电源 / 电子负载 / 信号源 / 运动控制）
-3. 被动设备（夹具等无通讯设备）
-4. 通用 SCPI 仪器（最后兜底，保证任何登记过的设备都能被实例化）
+设备类型是注册记录中的显式字段 `device_type`，不再根据型号、厂商、类别或
+接口关键词做打分选型。新增型号时，注册人员从受控类型列表中选择；运行时只做
+一次精确查表，找不到就报错，不回退到相似驱动。
 """
 
 from __future__ import annotations
@@ -18,124 +16,117 @@ from .models import DeviceConfig
 from .scope import ScopeDriver
 from .scpi import AwgDriver, DmmDriver, ELoadDriver, GenericScpiDriver, MotionDriver, PsuDriver
 
-# 每条规格: key / family / label / cls / priority(越大越优先) / match(字段->关键词列表)
-DRIVER_SPECS: list[dict] = [
+# 受控设备类型清单。key 同时是注册记录中的 device_type 与 driver_key。
+DRIVER_TYPES: list[dict] = [
     {
         "key": "tektronix-mso5",
         "family": "scope",
         "label": "数字示波器 · 泰克 MSO5 系列",
         "cls": ScopeDriver,
-        "priority": 20,
-        "match": {"model": ["mso5", "mso54", "mso64", "dpo5", "tektronix"], "vendor": ["tektronix"]},
+        "description": "泰克 MSO5/DPO5 系列，LAN 或串口",
     },
     {
         "key": "generic-dmm",
         "family": "dmm",
         "label": "数字万用表",
         "cls": DmmDriver,
-        "priority": 12,
-        "match": {"category": ["万用表", "dmm", "multimeter"], "role": ["dmm", "万用表"]},
+        "description": "支持 SCPI 的台式/系统万用表",
     },
     {
         "key": "generic-psu",
         "family": "psu",
         "label": "可编程直流电源",
         "cls": PsuDriver,
-        "priority": 12,
-        "match": {"category": ["电源", "psu", "power supply"], "role": ["psu", "电源"]},
+        "description": "单路/多路可编程直流电源",
     },
     {
         "key": "generic-eload",
         "family": "eload",
         "label": "可编程电子负载",
         "cls": ELoadDriver,
-        "priority": 12,
-        "match": {"category": ["电子负载", "eload", "load"], "role": ["eload", "负载"]},
+        "description": "支持恒流/恒压/恒阻/恒功率的电子负载",
     },
     {
         "key": "generic-awg",
         "family": "awg",
         "label": "波形发生器 / 信号源",
         "cls": AwgDriver,
-        "priority": 12,
-        "match": {"category": ["信号源", "波形", "awg", "generator"], "role": ["awg", "信号源"]},
+        "description": "函数发生器、任意波形发生器或射频信号源",
     },
     {
         "key": "serial-motion",
         "family": "motion",
         "label": "运动控制器（串口）",
         "cls": MotionDriver,
-        "priority": 14,
-        "match": {"category": ["运动控制", "motion", "转速", "spin"], "interface": ["SERIAL", "RS232", "RS485", "UART", "COM"]},
+        "description": "通过串口控制转速、位置或扫描运动",
     },
     {
         "key": "passive-device",
         "family": "passive",
         "label": "被动设备（无通讯）",
         "cls": PassiveDriver,
-        "priority": 5,
-        "match": {"interface": ["NONE", "MANUAL", "USB", "GPIB"]},
+        "description": "夹具、工装、手动设备等无通讯对象",
     },
     {
         "key": "generic-scpi",
         "family": "generic",
         "label": "通用 SCPI 仪器",
         "cls": GenericScpiDriver,
-        "priority": 1,
-        "match": {},
+        "description": "未归入上述家族、但支持 SCPI 的仪器",
     },
 ]
 
-DRIVER_SPECS_KEYS = [s["key"] for s in DRIVER_SPECS]
+DRIVER_TYPE_MAP: dict[str, dict] = {item["key"]: item for item in DRIVER_TYPES}
+DRIVER_TYPE_KEYS = [item["key"] for item in DRIVER_TYPES]
 
-_FIELD_WEIGHT = {"model": 3.0, "vendor": 2.0, "category": 2.0, "role": 1.5, "interface": 1.2, "name": 1.0}
+# 旧记录迁移用的精确类别映射，只在补齐缺失字段时使用，不参与运行时选型。
+LEGACY_CATEGORY_TYPE: dict[str, str] = {
+    "示波器": "tektronix-mso5",
+    "万用表": "generic-dmm",
+    "电源": "generic-psu",
+    "电子负载": "generic-eload",
+    "信号源": "generic-awg",
+    "波形": "generic-awg",
+    "运动控制": "serial-motion",
+    "串口": "generic-scpi",
+    "夹具": "passive-device",
+    "台架": "passive-device",
+}
 
 _OPEN_DRIVERS: list[Driver] = []
 
 
-def _text_of(dev: Any, field: str) -> str:
+def default_device_type(dev: Any) -> str:
+    """旧记录/旧 BOM 缺失 device_type 时的精确类别映射。
+
+    不做关键词打分，也不看型号；未命中的类别统一落到通用 SCPI。
+    """
     cfg = dev if isinstance(dev, DeviceConfig) else DeviceConfig.from_dict(dev or {})
-    if field == "interface":
-        return str(cfg.interface or "")
-    return str(getattr(cfg, field, "") or "")
-
-
-def _score(spec: dict, dev: Any) -> float:
-    score = 0.0
-    for field, keywords in (spec.get("match") or {}).items():
-        hay = _text_of(dev, field).lower()
-        if not hay:
-            continue
-        for kw in keywords:
-            if str(kw).lower() in hay:
-                score += _FIELD_WEIGHT.get(field, 1.0)
-                break
-    return score
+    return LEGACY_CATEGORY_TYPE.get(str(cfg.category or "").strip(), "generic-scpi")
 
 
 def resolve_spec(dev: Any) -> dict:
-    """返回命中的驱动规格（找不到则返回通用 SCPI 兜底规格）"""
-    best: Optional[dict] = None
-    best_score = 0.0
-    for spec in DRIVER_SPECS:
-        if not spec.get("match"):
-            continue
-        score = _score(spec, dev)
-        if score <= 0:
-            continue
-        if score > best_score or (score == best_score and best and spec["priority"] > best["priority"]):
-            best, best_score = spec, score
-    if best:
-        return best
-    return next(s for s in DRIVER_SPECS if s["key"] == "generic-scpi")
+    """按 device_type 精确取驱动类型；缺失或非法直接报错。"""
+    cfg = dev if isinstance(dev, DeviceConfig) else DeviceConfig.from_dict(dev or {})
+    key = str(cfg.device_type or "").strip()
+    if not key:
+        raise DriverNotFound(
+            "设备未指定 device_type，请在测试台注册时选择设备类型",
+            device_id=cfg.device_id,
+        )
+    spec = DRIVER_TYPE_MAP.get(key)
+    if not spec:
+        raise DriverNotFound(
+            f"未知设备类型: {key}",
+            device_id=cfg.device_id,
+            detail="可选类型: " + ", ".join(DRIVER_TYPE_KEYS),
+        )
+    return spec
 
 
 def resolve_driver_key(dev: Any) -> str:
-    """设备 -> 驱动规格名（写入 SQLite `device_registry.driver` 列，供运行时核对）"""
-    try:
-        return resolve_spec(dev)["key"]
-    except Exception:
-        return "generic-scpi"
+    """设备 -> 设备类型 key（写入 SQLite `device_registry.driver` 列）。"""
+    return resolve_spec(dev)["key"]
 
 
 def resolve_driver_class(dev: Any) -> type:
@@ -149,11 +140,7 @@ def get_driver(
     timeout: Optional[float] = None,
     transport=None,
 ) -> Driver:
-    """按设备配置实例化驱动
-
-    * `dev`：`DeviceConfig` / dict（SQLite 行或注册库设备字典）
-    * `mode`：`simulate`（默认，无硬件）/ `real`
-    """
+    """按注册时选定的设备类型实例化驱动。"""
     cfg = dev if isinstance(dev, DeviceConfig) else DeviceConfig.from_dict(dev or {})
     if not cfg.device_id:
         raise DriverNotFound("设备配置缺少 device_id", detail="请检查测试台注册信息")
@@ -180,17 +167,29 @@ def release_all() -> int:
     return closed
 
 
-def list_specs() -> list[dict]:
-    """驱动规格清单（前端 / 文档 / 排查用）"""
+def list_driver_types() -> list[dict]:
+    """注册页设备类型下拉框的数据源。"""
     return [
         {
-            "key": s["key"],
-            "family": s["family"],
-            "label": s["label"],
-            "driver_class": s["cls"].__name__,
-            "priority": s["priority"],
-            "match": s.get("match") or {},
-            "actions": sorted(set(s["cls"].ACTIONS)),
+            "key": item["key"],
+            "family": item["family"],
+            "label": item["label"],
+            "description": item["description"],
+            "actions": sorted(set(item["cls"].ACTIONS)),
         }
-        for s in DRIVER_SPECS
+        for item in DRIVER_TYPES
+    ]
+
+
+def list_specs() -> list[dict]:
+    """兼容旧排查接口：返回类型清单，不再包含 priority/match。"""
+    return [
+        {
+            "key": item["key"],
+            "family": item["family"],
+            "label": item["label"],
+            "driver_class": item["cls"].__name__,
+            "actions": sorted(set(item["cls"].ACTIONS)),
+        }
+        for item in DRIVER_TYPES
     ]

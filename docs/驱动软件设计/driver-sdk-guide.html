@@ -267,7 +267,7 @@ cls   = resolve_entry(spec[&quot;manifest&quot;])                       # 只有
 <div class='tw'><table><thead><tr><th>阶段</th><th>内容</th><th>行为变化</th><th>预估</th></tr></thead><tbody>
 <tr><td class='f'>阶段 1</td><td>`DRIVER_SPECS` 改为「内置 + 目录扫描合并」；定义 `driver.json` 规范</td><td>零行为变化（纯重构，回归全绿为准）</td><td>1–2 天</td></tr>
 <tr><td class='f'>阶段 2</td><td>`<ATE>/drivers/` 目录 + 安装/卸载/启停/回滚 + 前端「驱动库」页</td><td>新增界面与接口</td><td>2–3 天</td></tr>
-<tr><td class='f'>阶段 3</td><td>签名校验（复用现有 Ed25519）+ 离线目录源 + `index.json`</td><td>安装需过校验</td><td>1–2 天</td></tr>
+<tr><td class='f'>阶段 3</td><td>签名校验（复用现有 Ed25519）+ 仓库索引源 + `index.json`</td><td>安装需过校验</td><td>1–2 天</td></tr>
 <tr><td class='f'>阶段 4</td><td>把内置 MSO5 驱动抽成第一个货架包（本 SDK 的 `samples/tek_mso5` 即样板）</td><td>第一个真实货架条目</td><td>1–2 天</td></tr>
 </tbody></table></div>
 <p>内置的 MSO5 驱动抽包时不要另写一份：直接用本 SDK 的 <code>samples/tek_mso5</code> 作为样板，它已过 19 项检查，且与平台现有 <code>scope.py</code> 的协议一致。</p></section>

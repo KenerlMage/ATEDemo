@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>驱动开发指导手册 · ATE Runner</title>
+<style>
+  :root{
+    --paper:#f2eee4;
+    --paper-2:#fbf8f0;
+    --ink:#1b1d22;
+    --muted:#64605a;
+    --line:#d3cabb;
+    --line-strong:#a69c8b;
+    --accent:#8f3f1d;
+    --accent-soft:#efdfd0;
+    --ok:#2f6247;
+    --warn:#7a5500;
+    --bad:#8e2f2f;
+    --mono:"Cascadia Mono","Consolas","SFMono-Regular",monospace;
+    --sans:"Source Han Sans SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    --serif:"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.72;line-break:strict}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(143,63,29,.35)}
+  a:hover{border-bottom-color:var(--accent)}
+  .page{max-width:1240px;margin:0 auto;padding:32px 44px 82px}
+  .topline{display:flex;justify-content:space-between;gap:24px;padding-bottom:12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .topline strong{color:var(--ink);font-weight:600}
+
+  .cover{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.62fr);gap:52px;padding:44px 0 36px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 16px}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(34px,4.1vw,50px);line-height:1.12;letter-spacing:-.02em;margin:0 0 18px;max-width:820px}
+  .lede{font-size:17px;line-height:1.78;color:#403e39;max-width:760px;margin:0;text-wrap:pretty}
+  .lede strong{color:var(--ink);font-weight:600}
+  .cover-meta{border-top:2px solid var(--ink);padding-top:16px;align-self:end}
+  .cover-meta dl{display:grid;grid-template-columns:74px 1fr;gap:7px 10px;margin:0;font-size:12.5px}
+  .cover-meta dt{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .cover-meta dd{margin:0;color:var(--ink)}
+  .stamp{display:inline-block;margin-top:14px;padding:6px 9px;border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+
+  .doc{display:grid;grid-template-columns:216px minmax(0,800px);gap:58px;align-items:start;margin-top:38px}
+  .toc{position:sticky;top:22px;font-size:13.5px}
+  .toc-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+  .toc a{display:block;color:var(--muted);border:0;padding:6px 0;line-height:1.4}
+  .toc a:hover{color:var(--accent)}
+  .toc .num{font-family:var(--mono);font-size:10.5px;color:var(--line-strong);margin-right:8px}
+  .toc-note{margin-top:22px;padding-top:12px;border-top:1px solid var(--line);color:var(--muted);font-size:11.5px;line-height:1.65;text-wrap:pretty;line-break:strict}
+
+  main{min-width:0}
+  section{scroll-margin-top:24px;margin:0 0 64px}
+  .sec-head{display:flex;gap:16px;align-items:baseline;border-top:1px solid var(--line);padding-top:15px;margin-bottom:20px}
+  .sec-num{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);flex:0 0 34px}
+  h2{font-family:var(--serif);font-size:30px;line-height:1.22;letter-spacing:-.015em;font-weight:600;margin:0}
+  h3{font-size:16px;line-height:1.4;margin:26px 0 9px;font-weight:600}
+  h4{font-size:14.5px;line-height:1.45;margin:18px 0 7px;font-weight:600}
+  p{margin:0 0 14px}
+  .small{font-size:13.5px;line-height:1.66}
+  .muted{color:var(--muted)}
+  .mono{font-family:var(--mono)}
+  .accent{color:var(--accent)}
+  .ok{color:var(--ok)}
+  .warn{color:var(--warn)}
+  .bad{color:var(--bad)}
+
+  .decision{margin:0 0 22px;padding:22px 0 20px;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+  .decision .label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .decision .main{font-family:var(--serif);font-size:clamp(23px,2.9vw,30px);line-height:1.32;letter-spacing:-.015em;margin:0 0 9px}
+  .decision p:last-child{margin:0;color:#3f3e39;max-width:740px}
+
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .panel{border:1px solid var(--line);background:var(--paper-2);padding:16px 18px;border-radius:2px;text-wrap:pretty;line-break:strict}
+  .panel-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  .panel p:last-child{margin:0}
+  .panel ul{margin:0;padding-left:17px}
+  .panel li{margin:4px 0}
+  .panel .big{font-family:var(--serif);font-size:20px;line-height:1.35;margin:0 0 7px;color:var(--ink)}
+
+  table{width:100%;border-collapse:collapse;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);font-size:13.5px;line-height:1.55;margin:8px 0 18px}
+  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:9px 9px 8px;border-bottom:1px solid var(--line);vertical-align:bottom}
+  td{padding:10px 9px;border-bottom:1px solid var(--line);vertical-align:top;text-wrap:pretty;line-break:strict}
+  td:first-child,th:first-child{word-break:keep-all}
+  tr:last-child td{border-bottom:0}
+  td strong{font-weight:600}
+  .tag{display:inline-block;padding:2px 6px;border:1px solid var(--line-strong);font-family:var(--mono);font-size:10px;line-height:1.5;white-space:nowrap}
+  .tag.a{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .tag.g{color:var(--ok);border-color:#a9bfb0}
+  .tag.r{color:var(--bad);border-color:#c9a5a0}
+  .tag.w{color:var(--warn);border-color:#c7b17a}
+
+  code{font-family:var(--mono);font-size:.9em;background:#e9e3d6;padding:1px 4px;border-radius:2px}
+  pre{margin:10px 0 19px;padding:15px 17px;background:#1d2026;color:#e8e4d8;border:1px solid #2c3038;overflow-x:auto;font-family:var(--mono);font-size:12.3px;line-height:1.65}
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  pre .c{color:#8f9bae}
+  pre .k{color:#e8b57a}
+  pre .s{color:#a9c9a5}
+
+  .figure{margin:14px 0 22px;border:1px solid var(--line);background:var(--paper-2)}
+  .figure svg{display:block;width:100%;height:auto}
+  .figure figcaption{padding:9px 13px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+
+  .steps{list-style:none;margin:12px 0 20px;padding:0;border-left:1px solid var(--line-strong)}
+  .steps li{position:relative;padding:0 0 17px 28px}
+  .steps li:last-child{padding-bottom:0}
+  .steps .n{position:absolute;left:-1px;top:2px;transform:translateX(-50%);width:25px;height:25px;display:flex;align-items:center;justify-content:center;background:var(--paper);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:10px}
+  .steps h4{font-size:14px;margin:0 0 2px;font-weight:600}
+  .steps p{margin:0;font-size:13.3px;color:#47443e;line-height:1.6}
+
+  .callout{border-top:1px solid var(--accent);border-bottom:1px solid var(--line);padding:12px 0;margin:16px 0 20px;font-size:13.8px}
+  .callout .label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-right:7px}
+
+  .checks{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:0 26px}
+  .checks li{position:relative;padding:8px 0 8px 23px;border-bottom:1px solid var(--line);font-size:13.3px;line-height:1.55}
+  .checks li:before{content:"";position:absolute;left:2px;top:15px;width:9px;height:9px;border:1px solid var(--line-strong)}
+  .checks li strong{font-weight:600}
+
+  footer{margin-top:66px;padding-top:16px;border-top:2px solid var(--ink);display:flex;justify-content:space-between;gap:22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--muted)}
+
+  @media (max-width:1000px){
+    .page{padding:22px 22px 56px}
+    .cover{grid-template-columns:1fr;gap:26px;padding:36px 0 30px}
+    .doc{grid-template-columns:1fr;gap:26px}
+    .toc{position:static;border-bottom:1px solid var(--line);padding-bottom:14px}
+    .toc a{display:inline-block;margin-right:13px}
+    .grid-3,.grid-2,.checks{grid-template-columns:1fr}
+    h1{font-size:36px}
+    h2{font-size:26px}
+  }
+  @media print{
+    body{background:#fff}
+    .page{max-width:none;padding:0}
+    .toc{display:none}
+    .doc{display:block}
+    a{color:inherit;border:0}
+    section{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topline">
+    <span><strong>ATE Runner</strong> · 驱动软件设计</span>
+    <span>Developer Guide · v1.0</span>
+  </div>
+
+  <header class="cover">
+    <div>
+      <p class="kicker">Developer Guide · v1.0</p>
+      <h1>驱动开发指导手册</h1>
+      <p class="lede">从空目录到货架生效的完整路径：写清单、实现动作、本地过门禁、打包签名、安装激活、绑定设备类型、发布与回滚。每一步都给出可执行的命令和判定标准。</p>
+    </div>
+    <div class="cover-meta">
+      <dl>
+        <dt>文档</dt><dd>开发指导手册</dd>
+        <dt>版本</dt><dd>v1.0</dd>
+        <dt>适用</dt><dd>驱动开发者 / 现场工程师</dd>
+        <dt>前置</dt><dd>Python 3.11+ · atedrv CLI</dd>
+        <dt>状态</dt><dd>与当前代码一致</dd>
+      </dl>
+      <span class="stamp">Working Copy</span>
+    </div>
+  </header>
+
+  <div class="doc">
+<nav class="toc">
+  <div class="toc-title">目录</div>
+  <a href="#s1"><span class="num">01</span>适用范围</a>
+  <a href="#s2"><span class="num">02</span>环境与目录</a>
+  <a href="#s3"><span class="num">03</span>最小可用驱动</a>
+  <a href="#s4"><span class="num">04</span>清单字段</a>
+  <a href="#s5"><span class="num">05</span>能力与家族</a>
+  <a href="#s6"><span class="num">06</span>端点与传输</a>
+  <a href="#s7"><span class="num">07</span>动作实现规范</a>
+  <a href="#s8"><span class="num">08</span>本地验证</a>
+  <a href="#s9"><span class="num">09</span>打包与上架</a>
+  <a href="#s10"><span class="num">10</span>注册与绑定</a>
+  <a href="#s11"><span class="num">11</span>发布与回滚</a>
+  <a href="#s12"><span class="num">12</span>排错表</a>
+  <a href="#s13"><span class="num">13</span>提交前检查</a>
+  <div class="toc-note">命令以仓库根目录为工作目录
+所有路径相对 <span class="mono">&lt;RUNNER_HOME&gt;</span></div>
+</nav>
+<main>
+
+<section id="s1">
+  <div class="sec-head"><span class="sec-num">01</span><h2>适用范围与前置</h2></div>
+  <p>本手册面向两类人：给新型号写驱动的开发者，以及在现场把驱动装上去、换回去的工程师。两者读同一份文档，但只需要看各自的章节——开发者从第 03 节开始，现场工程师直接看第 09 到 11 节。</p>
+  <table>
+    <thead><tr><th>前置项</th><th>要求</th><th>验证方式</th></tr></thead>
+    <tbody>
+      <tr><td>Python</td><td>3.11 及以上</td><td><span class="mono">python -V</span></td></tr>
+      <tr><td>SDK</td><td>仓库内 <span class="mono">sdk/ate_drivers</span>，无需安装到 site-packages</td><td><span class="mono">python -m ate_drivers.kit.cli contract</span></td></tr>
+      <tr><td>仪器或仿真</td><td>至少能在 <span class="mono">simulate</span> 模式跑通</td><td>第 08 节门禁</td></tr>
+      <tr><td>契约版本</td><td><span class="mono">ate.driver.api</span> 1.2</td><td><span class="mono">ATEDRV_API</span> 常量</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><span class="label">先读这一句</span>驱动只负责「把动作翻译成协议」，不负责判定合格、不负责组织流程、不负责决定用哪个型号。</div>
+</section>
+
+<section id="s2">
+  <div class="sec-head"><span class="sec-num">02</span><h2>环境与目录</h2></div>
+  <p>一个驱动包就是一个目录，目录名与 <span class="mono">driver.json</span> 的 <span class="mono">key</span> 一致。开发期放在仓库里，发布期打成 <span class="mono">.atepkg</span>，运行期解到 <span class="mono">&lt;RUNNER_HOME&gt;/drivers/&lt;key&gt;/&lt;version&gt;/</span>。</p>
+  <pre><code>acme-psu-600/                 <span class="c"># 目录名 = key</span>
+├── driver.json               <span class="c"># 清单，必需</span>
+├── driver.py                 <span class="c"># 实现，类名与 entry 对应</span>
+├── __init__.py
+└── assets/                   <span class="c"># 可选：命令表、校准数据</span>
+
+<span class="c"># 生成骨架</span>
+python -m ate_drivers.kit.cli new acme-psu-600 \
+  --vendor Acme --model APS-600 --interface LAN --label <span class="s">"Acme 600W 电源"</span></code></pre>
+  <div class="grid-2">
+    <div class="panel"><p class="panel-title">允许</p><p>纯 Python 标准库实现；包内自带静态资源；同一包声明多个型号。</p></div>
+    <div class="panel"><p class="panel-title">禁止</p><p>依赖第三方库（门禁 C15 会拦）；在包内读写注册库；import <span class="mono">backend</span> 或 <span class="mono">tps_runtime</span>。</p></div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="sec-head"><span class="sec-num">03</span><h2>最小可用驱动</h2></div>
+  <p>下面是一个能通过门禁的最小实现。它声明了两个能力，用一条 SCPI 命令完成电压设置与回读，并在仿真模式下给出确定性应答。</p>
+  <pre><code><span class="c"># driver.py</span>
+<span class="k">from</span> ate_drivers.base <span class="k">import</span> InstrumentDriver
+<span class="k">from</span> ate_drivers.capabilities <span class="k">import</span> capability
+
+<span class="k">class</span> AcmePsu600(InstrumentDriver):
+    key = <span class="s">"acme-psu-600"</span>
+    family = <span class="s">"psu"</span>
+    label = <span class="s">"Acme 600W 电源"</span>
+    api_version = <span class="s">"1.2"</span>
+    sim_idn = <span class="s">"ACME,APS-600,0,1.0.0"</span>
+
+    ACTIONS = {<span class="s">"set_voltage"</span>: <span class="s">"set_voltage"</span>, <span class="s">"measure_voltage"</span>: <span class="s">"measure_voltage"</span>}
+
+    <span class="k">def</span> set_voltage(self, volts: float) -> dict:
+        self.write(<span class="s">f"VOLT {volts:.3f}"</span>)
+        <span class="k">return</span> {<span class="s">"value"</span>: volts, <span class="s">"unit"</span>: <span class="s">"V"</span>}
+
+    <span class="k">def</span> measure_voltage(self) -> dict:
+        raw = self.query(<span class="s">"MEAS:VOLT?"</span>)
+        <span class="k">return</span> {<span class="s">"value"</span>: float(raw), <span class="s">"unit"</span>: <span class="s">"V"</span>}</code></pre>
+  <div class="callout"><span class="label">要点</span><span class="mono">value</span> 放主测量值，<span class="mono">unit</span> 必填（门禁 C08）；其余字段放 <span class="mono">detail</span>，由基类自动搬运。</div>
+</section>
+
+<section id="s4">
+  <div class="sec-head"><span class="sec-num">04</span><h2>清单字段</h2></div>
+  <p><span class="mono">driver.json</span> 是货架与运行时的唯一约定。字段分三档：缺失即拒收、缺失取默认、仅供展示。</p>
+  <table>
+    <thead><tr><th>字段</th><th>要求</th><th>校验规则</th><th>示例</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">schema</span></td><td>必填</td><td>固定 <span class="mono">ate.driver.manifest.v1</span></td><td><span class="mono">ate.driver.manifest.v1</span></td></tr>
+      <tr><td><span class="mono">key</span></td><td>必填</td><td>小写字母开头，仅 <span class="mono">a-z0-9._-</span></td><td><span class="mono">acme-psu-600</span></td></tr>
+      <tr><td><span class="mono">version</span></td><td>必填</td><td>严格 <span class="mono">x.y.z</span></td><td><span class="mono">1.0.0</span></td></tr>
+      <tr><td><span class="mono">family</span></td><td>必填</td><td>必须属于已定义家族</td><td><span class="mono">psu</span></td></tr>
+      <tr><td><span class="mono">api</span></td><td>必填</td><td>major 必须与平台一致，minor 不得高于平台</td><td><span class="mono">1.2</span></td></tr>
+      <tr><td><span class="mono">entry</span></td><td>必填</td><td><span class="mono">module:ClassName</span>，可导入</td><td><span class="mono">driver:AcmePsu600</span></td></tr>
+      <tr><td><span class="mono">models</span></td><td>必填</td><td>非空、无重复（归一化后比较）</td><td><span class="mono">["APS-600"]</span></td></tr>
+      <tr><td><span class="mono">interfaces</span></td><td>可选</td><td><span class="mono">LAN</span> / <span class="mono">SERIAL</span> 组合</td><td><span class="mono">["LAN"]</span></td></tr>
+      <tr><td><span class="mono">backends</span></td><td>可选</td><td><span class="mono">native</span> / <span class="mono">visa</span></td><td><span class="mono">["native","visa"]</span></td></tr>
+      <tr><td><span class="mono">capabilities</span></td><td>可选</td><td>必须在家族能力表内</td><td><span class="mono">["psu.set_voltage"]</span></td></tr>
+      <tr><td><span class="mono">simulate</span></td><td>可选</td><td>布尔，默认 <span class="mono">true</span></td><td><span class="mono">true</span></td></tr>
+      <tr><td><span class="mono">min_platform</span></td><td>可选</td><td>低于平台版本则拒装</td><td><span class="mono">1.0.0</span></td></tr>
+      <tr><td><span class="mono">vendor</span> / <span class="mono">label</span></td><td>可选</td><td>仅展示，不参与派发</td><td><span class="mono">Acme</span></td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><span class="label">改名代价</span><span class="mono">key</span> 是数据库里的 <span class="mono">device_type</span>，发布后不能改。要换命名，新增 key 并保留旧 key 一个发布周期。</div>
+</section>
+
+<section id="s5">
+  <div class="sec-head"><span class="sec-num">05</span><h2>能力与家族</h2></div>
+  <p>家族决定"这台仪器应该会什么"，能力决定"这一版实现承诺了什么"。声明了但没实现，门禁 C04 直接拦下；实现了但没声明，上层 <span class="mono">supports()</span> 会返回 false。</p>
+  <table>
+    <thead><tr><th>家族</th><th>典型能力</th><th>不要放进该家族</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">scope</span></td><td>取波形、读通道标度、触发配置、自动测量</td><td>电源设压、负载拉载</td></tr>
+      <tr><td><span class="mono">dmm</span></td><td>直流/交流电压电流、电阻、四线制</td><td>波形采集</td></tr>
+      <tr><td><span class="mono">psu</span></td><td>设压设流、输出开关、回读</td><td>拉载与吸收</td></tr>
+      <tr><td><span class="mono">eload</span></td><td>恒流/恒压/恒阻/恒功率、动态载</td><td>供电</td></tr>
+      <tr><td><span class="mono">awg</span></td><td>波形选择、频率幅度偏置、输出开关</td><td>频谱分析</td></tr>
+      <tr><td><span class="mono">motion</span></td><td>转速/位置设定、回零、状态查询</td><td>模拟量采集</td></tr>
+      <tr><td><span class="mono">passive</span></td><td>仅登记信息（夹具、工装）</td><td>任何通讯动作</td></tr>
+      <tr><td><span class="mono">generic</span></td><td>通用 SCPI 读写与状态查询</td><td>家族专属语义</td></tr>
+    </tbody>
+  </table>
+  <div class="grid-2">
+    <div class="panel"><p class="panel-title">能力命名</p><p><span class="mono">&lt;family&gt;.&lt;verb&gt;_&lt;object&gt;</span>，如 <span class="mono">psu.set_voltage</span>。动词用祈使式，不加 <span class="mono">do</span>、不加型号。</p></div>
+    <div class="panel"><p class="panel-title">跨家族</p><p>一台设备同时是电源和万用表时，不要造"混合家族"。拆成两条设备记录，各用各的类型。</p></div>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="sec-head"><span class="sec-num">06</span><h2>端点与传输</h2></div>
+  <p>驱动不拼资源串，资源串由注册信息生成。驱动只声明自己支持哪种链路，运行时按 <span class="mono">interface</span> 选择传输实现。</p>
+  <table>
+    <thead><tr><th>链路</th><th>注册字段</th><th>资源串形态</th><th>超时默认</th></tr></thead>
+    <tbody>
+      <tr><td>LAN / SCPI</td><td><span class="mono">host</span>、<span class="mono">port</span>(5025)</td><td><span class="mono">TCPIP0::192.168.1.20::5025::SOCKET</span></td><td>2 s 读，1 s 写</td></tr>
+      <tr><td>串口</td><td><span class="mono">serial_port</span>、<span class="mono">baudrate</span></td><td><span class="mono">ASRL6::INSTR</span> 或 <span class="mono">COM6</span></td><td>按波特率折算，最短 1 s</td></tr>
+      <tr><td>被动设备</td><td>无</td><td>无</td><td>不建链路</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><span class="label">常见错误</span>在驱动里硬编码 IP 或 COM 口。这会让同一份驱动在第二条产线上失效，而且错误信息看起来像"仪器离线"。</div>
+</section>
+
+<section id="s7">
+  <div class="sec-head"><span class="sec-num">07</span><h2>动作实现规范</h2></div>
+  <p>动作方法只做四件事：校验参数、拼协议、读写、返回结构化值。任何超出这四件事的逻辑都应上移。</p>
+  <table>
+    <thead><tr><th>规则</th><th>要求</th><th>违反后果</th></tr></thead>
+    <tbody>
+      <tr><td>返回结构</td><td><span class="mono">{"value": ..., "unit": "V"}</span>，附加信息平铺</td><td>门禁 C07 失败；上层无法统一取值</td></tr>
+      <tr><td>单位</td><td>测量类动作必须带 <span class="mono">unit</span></td><td>报告缺单位，评审无法判断量级</td></tr>
+      <tr><td>错误</td><td>抛 <span class="mono">DriverError</span> 子类，带稳定 <span class="mono">code</span></td><td>上层只能匹配中文，改文案就崩</td></tr>
+      <tr><td>超时</td><td>不吞超时；让 <span class="mono">DriverTimeout</span> 冒泡</td><td>用例误判为测量值异常</td></tr>
+      <tr><td>幂等</td><td>设置类动作可重复执行且结果一致</td><td>重试导致状态漂移</td></tr>
+      <tr><td>无状态假设</td><td>不假设上次调用留下的仪器状态</td><td>单步执行与连续执行结果不同</td></tr>
+    </tbody>
+  </table>
+  <pre><code><span class="c"># 推荐：显式参数校验，错误码稳定</span>
+<span class="k">def</span> set_current(self, amps: float) -> dict:
+    <span class="k">if not</span> (0 &lt;= amps &lt;= self.max_current):
+        <span class="k">raise</span> ConfigurationError(
+            <span class="s">f"电流超出量程: {amps}A"</span>, detail=<span class="s">f"允许 0 ~ {self.max_current}A"</span>)
+    self.write(<span class="s">f"CURR {amps:.4f}"</span>)
+    <span class="k">return</span> {<span class="s">"value"</span>: amps, <span class="s">"unit"</span>: <span class="s">"A"</span>}</code></pre>
+</section>
+
+<section id="s8">
+  <div class="sec-head"><span class="sec-num">08</span><h2>本地验证与门禁</h2></div>
+  <p>上架前必须跑一致性检查。19 项全部通过才算"可装"，不是"能跑就行"。</p>
+  <pre><code>python -m ate_drivers.kit.cli check acme-psu-600
+python -m ate_drivers.kit.cli check acme-psu-600 --json &gt; check.json</code></pre>
+  <table>
+    <thead><tr><th>编号</th><th>检查项</th><th>常见不通过原因</th></tr></thead>
+    <tbody>
+      <tr><td>C01</td><td>类元数据完整</td><td>缺 <span class="mono">key</span> / <span class="mono">family</span> / <span class="mono">label</span></td></tr>
+      <tr><td>C02</td><td>契约版本兼容</td><td><span class="mono">api_version</span> 写成 2.0</td></tr>
+      <tr><td>C03 / C04</td><td>能力声明合法 / 均有实现</td><td>声明了 <span class="mono">scope.acquire_waveform</span> 但没写方法</td></tr>
+      <tr><td>C05</td><td>命令表完整</td><td><span class="mono">ACTIONS</span> 指向不存在的方法</td></tr>
+      <tr><td>C06</td><td>仿真可执行全部能力</td><td>仿真模式某动作抛异常</td></tr>
+      <tr><td>C07</td><td>返回结构可序列化</td><td>返回了对象或 bytes</td></tr>
+      <tr><td>C08</td><td>测量项带单位</td><td>只返回裸数字</td></tr>
+      <tr><td>C09</td><td>错误可分类</td><td>抛裸 <span class="mono">Exception</span></td></tr>
+      <tr><td>C10 / C11</td><td>会话可重入 / 安全退出</td><td>close 后仍可写；异常时未释放</td></tr>
+      <tr><td>C12</td><td>仿真可复现</td><td>用随机数且无种子</td></tr>
+      <tr><td>C13</td><td>实例互不干扰</td><td>类级可变状态</td></tr>
+      <tr><td>C14</td><td>旧动作别名有效</td><td>弃用动作直接删掉</td></tr>
+      <tr><td>C15</td><td>零第三方依赖</td><td>import 了 numpy / pyvisa</td></tr>
+      <tr><td>C16</td><td>弃用项有替代</td><td>标注弃用但没给替代动作</td></tr>
+      <tr><td>C17</td><td>型号可派发</td><td><span class="mono">models</span> 为空或与实现不符</td></tr>
+      <tr><td>C18 / C19</td><td>连接方式 / 传输后端可声明</td><td>声明了平台不支持的组合</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><span class="label">判定</span>报告 <span class="mono">ok=false</span> 时不允许打包上架；修完重跑，不要用 <span class="mono">--force</span> 绕过——那个参数只用于覆盖骨架文件。</div>
+</section>
+
+<section id="s9">
+  <div class="sec-head"><span class="sec-num">09</span><h2>打包、签名与上架</h2></div>
+  <p>包是 zip，改名 <span class="mono">.atepkg</span>。打包顺序固定：先写清单，再算哈希，最后签名。签名覆盖 <span class="mono">SHA256SUMS</span> 的原始字节。</p>
+  <pre><code><span class="c"># 1. 打包（生成 driver.json / payload/ / SHA256SUMS）</span>
+python -m ate_drivers.shelf.package acme-psu-600 --out dist/acme-psu-600-1.0.0.atepkg
+
+<span class="c"># 2. 签名（私钥只在发布机）</span>
+python -m ate_drivers.shelf.sign dist/acme-psu-600-1.0.0.atepkg \
+  --key ~/.ate/keys/release.pem --key-id ate-prod-2026
+
+<span class="c"># 3. 校验（装之前先自检）</span>
+python -m ate_drivers.shelf.verify dist/acme-psu-600-1.0.0.atepkg \
+  --pubkey ~/.ate/keys/release.pub</code></pre>
+  <table>
+    <thead><tr><th>错误码</th><th>含义</th><th>处置</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">E_PKG_LAYOUT</span></td><td>根目录缺清单、路径越界、payload 为空</td><td>重新打包，不要手工改 zip</td></tr>
+      <tr><td><span class="mono">E_PKG_MANIFEST</span></td><td>清单字段缺失或格式非法</td><td>按第 04 节逐字段核对</td></tr>
+      <tr><td><span class="mono">E_PKG_HASH</span></td><td>文件与 SHA256SUMS 不一致</td><td>包被改动过，重新打包</td></tr>
+      <tr><td><span class="mono">E_PKG_SIGNATURE</span></td><td>签名无效或公钥不匹配</td><td>确认 key_id 与受信公钥</td></tr>
+      <tr><td><span class="mono">E_PKG_COMPAT</span></td><td>api 或 min_platform 不满足</td><td>升级平台或改驱动</td></tr>
+      <tr><td><span class="mono">E_PKG_CONFLICT</span></td><td>型号已被其他 key 声明</td><td>改型号归属，不要并存</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><span class="label">在线分发</span>包只从受控 HTTP 仓库或 MES 推送获取；不接受 U 盘、聊天工具、邮件附件作为来源。下载后先验签，再进安装队列。</div>
+</section>
+
+<section id="s10">
+  <div class="sec-head"><span class="sec-num">10</span><h2>注册到测试台与 TPS 绑定</h2></div>
+  <p>驱动装上不等于能用。设备记录必须显式选择类型，运行时才按这个类型精确取驱动。</p>
+  <ol class="steps">
+    <li><span class="n">1</span><h4>确认类型已注册</h4><p><span class="mono">GET /api/testbench/device-types</span> 返回的清单里应出现 <span class="mono">acme-psu-600</span>；没有就是货架未激活。</p></li>
+    <li><span class="n">2</span><h4>注册设备</h4><p>在注册页为每台设备选择类型，填型号与连接参数；第二步保存时会强校验，缺类型直接拒存。</p></li>
+    <li><span class="n">3</span><h4>修正历史记录</h4><p>旧记录用 <span class="mono">PATCH /api/testbench/{bench}/devices/{dev}</span> 补 <span class="mono">device_type</span>，不要直接改 SQLite。</p></li>
+    <li><span class="n">4</span><h4>TPS 声明别名</h4><p><span class="mono">device_config.psu = {"device_id": "rh-psu", "role": "psu"}</span>，别名与类型无关，与设备记录对应。</p></li>
+    <li><span class="n">5</span><h4>跑一条最小用例</h4><p>先 <span class="mono">ctx.driver("psu").identify()</span> 确认握手，再执行测量动作。</p></li>
+  </ol>
+  <div class="callout"><span class="label">失败判据</span>运行时报 <span class="mono">E_NOT_FOUND</span> 且信息为"未知设备类型"，说明类型没进注册表；报"设备未指定 device_type"，说明注册记录缺字段。两者处置不同。</div>
+</section>
+
+<section id="s11">
+  <div class="sec-head"><span class="sec-num">11</span><h2>发布、锁定与回滚</h2></div>
+  <p>生产台架不允许"自动最新"。每个台架锁定精确的 <span class="mono">key + version</span>，升级是显式动作，回滚也是一步操作。</p>
+  <table>
+    <thead><tr><th>场景</th><th>操作</th><th>影响</th></tr></thead>
+    <tbody>
+      <tr><td>新版本试跑</td><td>装到货架但不激活，在试验台架手动激活</td><td>生产台架不受影响</td></tr>
+      <tr><td>生产升级</td><td>先在台架锁定新版本，再跑一遍首件</td><td>失败可立即回滚</td></tr>
+      <tr><td>紧急回退</td><td><span class="mono">rollback(key)</span> 回到上一版本</td><td>目录不动，只切生效指针</td></tr>
+      <tr><td>版本下线</td><td>确认无台架锁定后卸载</td><td>锁定的台架会阻止卸载</td></tr>
+    </tbody>
+  </table>
+  <div class="grid-3">
+    <div class="panel"><p class="panel-title">版本号</p><p>修协议 bug 升 patch；加动作升 minor；删动作或改语义必须升 major 并同步平台。</p></div>
+    <div class="panel"><p class="panel-title">保留策略</p><p>至少保留 N-1 一个版本用于回滚，卸载前检查台架锁。</p></div>
+    <div class="panel"><p class="panel-title">审计</p><p>安装、激活、回滚、卸载都写 <span class="mono">audit.log</span>，含操作者与包哈希。</p></div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="sec-head"><span class="sec-num">12</span><h2>排错表</h2></div>
+  <table>
+    <thead><tr><th>现象</th><th>最可能原因</th><th>确认方法</th><th>处置</th></tr></thead>
+    <tbody>
+      <tr><td>握手超时</td><td>IP/端口错，或仪器未开 SCPI</td><td><span class="mono">ping</span> + telnet 5025</td><td>核对注册参数</td></tr>
+      <tr><td>串口打不开</td><td>端口被占用或波特率不符</td><td>设备管理器 + 串口助手</td><td>释放端口，核对 115200</td></tr>
+      <tr><td>读回值恒为 0</td><td>查询命令不匹配该固件</td><td>手动发同一命令</td><td>按固件分支，不猜</td></tr>
+      <tr><td>动作报不支持</td><td>能力未声明或方法名不在 ACTIONS</td><td><span class="mono">driver.actions()</span></td><td>补声明与映射</td></tr>
+      <tr><td>同一测试单步通过、连跑失败</td><td>依赖了上次调用的仪器状态</td><td>对比两次日志的命令序列</td><td>动作前显式设置状态</td></tr>
+      <tr><td>装了包但选不到类型</td><td>包未激活，或运行时未扫描货架</td><td><span class="mono">GET /api/testbench/device-types</span></td><td>激活包；确认货架接线</td></tr>
+      <tr><td>升级后驱动消失</td><td><span class="mono">drivers/</span> 未列入升级保留路径</td><td>对比升级前后目录</td><td>加入 <span class="mono">PRESERVED_PATHS</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s13">
+  <div class="sec-head"><span class="sec-num">13</span><h2>提交前检查清单</h2></div>
+  <p>下面十条全部打勾再提 PR。少一条都可能在上架阶段返工。</p>
+  <ul class="checks">
+    <li><strong>19 项门禁全绿</strong>：<span class="mono">cli check</span> 返回 <span class="mono">ok=true</span></li>
+    <li><strong>型号清单准确</strong>：<span class="mono">models</span> 与真实支持型号一致，无通配</li>
+    <li><strong>单位齐全</strong>：所有测量动作带 <span class="mono">unit</span></li>
+    <li><strong>错误有码</strong>：每个失败路径抛带 <span class="mono">code</span> 的异常</li>
+    <li><strong>仿真可复现</strong>：同输入两次运行结果一致</li>
+    <li><strong>无第三方依赖</strong>：只用标准库</li>
+    <li><strong>不读注册库</strong>：连接参数只从 <span class="mono">DeviceConfig</span> 取</li>
+    <li><strong>清单版本正确</strong>：<span class="mono">api=1.2</span>，<span class="mono">min_platform</span> 明确</li>
+    <li><strong>包已签名</strong>：<span class="mono">SIGNATURE</span> 存在且可验</li>
+    <li><strong>回滚路径可用</strong>：上一版本仍在货架且未被卸载</li>
+  </ul>
+</section>
+
+  <p class="small muted">相关文档：<a href="driver-master-design.html">设计总纲</a>、<a href="driver-allinone-design.html">全量随包方案</a>、<a href="driver-logical-view.html">逻辑视图</a>、<a href="driver-design-patterns.html">设计模式</a>、<a href="scope-api-reference.html">示波器函数清单</a>、<a href="tps-dev-guide.html">TPS 开发说明</a>、<a href="driver-kernel-design.html">内核设计</a>、<a href="driver-shelf-design.html">货架设计（已废止）</a>、<a href="driver-deployment-decision.html">部署决策（已废止）</a>、<a href="driver-distribution.html">在线分发（已废止）</a>、<a href="shelf-simulation.html">货架仿真（已废止）</a>。</p>
+</main>
+
+  </div>
+
+  <footer>
+    <span>开发手册 · 从零到上线</span>
+    <span>ATE Runner · 驱动软件设计 · 2026-10</span>
+  </footer>
+</div>
+</body>
+</html>

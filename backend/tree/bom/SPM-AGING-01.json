@@ -21,7 +21,8 @@
       "default_address": "",
       "default_channel": "CH1/CH2",
       "required": true,
-      "note": "双路 0-30V/3A，CH1 供 DUT、CH2 供偏置"
+      "note": "双路 0-30V/3A，CH1 供 DUT、CH2 供偏置",
+      "device_type": "generic-psu"
     },
     {
       "id": "itech-it8511a",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "150V/30A/150W，A 组 8 件并联带载"
+      "note": "150V/30A/150W，A 组 8 件并联带载",
+      "device_type": "generic-eload"
     },
     {
       "id": "itech-it8511b",
@@ -59,7 +61,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "150V/30A/150W，B 组 8 件并联带载"
+      "note": "150V/30A/150W，B 组 8 件并联带载",
+      "device_type": "generic-eload"
     },
     {
       "id": "keysight-34970a",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "配 34901A 20 通道板卡，T 型热电偶"
+      "note": "配 34901A 20 通道板卡，T 型热电偶",
+      "device_type": "generic-scpi"
     },
     {
       "id": "therm-chamber",
@@ -97,7 +101,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "-40~150℃，由老化程序设定，不支持程控（人工设定后由测试程序计时）"
+      "note": "-40~150℃，由老化程序设定，不支持程控（人工设定后由测试程序计时）",
+      "device_type": "generic-scpi"
     },
     {
       "id": "uart-dut-aging",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "每 30 s 回读一次 DUT 状态字"
+      "note": "每 30 s 回读一次 DUT 状态字",
+      "device_type": "generic-scpi"
     }
   ]
 }

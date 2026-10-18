@@ -1,0 +1,25 @@
+{
+  "schema": "ate.driver.manifest.v1",
+  "key": "autocollimator-ascii",
+  "version": "1.0.0",
+  "family": "generic",
+  "api": "1.2",
+  "label": "自准直仪 · ASCII 串口系列",
+  "vendor": "Generic",
+  "entry": "ate_drivers.vendors.autocollimator_ascii.driver:AsciiAutocollimator",
+  "interfaces": ["SERIAL"],
+  "backends": ["native"],
+  "models": ["AC-100", "AC-200", "ELCOMAT-3000"],
+  "capabilities": [
+    "identify",
+    "reset",
+    "state",
+    "vendor.autocollimator.measure",
+    "vendor.autocollimator.zero",
+    "vendor.autocollimator.mode"
+  ],
+  "simulate": true,
+  "min_platform": "1.0.0",
+  "depends": [],
+  "signature": ""
+}

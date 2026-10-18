@@ -67,6 +67,7 @@
   .mig-row { display: grid; grid-template-columns: 34px 1fr; align-items: start; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; background: #fff; }
   .mig-row b { font-size: 13.5px; }
   .mig-row span { color: var(--muted); font-size: 12.5px; }
+.h4-gap{margin-top:12px}
 </style>
 </head>
 <body>
@@ -243,7 +244,7 @@
       <div class="card">
         <h4>并发</h4>
         <p>FastAPI 同步路由跑在线程池：驱动实例自身<b>不加锁</b>，由会话管理器对同一设备串行化命令；不同设备天然并行。</p>
-        <h4 style="margin-top:12px">超时</h4>
+        <h4 class="h4-gap">超时</h4>
         <p>统一在传输层：普通查询 2s（可被请求覆盖）、波形查询 5s、连接 2s。会话空闲 10 分钟自动断开，不长期占仪器 socket。</p>
       </div>
       <div class="card">

@@ -25,7 +25,8 @@
           "protocol": "VXI-11 (SCPI)",
           "default_address": "TCPIP0::192.168.10.21::inst0::INSTR",
           "required": true,
-          "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口"
+          "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "itech-it6332a",
@@ -41,7 +42,8 @@
           "protocol": "SCPI (raw socket)",
           "default_channel": "CH1",
           "required": true,
-          "note": "双路 0-30V/6A；CH1 供 DUT，CH2 供辅助电路"
+          "note": "双路 0-30V/6A；CH1 供 DUT，CH2 供辅助电路",
+          "device_type": "generic-psu"
         },
         {
           "id": "keithley-6221",
@@ -56,7 +58,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "精密交直流电流源；漏电流测试精度可达 10 fA"
+          "note": "精密交直流电流源；漏电流测试精度可达 10 fA",
+          "device_type": "generic-scpi"
         },
         {
           "id": "itech-it8512a",
@@ -71,7 +74,8 @@
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
           "required": false,
-          "note": "150V/30A/300W，供效率曲线扫描"
+          "note": "150V/30A/300W，供效率曲线扫描",
+          "device_type": "generic-eload"
         },
         {
           "id": "fluke-8846a",
@@ -86,7 +90,8 @@
           "default_port": 3490,
           "protocol": "SCPI (LAN socket)",
           "required": true,
-          "note": "6.5 位；作校准基准，建议每年送检"
+          "note": "6.5 位；作校准基准，建议每年送检",
+          "device_type": "generic-dmm"
         },
         {
           "id": "keysight-34972a",
@@ -101,7 +106,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": false,
-          "note": "配 34901A 20 通道多路复用板卡"
+          "note": "配 34901A 20 通道多路复用板卡",
+          "device_type": "generic-scpi"
         },
         {
           "id": "uart-dut",
@@ -116,7 +122,8 @@
           "default_baudrate": 115200,
           "protocol": "自定义 ASCII 协议",
           "required": true,
-          "note": "用于读取 DUT 版本号与写入测试标志位"
+          "note": "用于读取 DUT 版本号与写入测试标志位",
+          "device_type": "generic-scpi"
         },
         {
           "id": "fixture-probe",
@@ -128,7 +135,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": false,
-          "note": "易损件，建议 180 天更换并登记寿命"
+          "note": "易损件，建议 180 天更换并登记寿命",
+          "device_type": "passive-device"
         }
       ],
       "product": "1000-A",
@@ -157,7 +165,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "用于接收灵敏度与解调性能测试"
+          "note": "用于接收灵敏度与解调性能测试",
+          "device_type": "generic-awg"
         },
         {
           "id": "rs-fsw26",
@@ -172,7 +181,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "26.5GHz，建议加装前置放大器"
+          "note": "26.5GHz，建议加装前置放大器",
+          "device_type": "generic-scpi"
         },
         {
           "id": "tek-mso64b",
@@ -188,7 +198,8 @@
           "protocol": "VXI-11 (SCPI)",
           "default_address": "TCPIP0::192.168.20.33::inst0::INSTR",
           "required": true,
-          "note": "配差分探头用于包络与调制时序"
+          "note": "配差分探头用于包络与调制时序",
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "keysight-e36313a",
@@ -203,7 +214,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "三路低噪声输出"
+          "note": "三路低噪声输出",
+          "device_type": "generic-psu"
         },
         {
           "id": "rf-switch-matrix",
@@ -216,7 +228,8 @@
           "interface": "USB",
           "default_address": "USB0::0x1234::0x5678::RFMX01::INSTR",
           "required": false,
-          "note": "USB 接口不支持网络探测，需按自检清单人工确认"
+          "note": "USB 接口不支持网络探测，需按自检清单人工确认",
+          "device_type": "generic-scpi"
         },
         {
           "id": "uart-ctrl",
@@ -230,7 +243,8 @@
           "default_serial_port": "COM5",
           "default_baudrate": 9600,
           "protocol": "自定义 ASCII 协议",
-          "required": true
+          "required": true,
+          "device_type": "generic-scpi"
         },
         {
           "id": "shield-box",
@@ -242,7 +256,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": false,
-          "note": "无程控接口"
+          "note": "无程控接口",
+          "device_type": "passive-device"
         }
       ],
       "product": "1000-A",
@@ -271,7 +286,8 @@
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "600V/17A；需配置过压保护点"
+          "note": "600V/17A；需配置过压保护点",
+          "device_type": "generic-psu"
         },
         {
           "id": "keithley-6221b",
@@ -286,7 +302,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "为电流传感器提供精密激励"
+          "note": "为电流传感器提供精密激励",
+          "device_type": "generic-scpi"
         },
         {
           "id": "tek-mdo34",
@@ -302,7 +319,8 @@
           "protocol": "VXI-11 (SCPI)",
           "default_address": "TCPIP0::192.168.30.43::inst0::INSTR",
           "required": true,
-          "note": "配电流探头 TCP0030A"
+          "note": "配电流探头 TCP0030A",
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "yokogawa-wt310e",
@@ -316,7 +334,8 @@
           "default_host": "192.168.30.44",
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
-          "required": true
+          "required": true,
+          "device_type": "generic-scpi"
         },
         {
           "id": "ni-cdaq9185",
@@ -331,7 +350,8 @@
           "default_port": 3580,
           "protocol": "NI-DAQmx / HTTP",
           "required": true,
-          "note": "配 NI-9213 热电偶模块"
+          "note": "配 NI-9213 热电偶模块",
+          "device_type": "generic-scpi"
         },
         {
           "id": "chroma-63204a",
@@ -345,7 +365,8 @@
           "default_host": "192.168.30.46",
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
-          "required": false
+          "required": false,
+          "device_type": "generic-eload"
         },
         {
           "id": "uart-encoder",
@@ -359,7 +380,8 @@
           "default_serial_port": "COM7",
           "default_baudrate": 115200,
           "protocol": "自定义 ASCII 协议",
-          "required": true
+          "required": true,
+          "device_type": "generic-scpi"
         },
         {
           "id": "motor-fixture",
@@ -371,7 +393,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": false,
-          "note": "易损件, 建议 180 天更换"
+          "note": "易损件, 建议 180 天更换",
+          "device_type": "passive-device"
         }
       ],
       "product": "1000-A",
@@ -405,7 +428,8 @@
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
           "default_channel": "CH1/CH2",
-          "note": "双路 0-30V/3A，CH1 供 DUT、CH2 供偏置"
+          "note": "双路 0-30V/3A，CH1 供 DUT、CH2 供偏置",
+          "device_type": "generic-psu"
         },
         {
           "id": "itech-it8511a",
@@ -420,7 +444,8 @@
           "default_host": "192.168.20.32",
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
-          "note": "150V/30A/150W，A 组 8 件并联带载"
+          "note": "150V/30A/150W，A 组 8 件并联带载",
+          "device_type": "generic-eload"
         },
         {
           "id": "itech-it8511b",
@@ -435,7 +460,8 @@
           "default_host": "192.168.20.33",
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
-          "note": "150V/30A/150W，B 组 8 件并联带载"
+          "note": "150V/30A/150W，B 组 8 件并联带载",
+          "device_type": "generic-eload"
         },
         {
           "id": "keysight-34970a",
@@ -450,7 +476,8 @@
           "default_host": "192.168.20.34",
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
-          "note": "配 34901A 20 通道板卡，T 型热电偶"
+          "note": "配 34901A 20 通道板卡，T 型热电偶",
+          "device_type": "generic-scpi"
         },
         {
           "id": "therm-chamber",
@@ -462,7 +489,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": true,
-          "note": "-40~150℃，由老化程序设定，不支持程控（人工设定后由测试程序计时）"
+          "note": "-40~150℃，由老化程序设定，不支持程控（人工设定后由测试程序计时）",
+          "device_type": "generic-scpi"
         },
         {
           "id": "uart-dut-aging",
@@ -477,7 +505,8 @@
           "protocol": "自定义 ASCII 协议",
           "default_serial_port": "COM5",
           "default_baudrate": 115200,
-          "note": "每 30 s 回读一次 DUT 状态字"
+          "note": "每 30 s 回读一次 DUT 状态字",
+          "device_type": "generic-scpi"
         }
       ]
     },
@@ -506,7 +535,8 @@
           "default_host": "192.168.30.41",
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
-          "note": "600V/8A，需确认高压联锁回路已闭合"
+          "note": "600V/8A，需确认高压联锁回路已闭合",
+          "device_type": "generic-psu"
         },
         {
           "id": "chroma-63204a",
@@ -521,7 +551,8 @@
           "default_host": "192.168.30.42",
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
-          "note": "600V/80A/4kW"
+          "note": "600V/80A/4kW",
+          "device_type": "generic-eload"
         },
         {
           "id": "yokogawa-wt310",
@@ -536,7 +567,8 @@
           "default_host": "192.168.30.43",
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
-          "note": "DC/DC 效率测试精度 0.1%"
+          "note": "DC/DC 效率测试精度 0.1%",
+          "device_type": "generic-scpi"
         },
         {
           "id": "fluke-8846a-hv",
@@ -551,7 +583,8 @@
           "default_host": "192.168.30.44",
           "default_port": 3490,
           "protocol": "SCPI (LAN socket)",
-          "note": "配高压衰减探头"
+          "note": "配高压衰减探头",
+          "device_type": "generic-dmm"
         },
         {
           "id": "hioki-st5520",
@@ -565,7 +598,8 @@
           "required": true,
           "protocol": "IEEE-488",
           "default_address": "GPIB0::22::INSTR",
-          "note": "1500V 耐压；GPIB 需 NI-488.2 驱动，不支持自动连通探测"
+          "note": "1500V 耐压；GPIB 需 NI-488.2 驱动，不支持自动连通探测",
+          "device_type": "generic-scpi"
         },
         {
           "id": "uart-dut-hv",
@@ -579,7 +613,8 @@
           "required": true,
           "protocol": "自定义二进制协议",
           "default_serial_port": "COM6",
-          "default_baudrate": 460800
+          "default_baudrate": 460800,
+          "device_type": "generic-scpi"
         }
       ]
     },
@@ -608,7 +643,8 @@
           "default_host": "192.168.40.51",
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
-          "note": "0-150V/10A，母线电压可编程斜率上电"
+          "note": "0-150V/10A，母线电压可编程斜率上电",
+          "device_type": "generic-psu"
         },
         {
           "id": "tek-mdo34",
@@ -624,7 +660,8 @@
           "default_port": 4000,
           "protocol": "VXI-11 (SCPI)",
           "default_address": "TCPIP0::192.168.40.52::inst0::INSTR",
-          "note": "4 通道 + 16 路逻辑探头"
+          "note": "4 通道 + 16 路逻辑探头",
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "yokogawa-wt310-sd",
@@ -638,7 +675,8 @@
           "required": true,
           "default_host": "192.168.40.53",
           "default_port": 5025,
-          "protocol": "SCPI (raw socket)"
+          "protocol": "SCPI (raw socket)",
+          "device_type": "generic-scpi"
         },
         {
           "id": "itech-it8512a-sd",
@@ -652,7 +690,8 @@
           "required": true,
           "default_host": "192.168.40.54",
           "default_port": 30000,
-          "protocol": "SCPI (raw socket)"
+          "protocol": "SCPI (raw socket)",
+          "device_type": "generic-eload"
         },
         {
           "id": "enc-sim",
@@ -667,7 +706,8 @@
           "protocol": "自定义二进制协议",
           "default_serial_port": "COM8",
           "default_baudrate": 460800,
-          "note": "可编程线数与转速"
+          "note": "可编程线数与转速",
+          "device_type": "generic-awg"
         },
         {
           "id": "zlg-usbcan",
@@ -681,7 +721,8 @@
           "required": true,
           "protocol": "CAN 2.0B",
           "default_address": "USB0::0x1234::0x5678::INSTR",
-          "note": "USB 接口不支持自动连通探测，需人工确认枚举成功"
+          "note": "USB 接口不支持自动连通探测，需人工确认枚举成功",
+          "device_type": "generic-scpi"
         },
         {
           "id": "dyno-rig",
@@ -693,7 +734,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": true,
-          "note": "手动加载；自动化加载需后续接入伺服加载控制器"
+          "note": "手动加载；自动化加载需后续接入伺服加载控制器",
+          "device_type": "passive-device"
         }
       ]
     },
@@ -719,7 +761,8 @@
           "protocol": "VXI-11 (SCPI)",
           "default_address": "TCPIP0::192.168.10.41::inst0::INSTR",
           "required": true,
-          "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口"
+          "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "rh-dmm",
@@ -734,7 +777,8 @@
           "default_port": 3490,
           "protocol": "SCPI (LAN socket)",
           "required": true,
-          "note": "6.5 位；作读头阻值与偏置电压的测量基准，建议每年送检"
+          "note": "6.5 位；作读头阻值与偏置电压的测量基准，建议每年送检",
+          "device_type": "generic-dmm"
         },
         {
           "id": "rh-psu",
@@ -750,7 +794,8 @@
           "protocol": "SCPI (raw socket)",
           "default_channel": "CH1",
           "required": true,
-          "note": "双路 0-30V/6A；CH1 供读头本体，CH2 供前置放大电路"
+          "note": "双路 0-30V/6A；CH1 供读头本体，CH2 供前置放大电路",
+          "device_type": "generic-psu"
         },
         {
           "id": "rh-eload",
@@ -765,7 +810,8 @@
           "default_port": 30000,
           "protocol": "SCPI (raw socket)",
           "required": false,
-          "note": "150V/30A/300W，用于动态拉载与纹波测试"
+          "note": "150V/30A/300W，用于动态拉载与纹波测试",
+          "device_type": "generic-eload"
         },
         {
           "id": "rh-awg",
@@ -780,7 +826,8 @@
           "default_port": 5025,
           "protocol": "SCPI (raw socket)",
           "required": true,
-          "note": "20 MHz；扫频与脉冲激励，配合示波器做动态响应分析"
+          "note": "20 MHz；扫频与脉冲激励，配合示波器做动态响应分析",
+          "device_type": "generic-awg"
         },
         {
           "id": "rh-spin",
@@ -795,7 +842,8 @@
           "default_baudrate": 115200,
           "protocol": "自定义 ASCII 协议",
           "required": true,
-          "note": "用于转速扫描下的输出一致性验证；转速范围 0-12000 rpm"
+          "note": "用于转速扫描下的输出一致性验证；转速范围 0-12000 rpm",
+          "device_type": "serial-motion"
         },
         {
           "id": "rh-fixture",
@@ -807,7 +855,8 @@
           "programmable": false,
           "interface": "NONE",
           "required": false,
-          "note": "易损件，建议 180 天更换并登记寿命"
+          "note": "易损件，建议 180 天更换并登记寿命",
+          "device_type": "passive-device"
         }
       ],
       "product": "1000-A",

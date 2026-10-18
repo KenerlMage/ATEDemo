@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>独立驱动货架设计方案 · ATE Runner</title>
+<style>
+  :root{
+    --paper:#f2eee4;
+    --paper-2:#fbf8f0;
+    --ink:#1b1d22;
+    --muted:#64605a;
+    --line:#d3cabb;
+    --line-strong:#a69c8b;
+    --accent:#8f3f1d;
+    --accent-soft:#efdfd0;
+    --ok:#2f6247;
+    --warn:#7a5500;
+    --bad:#8e2f2f;
+    --mono:"Cascadia Mono","Consolas","SFMono-Regular",monospace;
+    --sans:"Source Han Sans SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    --serif:"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.72;line-break:strict}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(143,63,29,.35)}
+  a:hover{border-bottom-color:var(--accent)}
+  .page{max-width:1240px;margin:0 auto;padding:32px 44px 82px}
+  .topline{display:flex;justify-content:space-between;gap:24px;padding-bottom:12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .topline strong{color:var(--ink);font-weight:600}
+
+  .cover{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.62fr);gap:52px;padding:44px 0 36px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 16px}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(34px,4.1vw,50px);line-height:1.12;letter-spacing:-.02em;margin:0 0 18px;max-width:820px}
+  .lede{font-size:17px;line-height:1.78;color:#403e39;max-width:760px;margin:0;text-wrap:pretty}
+  .lede strong{color:var(--ink);font-weight:600}
+  .cover-meta{border-top:2px solid var(--ink);padding-top:16px;align-self:end}
+  .cover-meta dl{display:grid;grid-template-columns:74px 1fr;gap:7px 10px;margin:0;font-size:12.5px}
+  .cover-meta dt{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .cover-meta dd{margin:0;color:var(--ink)}
+  .stamp{display:inline-block;margin-top:14px;padding:6px 9px;border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+
+  .doc{display:grid;grid-template-columns:216px minmax(0,800px);gap:58px;align-items:start;margin-top:38px}
+  .toc{position:sticky;top:22px;font-size:13.5px}
+  .toc-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+  .toc a{display:block;color:var(--muted);border:0;padding:6px 0;line-height:1.4}
+  .toc a:hover{color:var(--accent)}
+  .toc .num{font-family:var(--mono);font-size:10.5px;color:var(--line-strong);margin-right:8px}
+  .toc-note{margin-top:22px;padding-top:12px;border-top:1px solid var(--line);color:var(--muted);font-size:11.5px;line-height:1.65;text-wrap:pretty;line-break:strict}
+
+  main{min-width:0}
+  section{scroll-margin-top:24px;margin:0 0 64px}
+  .sec-head{display:flex;gap:16px;align-items:baseline;border-top:1px solid var(--line);padding-top:15px;margin-bottom:20px}
+  .sec-num{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);flex:0 0 34px}
+  h2{font-family:var(--serif);font-size:30px;line-height:1.22;letter-spacing:-.015em;font-weight:600;margin:0}
+  h3{font-size:16px;line-height:1.4;margin:26px 0 9px;font-weight:600}
+  h4{font-size:14.5px;line-height:1.45;margin:18px 0 7px;font-weight:600}
+  p{margin:0 0 14px}
+  .small{font-size:13.5px;line-height:1.66}
+  .muted{color:var(--muted)}
+  .mono{font-family:var(--mono)}
+  .accent{color:var(--accent)}
+  .ok{color:var(--ok)}
+  .warn{color:var(--warn)}
+  .bad{color:var(--bad)}
+
+  .decision{margin:0 0 22px;padding:22px 0 20px;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+  .decision .label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .decision .main{font-family:var(--serif);font-size:clamp(23px,2.9vw,30px);line-height:1.32;letter-spacing:-.015em;margin:0 0 9px}
+  .decision p:last-child{margin:0;color:#3f3e39;max-width:740px}
+
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .panel{border:1px solid var(--line);background:var(--paper-2);padding:16px 18px;border-radius:2px;text-wrap:pretty;line-break:strict}
+  .panel-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  .panel p:last-child{margin:0}
+  .panel ul{margin:0;padding-left:17px}
+  .panel li{margin:4px 0}
+  .panel .big{font-family:var(--serif);font-size:20px;line-height:1.35;margin:0 0 7px;color:var(--ink)}
+
+  table{width:100%;border-collapse:collapse;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);font-size:13.5px;line-height:1.55;margin:8px 0 18px}
+  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:9px 9px 8px;border-bottom:1px solid var(--line);vertical-align:bottom}
+  td{padding:10px 9px;border-bottom:1px solid var(--line);vertical-align:top;text-wrap:pretty;line-break:strict}
+  td:first-child,th:first-child{word-break:keep-all}
+  tr:last-child td{border-bottom:0}
+  td strong{font-weight:600}
+  .tag{display:inline-block;padding:2px 6px;border:1px solid var(--line-strong);font-family:var(--mono);font-size:10px;line-height:1.5;white-space:nowrap}
+  .tag.a{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .tag.g{color:var(--ok);border-color:#a9bfb0}
+  .tag.r{color:var(--bad);border-color:#c9a5a0}
+  .tag.w{color:var(--warn);border-color:#c7b17a}
+
+  code{font-family:var(--mono);font-size:.9em;background:#e9e3d6;padding:1px 4px;border-radius:2px}
+  pre{margin:10px 0 19px;padding:15px 17px;background:#1d2026;color:#e8e4d8;border:1px solid #2c3038;overflow-x:auto;font-family:var(--mono);font-size:12.3px;line-height:1.65}
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  pre .c{color:#8f9bae}
+  pre .k{color:#e8b57a}
+  pre .s{color:#a9c9a5}
+
+  .figure{margin:14px 0 22px;border:1px solid var(--line);background:var(--paper-2)}
+  .figure svg{display:block;width:100%;height:auto}
+  .figure figcaption{padding:9px 13px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+
+  .steps{list-style:none;margin:12px 0 20px;padding:0;border-left:1px solid var(--line-strong)}
+  .steps li{position:relative;padding:0 0 17px 28px}
+  .steps li:last-child{padding-bottom:0}
+  .steps .n{position:absolute;left:-1px;top:2px;transform:translateX(-50%);width:25px;height:25px;display:flex;align-items:center;justify-content:center;background:var(--paper);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:10px}
+  .steps h4{font-size:14px;margin:0 0 2px;font-weight:600}
+  .steps p{margin:0;font-size:13.3px;color:#47443e;line-height:1.6}
+
+  .callout{border-top:1px solid var(--accent);border-bottom:1px solid var(--line);padding:12px 0;margin:16px 0 20px;font-size:13.8px}
+  .callout .label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-right:7px}
+
+  .checks{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:0 26px}
+  .checks li{position:relative;padding:8px 0 8px 23px;border-bottom:1px solid var(--line);font-size:13.3px;line-height:1.55}
+  .checks li:before{content:"";position:absolute;left:2px;top:15px;width:9px;height:9px;border:1px solid var(--line-strong)}
+  .checks li strong{font-weight:600}
+
+  footer{margin-top:66px;padding-top:16px;border-top:2px solid var(--ink);display:flex;justify-content:space-between;gap:22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--muted)}
+
+  @media (max-width:1000px){
+    .page{padding:22px 22px 56px}
+    .cover{grid-template-columns:1fr;gap:26px;padding:36px 0 30px}
+    .doc{grid-template-columns:1fr;gap:26px}
+    .toc{position:static;border-bottom:1px solid var(--line);padding-bottom:14px}
+    .toc a{display:inline-block;margin-right:13px}
+    .grid-3,.grid-2,.checks{grid-template-columns:1fr}
+    h1{font-size:36px}
+    h2{font-size:26px}
+  }
+  @media print{
+    body{background:#fff}
+    .page{max-width:none;padding:0}
+    .toc{display:none}
+    .doc{display:block}
+    a{color:inherit;border:0}
+    section{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topline">
+    <span><strong>ATE PLATFORM</strong> / DRIVER SHELF DESIGN</span>
+    <span>DRV-SHF-001 · 2026-10-18 · v1.0</span>
+  </div>
+
+  <header class="cover">
+    <div>
+      <p class="kicker">Design document · external shelf</p>
+      <h1>独立驱动货架设计方案</h1>
+      <p class="lede">定义 Runner 之外的驱动包生命周期：包格式、签名与哈希、安装事务、注册表合并、版本激活与回滚。货架不是第二个驱动内核，而是<strong>受控的驱动供应链</strong>；运行时不直接读取货架目录，只消费合并后的注册表。</p>
+      <span class="stamp">Design baseline · signed .atepkg</span>
+    </div>
+    <div class="cover-meta">
+      <dl>
+        <dt>文档编号</dt><dd>DRV-SHF-001</dd>
+        <dt>版本 / 日期</dt><dd>1.0 / 2026-10-18</dd>
+        <dt>适用代码</dt><dd>D:\ATE\sdk\ate_drivers\kit<br>D:\ATE\packaging</dd>
+        <dt>关联文档</dt><dd>内置驱动内核设计方案<br>驱动部署决策</dd>
+        <dt>读者</dt><dd>驱动开发、平台后端、现场集成</dd>
+      </dl>
+    </div>
+  </header>
+
+  <div class="doc">
+    <nav class="toc" aria-label="目录">
+      <div class="toc-title">Contents</div>
+      <a href="#s0"><span class="num">00</span>摘要与边界</a>
+      <a href="#s1"><span class="num">01</span>术语与现状</a>
+      <a href="#s2"><span class="num">02</span>逻辑视图</a>
+      <a href="#s3"><span class="num">03</span>版本与信任规则</a>
+      <a href="#s4"><span class="num">04</span>开发视图</a>
+      <a href="#s5"><span class="num">05</span>安装与回滚</a>
+      <a href="#s6"><span class="num">06</span>安全与测试</a>
+      <a href="#s7"><span class="num">07</span>演进与验收</a>
+      <div class="toc-note">
+        <div>本文只定义货架</div>
+        <div>内核与契约见</div>
+        <div><a href="driver-kernel-design.html">内置驱动内核设计方案</a></div>
+        <div><a href="driver-deployment-decision.html">驱动部署决策</a></div>
+      </div>
+    </nav>
+
+    <main>
+<div class="callout"><span class="label">已废止</span>本方案已被 <a href="driver-allinone-design.html">驱动全量随包方案</a> 取代：核心驱动数量少、台架多，驱动改为随 Runner 包发布。本文仅保留取舍记录，不再作为实施依据。</div>
+
+      <section id="s0">
+        <div class="sec-head"><span class="sec-num">00</span><h2>摘要与边界</h2></div>
+        <div class="decision">
+          <div class="label">Design position</div>
+          <p class="main">货架管理供应链，内核管理运行时。</p>
+          <p>独立货架负责“驱动包从哪里来、是否可信、能否安装、当前激活哪个版本、如何退回上一版”；内核只负责“拿到合并后的注册表，按型号派发并执行”。两者通过 <span class="mono">driver.json</span> 与 <span class="mono">merge_specs</span> 对齐，不通过共享全局变量或目录扫描耦合。</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="panel">
+            <p class="panel-title">原则 01</p>
+            <p class="big">包是发布单元</p>
+            <p class="small">驱动以 <span class="mono">.atepkg</span> 发布，包含清单、实现、哈希与签名；不以单个 Python 文件或独立 MSI 作为现场交付单位。</p>
+          </div>
+          <div class="panel">
+            <p class="panel-title">原则 02</p>
+            <p class="big">一个 key 一个 active</p>
+            <p class="small">同一驱动 key 只允许一个激活版本；旧版本仅保留用于回滚，不参与运行时派发。</p>
+          </div>
+          <div class="panel">
+            <p class="panel-title">原则 03</p>
+            <p class="big">失败不阻断启动</p>
+            <p class="small">坏包进入隔离区并告警；当前 active 版本与 Runner 启动不受影响。安装失败不得留下半包。</p>
+          </div>
+        </div>
+
+        <h3>当前资产与缺口</h3>
+        <table>
+          <thead><tr><th>位置</th><th>已有能力</th><th>缺口 / 风险</th><th>本文要求</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">kit/registry.py</span></td><td><span class="mono">scan_dir</span> / <span class="mono">load_manifest</span> / <span class="mono">merge_specs</span> / <span class="mono">resolve_spec</span> / <span class="mono">model_conflicts</span></td><td>没有安装事务、状态文件、签名校验；<span class="mono">merge_specs</span> 对同 key 的已装包是无条件覆盖</td><td>保留扫描与合并接口；补版本门槛、状态与信任层</td></tr>
+            <tr><td><span class="mono">driver.json</span></td><td>已有 <span class="mono">schema</span> / <span class="mono">key</span> / <span class="mono">version</span> / <span class="mono">api</span> / <span class="mono">models</span> / <span class="mono">entry</span> / <span class="mono">min_platform</span></td><td><span class="mono">min_platform</span> 只声明，加载阶段未执行；<span class="mono">signature</span> 字段未验证</td><td>在安装阶段强制校验兼容性与签名</td></tr>
+            <tr><td><span class="mono">resolve_entry</span></td><td>可按 <span class="mono">module:Class</span> 导入</td><td>每次导入把包目录插入 <span class="mono">sys.path</span>，存在模块遮蔽与重复导入风险</td><td>使用受控加载器；包内模块名带 key 命名空间</td></tr>
+            <tr><td><span class="mono">build_package.ps1</span></td><td>可打 Runner 安装包</td><td>未复制 <span class="mono">sdk/ate_drivers</span>；没有货架目录与保留项</td><td>运行时随包；<span class="mono">drivers</span> 根目录加入保留清单</td></tr>
+            <tr><td><span class="mono">packaging/installer</span></td><td>可创建 app / logs / workspace</td><td>没有 <span class="mono">drivers</span> 目录；整个 app 可被普通用户修改</td><td>创建货架目录；代码目录只读，货架仅管理员可写</td></tr>
+          </tbody>
+        </table>
+
+        <h3>非目标</h3>
+        <div class="grid-2">
+          <div class="panel">
+            <p class="panel-title">货架不负责</p>
+            <ul>
+              <li>驱动内部协议、单位、测量算法。</li>
+              <li>TPS 业务逻辑、阈值判定与报告。</li>
+              <li>设备发现与台架注册。</li>
+              <li>替代内核的型号派发。</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <p class="panel-title">货架必须负责</p>
+            <ul>
+              <li>包格式、清单、哈希与签名。</li>
+              <li>安装事务、隔离、激活与回滚。</li>
+              <li>同 key 版本治理与同型号冲突拒绝。</li>
+              <li>安装台账、审计与离线分发。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="s1">
+        <div class="sec-head"><span class="sec-num">01</span><h2>术语与现状</h2></div>
+        <table>
+          <thead><tr><th>术语</th><th>定义</th><th>边界</th></tr></thead>
+          <tbody>
+            <tr><td><strong>货架</strong></td><td><span class="mono">&lt;RUNNER_HOME&gt;/drivers</span> 下的已安装包集合与状态</td><td>本地目录；可选由内网静态索引或 MES 提供来源</td></tr>
+            <tr><td><strong>驱动包</strong></td><td>一个 <span class="mono">.atepkg</span>，含清单、实现、依赖声明、哈希与签名</td><td>发布单元，不是安装器</td></tr>
+            <tr><td><strong>激活</strong></td><td>把某个 key 的某个版本写入 active 指针</td><td>不复制文件；只改变运行时可见版本</td></tr>
+            <tr><td><strong>隔离</strong></td><td>把未通过校验或探测的包移出可加载路径</td><td>保留证据，不删除原始包</td></tr>
+            <tr><td><strong>信任库</strong></td><td>Runner 内置的公钥集合与吊销状态</td><td>只读，随 Runner 升级；不放在货架目录</td></tr>
+            <tr><td><strong>台架锁定</strong></td><td>某测试台固定使用某个 key 的精确版本</td><td>生产默认；开发/仿真可放宽</td></tr>
+            <tr><td><strong>索引</strong></td><td>描述可用包版本、哈希、型号与下载地址的静态清单</td><td>可选；不是运行时依赖</td></tr>
+          </tbody>
+        </table>
+
+        <h3>现状判定</h3>
+        <p>现有 SDK 已经完成“扫描目录、读取清单、合并注册表、按型号派发”的骨架，因此本方案不重新设计包格式，而是在 <span class="mono">ate.driver.manifest.v1</span> 之上补齐供应链能力。需要特别修正三点：</p>
+        <table>
+          <thead><tr><th>问题</th><th>当前行为</th><th>目标行为</th></tr></thead>
+          <tbody>
+            <tr><td>同 key 覆盖</td><td><span class="mono">merge_specs</span> 中已装包直接替换内置项，不比较版本</td><td>只有“版本更高 + 签名有效 + 兼容”才允许覆盖；低版本仅用于显式回滚</td></tr>
+            <tr><td>最低平台版本</td><td><span class="mono">min_platform</span> 被读入清单，但加载时未比较 Runner 版本</td><td>安装/激活前比较，不满足直接拒绝</td></tr>
+            <tr><td>模块加载</td><td><span class="mono">resolve_entry</span> 把包目录插入 <span class="mono">sys.path</span></td><td>使用唯一命名空间与受控 loader；禁止包间模块名冲突</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="s2">
+        <div class="sec-head"><span class="sec-num">02</span><h2>逻辑视图</h2></div>
+        <p>逻辑视图分为“供应链”和“运行时”两个域。供应链负责把可信包放到正确位置；运行时只读取 active 状态与合并后的注册表。两者之间没有隐式调用，所有状态变化都落在 <span class="mono">.state</span> 与审计日志中。</p>
+
+        <div class="figure">
+          <svg viewBox="0 0 1000 530" role="img" aria-label="独立驱动货架逻辑视图：从驱动作者、构建、签名、货架到驱动管理器与内核注册表">
+            <defs>
+              <marker id="s-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#8f3f1d"/>
+              </marker>
+              <marker id="s-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#a69c8b"/>
+              </marker>
+            </defs>
+            <rect x="0" y="0" width="1000" height="530" fill="#fbf8f0"/>
+            <text x="22" y="27" font-family="Cascadia Mono, Consolas, monospace" font-size="10.5" fill="#64605a" letter-spacing="1">LOGICAL VIEW / SUPPLY CHAIN + RUNTIME</text>
+
+            <!-- supply chain -->
+            <text x="24" y="58" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#8f3f1d" letter-spacing="1">SUPPLY CHAIN</text>
+            <rect x="24" y="72" width="154" height="62" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="101" y="94" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="600" fill="#1b1d22">驱动作者</text>
+            <text x="101" y="112" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">driver.py · commands</text>
+
+            <rect x="210" y="72" width="164" height="62" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="292" y="94" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="600" fill="#1b1d22">构建与门禁</text>
+            <text x="292" y="112" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">19 项 conformance</text>
+
+            <rect x="406" y="72" width="154" height="62" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="483" y="94" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="600" fill="#1b1d22">签名</text>
+            <text x="483" y="112" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">Ed25519 · SHA256SUMS</text>
+
+            <rect x="592" y="72" width="154" height="62" fill="#efdfd0" stroke="#8f3f1d"/>
+            <text x="669" y="94" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="600" fill="#1b1d22">.atepkg</text>
+            <text x="669" y="112" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">immutable artifact</text>
+
+            <rect x="778" y="72" width="194" height="62" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="875" y="94" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="600" fill="#1b1d22">货架来源</text>
+            <text x="875" y="112" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">USB · static index · MES</text>
+
+            <line x1="178" y1="103" x2="204" y2="103" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+            <line x1="374" y1="103" x2="400" y2="103" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+            <line x1="560" y1="103" x2="586" y2="103" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+            <line x1="746" y1="103" x2="772" y2="103" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+
+            <!-- manager -->
+            <text x="24" y="180" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#8f3f1d" letter-spacing="1">CONTROL PLANE / DRIVER MANAGER</text>
+            <rect x="180" y="196" width="476" height="126" fill="#f2eee4" stroke="#1b1d22"/>
+            <text x="196" y="218" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#1b1d22">Driver Manager</text>
+            <text x="196" y="237" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">inspect → verify → stage → activate</text>
+
+            <rect x="198" y="252" width="96" height="44" fill="#fbf8f0" stroke="#d3cabb"/>
+            <text x="246" y="272" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#1b1d22">inspect</text>
+            <text x="246" y="287" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9" fill="#64605a">layout · manifest</text>
+
+            <rect x="306" y="252" width="96" height="44" fill="#fbf8f0" stroke="#d3cabb"/>
+            <text x="354" y="272" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#1b1d22">verify</text>
+            <text x="354" y="287" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9" fill="#64605a">hash · signature</text>
+
+            <rect x="414" y="252" width="96" height="44" fill="#fbf8f0" stroke="#d3cabb"/>
+            <text x="462" y="272" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#1b1d22">stage</text>
+            <text x="462" y="287" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9" fill="#64605a">probe · atomic dir</text>
+
+            <rect x="522" y="252" width="116" height="44" fill="#efdfd0" stroke="#8f3f1d"/>
+            <text x="580" y="272" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#1b1d22">activate</text>
+            <text x="580" y="287" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9" fill="#64605a">pointer swap</text>
+
+            <line x1="294" y1="274" x2="302" y2="274" stroke="#8f3f1d" stroke-width="1.2" marker-end="url(#s-arrow)"/>
+            <line x1="402" y1="274" x2="410" y2="274" stroke="#8f3f1d" stroke-width="1.2" marker-end="url(#s-arrow)"/>
+            <line x1="510" y1="274" x2="518" y2="274" stroke="#8f3f1d" stroke-width="1.2" marker-end="url(#s-arrow)"/>
+
+            <!-- quarantine -->
+            <rect x="24" y="216" width="126" height="76" fill="#fbf8f0" stroke="#c9a5a0" stroke-dasharray="5 4"/>
+            <text x="87" y="238" text-anchor="middle" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="12" font-weight="600" fill="#8e2f2f">隔离区</text>
+            <text x="87" y="256" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#64605a">quarantine/</text>
+            <text x="87" y="273" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="9.5" fill="#8e2f2f">保留证据</text>
+            <line x1="180" y1="244" x2="152" y2="244" stroke="#a69c8b" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#s-muted)"/>
+
+            <!-- state -->
+            <rect x="720" y="196" width="252" height="126" fill="#fbf8f0" stroke="#d3cabb"/>
+            <text x="736" y="218" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#1b1d22">本地状态</text>
+            <text x="736" y="238" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">.state/active.json</text>
+            <text x="736" y="255" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">.state/installed.json</text>
+            <text x="736" y="272" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">.state/audit.log</text>
+            <text x="736" y="295" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="10.5" fill="#8f3f1d">原子写入 · 可审计 · 可回滚</text>
+            <line x1="656" y1="274" x2="716" y2="274" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+
+            <!-- runtime -->
+            <text x="24" y="366" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#8f3f1d" letter-spacing="1">DATA PLANE / RUNTIME</text>
+            <rect x="180" y="382" width="272" height="84" fill="#f2eee4" stroke="#1b1d22"/>
+            <text x="196" y="404" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#1b1d22">Kernel Registry</text>
+            <text x="196" y="423" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">merge_specs(builtin, active)</text>
+            <text x="196" y="440" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">resolve_spec(model)</text>
+            <text x="196" y="457" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#8f3f1d">不直接扫描货架目录</text>
+
+            <rect x="500" y="382" width="210" height="84" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="516" y="404" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#1b1d22">TPS / 调用方</text>
+            <text x="516" y="423" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">ctx.device("scope_main")</text>
+            <text x="516" y="440" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">能力接口 · 无 SCPI</text>
+
+            <rect x="758" y="382" width="214" height="84" fill="#f2eee4" stroke="#a69c8b"/>
+            <text x="774" y="404" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#1b1d22">仪器</text>
+            <text x="774" y="423" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">LAN / SERIAL / VISA</text>
+            <text x="774" y="440" font-family="Cascadia Mono, Consolas, monospace" font-size="10" fill="#64605a">native · visa</text>
+
+            <line x1="316" y1="322" x2="316" y2="378" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+            <line x1="452" y1="424" x2="496" y2="424" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+            <line x1="710" y1="424" x2="754" y2="424" stroke="#8f3f1d" stroke-width="1.5" marker-end="url(#s-arrow)"/>
+
+            <text x="24" y="512" font-family="Source Han Sans SC, Microsoft YaHei, sans-serif" font-size="10.5" fill="#64605a">供应链变更不触碰运行时对象；运行时只读取 active 指针与合并后的规格。</text>
+          </svg>
+          <figcaption>图 1：货架逻辑视图。上半部分为供应链与控制面，下半部分为运行时数据面；隔离区与本地状态是两侧的唯一交接点。</figcaption>
+        </div>
+
+        <h3>2.1 角色与职责</h3>
+        <table>
+          <thead><tr><th>角色</th><th>职责</th><th>输入</th><th>输出</th></tr></thead>
+          <tbody>
+            <tr><td>驱动作者</td><td>实现型号差异、命令表、仿真模型</td><td>家族契约、型号手册</td><td>驱动源码、README</td></tr>
+            <tr><td>构建与门禁</td><td>脚手架、19 项一致性检查、打包</td><td>源码、`driver.json`</td><td>候选包、检查报告</td></tr>
+            <tr><td>签名服务</td><td>对包内哈希清单签名</td><td>候选包、私钥</td><td>`.atepkg`、签名、发布说明</td></tr>
+            <tr><td>货架来源</td><td>存放包与索引；不执行代码</td><td>签名包</td><td>可下载的包与索引</td></tr>
+            <tr><td>Driver Manager</td><td>检查、验签、暂存、探测、激活、回滚</td><td>包、信任库、平台版本</td><td>active 状态、审计记录</td></tr>
+            <tr><td>内核注册表</td><td>合并内置与 active 规格，按型号派发</td><td>active 清单、内置规格</td><td>DriverSpec、驱动类</td></tr>
+          </tbody>
+        </table>
+
+        <h3>2.2 生命周期状态</h3>
+        <table>
+          <thead><tr><th>状态</th><th>含义</th><th>进入条件</th><th>允许的下一步</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">AVAILABLE</span></td><td>包已到达机器，尚未读取</td><td>文件出现在导入入口或索引命中</td><td>INSPECTED / REJECTED</td></tr>
+            <tr><td><span class="mono">INSPECTED</span></td><td>清单、布局、文件类型已解析</td><td>zip 结构合法，`driver.json` 可解析</td><td>VERIFIED / QUARANTINED</td></tr>
+            <tr><td><span class="mono">VERIFIED</span></td><td>哈希、签名、兼容性均通过</td><td>信任库命中，`api` 与 `min_platform` 满足</td><td>STAGED / REJECTED</td></tr>
+            <tr><td><span class="mono">STAGED</span></td><td>已解压到隔离暂存目录并通过探测</td><td>导入、实例化、仿真冒烟成功</td><td>ACTIVE / FAILED</td></tr>
+            <tr><td><span class="mono">ACTIVE</span></td><td>当前 key 的派发版本</td><td>active 指针原子切换成功</td><td>SUPERSEDED / ROLLED_BACK</td></tr>
+            <tr><td><span class="mono">SUPERSEDED</span></td><td>被更高版本替代，保留用于回滚</td><td>新版本激活</td><td>ACTIVE（回滚） / 清理</td></tr>
+            <tr><td><span class="mono">QUARANTINED</span></td><td>校验失败或探测失败，禁止加载</td><td>哈希/签名/路径/探测异常</td><td>人工处理；不自动激活</td></tr>
+            <tr><td><span class="mono">ROLLED_BACK</span></td><td>已显式退回旧版本</td><td>回滚操作成功</td><td>ACTIVE（再次升级）</td></tr>
+          </tbody>
+        </table>
+        <p class="small muted">状态只描述包的生命周期，不描述仪器会话。仪器会话状态由内核维护；货架不得因为包状态变化而关闭正在运行的会话。</p>
+      </section>
+
+      <section id="s3">
+        <div class="sec-head"><span class="sec-num">03</span><h2>版本与信任规则</h2></div>
+        <h3>3.1 合并优先级</h3>
+        <table>
+          <thead><tr><th>场景</th><th>规则</th><th>失败行为</th></tr></thead>
+          <tbody>
+            <tr><td>同 key，货架版本高于内置</td><td>签名有效、API 兼容、`min_platform` 满足时允许覆盖</td><td>否则保留内置，记录拒绝原因</td></tr>
+            <tr><td>同 key，货架版本等于内置</td><td>不覆盖；视为重复包</td><td>安装成功但不改变 active</td></tr>
+            <tr><td>同 key，货架版本低于内置</td><td>禁止普通安装；仅允许显式回滚到已安装旧版</td><td>`E_PKG_VERSION`，当前 active 不变</td></tr>
+            <tr><td>不同 key，声明同一型号</td><td>拒绝激活；保留当前 active，列出冲突双方</td><td>`E_PKG_CONFLICT`</td></tr>
+            <tr><td>同 key 多版本并存</td><td>仅一个 active；其余为 SUPERSEDED，可回滚</td><td>不允许同时参与派发</td></tr>
+            <tr><td>台架锁定版本缺失</td><td>拒绝运行该台架，不回落到最新版</td><td>`E_PKG_PINNED_MISSING`</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.2 兼容性判定</h3>
+        <pre><code><span class="c"># 安装/激活前必须全部通过</span>
+manifest.schema == "ate.driver.manifest.v1"
+api.major == platform.API_VERSION.major
+api.minor &lt;= platform.API_VERSION.minor
+manifest.min_platform &lt;= runner.version
+all(model in manifest.models for model in required_by_bench)
+manifest.models 无重复（归一化后）
+entry 可解析，且类继承对应 family 契约
+manifest.interfaces ⊆ {LAN, SERIAL}
+manifest.backends  ⊆ {native, visa}</code></pre>
+        <p>兼容性检查必须在解压前和激活前各执行一次：前者防止坏包进入暂存区，后者防止平台在安装后被降级或替换。两次检查使用同一份规则实现，不允许 UI 与后端各自判断。</p>
+
+        <h3>3.3 信任链</h3>
+        <table>
+          <thead><tr><th>环节</th><th>校验对象</th><th>算法 / 规则</th><th>失败处理</th></tr></thead>
+          <tbody>
+            <tr><td>包完整性</td><td>包内每个文件</td><td>SHA-256，路径规范化，排序后写入 `SHA256SUMS`</td><td>`E_PKG_HASH`，隔离</td></tr>
+            <tr><td>发布者身份</td><td>`SHA256SUMS` 的字节</td><td>Ed25519；`signature.ed25519` 为 base64；`key_id` 指定信任库条目</td><td>`E_PKG_SIGNATURE`，隔离</td></tr>
+            <tr><td>信任库</td><td>公钥、吊销状态、有效期</td><td>Runner 内置只读；升级时整体替换；支持双 key 轮换</td><td>未命中即拒绝；不得现场导入私钥</td></tr>
+            <tr><td>索引</td><td>`index.json` 自身</td><td>与包相同的签名流程；记录包哈希与大小</td><td>索引不可信时仍可手工导入，但包仍需验签</td></tr>
+            <tr><td>运行时加载</td><td>模块命名空间与入口</td><td>每个包使用唯一包名；loader 不修改全局 `sys.path`</td><td>`E_PKG_LOAD`，不激活</td></tr>
+          </tbody>
+        </table>
+        <div class="callout"><span class="label">信任边界</span>签名包被视为受信代码，仍应在独立子进程中完成导入与仿真探测；一期不以操作系统级沙箱为前提，但必须限制导入时间、文件访问范围与网络调用，并把探测失败与运行时失败分开记录。</div>
+
+        <h3>3.4 版本锁定</h3>
+        <p>生产台架使用 `driver_lock` 固定 `key → version`。运行时解析规格时，先读取台架锁，再在 active 集合中查找；锁定的版本不存在时直接失败，不回落到更高版本或 `generic-scpi`。开发/仿真环境可以不锁定，但必须在运行记录中标记 `unlocked`。</p>
+      </section>
+
+      <section id="s4">
+        <div class="sec-head"><span class="sec-num">04</span><h2>开发视图</h2></div>
+        <p>开发视图定义包结构、状态文件、管理接口与构建流程。建议新增 <span class="mono">ate_drivers.shelf</span> 作为管理组件；它不进入 TPS 的导入路径，只由 Runner 后端调用。</p>
+
+        <h3>4.1 目录布局</h3>
+        <pre><code>&lt;RUNNER_HOME&gt;/
+├── app/
+│   └── drivers/                 <span class="c"># 内核与基线，只读</span>
+├── drivers/                     <span class="c"># 货架根，升级保留</span>
+│   ├── .state/
+│   │   ├── active.json          <span class="c"># key -> 精确版本</span>
+│   │   ├── installed.json       <span class="c"># 安装台账</span>
+│   │   ├── bench_locks.json     <span class="c"># 台架锁定</span>
+│   │   ├── .lock                <span class="c"># 安装互斥</span>
+│   │   └── audit.log            <span class="c"># JSONL 审计</span>
+│   ├── .incoming/               <span class="c"># 解压暂存，不参与扫描</span>
+│   ├── .quarantine/             <span class="c"># 隔离证据，不参与扫描</span>
+│   ├── tektronix_mso/
+│   │   └── 1.6.0/
+│   │       ├── driver.json
+│   │       ├── driver.py
+│   │       ├── SHA256SUMS
+│   │       └── signature.ed25519
+│   └── acme_scope/
+│       └── 0.3.1/
+├── runtime/
+├── web/
+└── ate.db</code></pre>
+        <p>扫描器只读取 <span class="mono">drivers/&lt;key&gt;/&lt;version&gt;</span> 中带 <span class="mono">driver.json</span> 的目录；<span class="mono">.incoming</span>、<span class="mono">.quarantine</span>、<span class="mono">.state</span> 必须显式排除。目录名与 <span class="mono">driver.json.key</span> 不一致时拒绝加载。</p>
+
+        <h3>4.2 发布包结构</h3>
+        <pre><code>tektronix_mso-1.6.0.atepkg
+├── driver.json
+├── driver.py
+├── native/                       <span class="c"># 可选：厂商 DLL，按 x64 架构</span>
+├── examples/                     <span class="c"># 可选：最小用例</span>
+├── README.md                     <span class="c"># 适用型号 / 固件 / 已知限制</span>
+├── SHA256SUMS                    <span class="c"># 规范化文件哈希</span>
+└── signature.ed25519             <span class="c"># 对 SHA256SUMS 的签名</span></code></pre>
+        <p class="small muted">包内不得包含安装脚本、`pip install` 命令、网络下载器或对系统目录的写操作。需要厂商运行库时，作为显式环境前置条件检测，不把安装器塞进驱动包。</p>
+
+        <h3>4.3 `driver.json` 字段</h3>
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束 / 说明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">schema</span></td><td>str</td><td>是</td><td>固定 `ate.driver.manifest.v1`</td></tr>
+            <tr><td><span class="mono">key</span></td><td>str</td><td>是</td><td>`^[a-z0-9][a-z0-9._-]*$`；同 key 单 active</td></tr>
+            <tr><td><span class="mono">version</span></td><td>str</td><td>是</td><td>语义化 `x.y.z`；写入运行记录</td></tr>
+            <tr><td><span class="mono">family</span></td><td>str</td><td>是</td><td>`scope/dmm/psu/eload/awg/motion/passive/generic`</td></tr>
+            <tr><td><span class="mono">api</span></td><td>str</td><td>是</td><td>`1.2`；major 必须相等，minor 不得高于平台</td></tr>
+            <tr><td><span class="mono">min_platform</span></td><td>str</td><td>建议</td><td>Runner 最低版本；安装前比较</td></tr>
+            <tr><td><span class="mono">entry</span></td><td>str</td><td>是</td><td>`包.模块:类名`；类必须继承对应家族</td></tr>
+            <tr><td><span class="mono">label</span> / <span class="mono">vendor</span></td><td>str</td><td>建议</td><td>UI、报告、审计显示</td></tr>
+            <tr><td><span class="mono">models</span></td><td>list[str]</td><td>是</td><td>归一化后唯一；不可为空；型号派发唯一依据</td></tr>
+            <tr><td><span class="mono">interfaces</span></td><td>list[str]</td><td>是</td><td>`LAN` / `SERIAL` 的非空组合</td></tr>
+            <tr><td><span class="mono">backends</span></td><td>list[str]</td><td>是</td><td>`native` / `visa` 的非空组合；不得写 `auto`</td></tr>
+            <tr><td><span class="mono">capabilities</span></td><td>list[str]</td><td>建议</td><td>与类声明一致；UI 与能力过滤使用</td></tr>
+            <tr><td><span class="mono">simulate</span></td><td>bool</td><td>是</td><td>上架要求 `true`；离线验收依赖</td></tr>
+            <tr><td><span class="mono">depends</span></td><td>list[str]</td><td>否</td><td>其它 key 的精确版本约束；一期仅允许同家族</td></tr>
+            <tr><td><span class="mono">key_id</span></td><td>str</td><td>是</td><td>信任库公钥标识；用于轮换与吊销</td></tr>
+            <tr><td><span class="mono">signature</span></td><td>str</td><td>否</td><td>兼容旧清单；正式包以 `signature.ed25519` 为准</td></tr>
+          </tbody>
+        </table>
+
+        <h3>4.4 状态文件</h3>
+        <pre><code><span class="c"># .state/active.json</span>
+{
+  <span class="k">"schema"</span>: <span class="s">"ate.driver.shelf.active.v1"</span>,
+  <span class="k">"updated_at"</span>: <span class="s">"2026-10-18T12:00:00+08:00"</span>,
+  <span class="k">"active"</span>: {
+    <span class="k">"tektronix-mso5"</span>: {
+      <span class="k">"version"</span>: <span class="s">"1.6.0"</span>,
+      <span class="k">"digest"</span>: <span class="s">"sha256:..."</span>,
+      <span class="k">"activated_at"</span>: <span class="s">"2026-10-18T12:00:00+08:00"</span>
+    }
+  }
+}
+
+<span class="c"># .state/installed.json（数组）</span>
+{
+  <span class="k">"key"</span>: <span class="s">"tektronix-mso5"</span>,
+  <span class="k">"version"</span>: <span class="s">"1.6.0"</span>,
+  <span class="k">"path"</span>: <span class="s">"drivers/tektronix_mso/1.6.0"</span>,
+  <span class="k">"digest"</span>: <span class="s">"sha256:..."</span>,
+  <span class="k">"key_id"</span>: <span class="s">"ate-release-2026"</span>,
+  <span class="k">"source"</span>: <span class="s">"usb"</span>,
+  <span class="k">"installed_at"</span>: <span class="s">"..."</span>,
+  <span class="k">"status"</span>: <span class="s">"active"</span>,
+  <span class="k">"models"</span>: [<span class="s">"MSO54"</span>, <span class="s">"MSO56"</span>]
+}</code></pre>
+        <p>所有状态写入采用“临时文件 + `os.replace()`”原子替换；`active.json` 与 `installed.json` 不共享同一文件锁以外的写路径。安装、激活、回滚必须在同一把文件锁内串行执行。</p>
+
+        <h3>4.5 管理接口</h3>
+        <table>
+          <thead><tr><th>接口</th><th>输入</th><th>输出</th><th>事务性</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">inspect(path)</span></td><td>包路径或流</td><td>`Inspection`：manifest、哈希、签名、兼容性、冲突</td><td>只读，不落地</td></tr>
+            <tr><td><span class="mono">install(path, activate=False)</span></td><td>包路径、来源、操作者</td><td>`InstallResult`：key、version、digest、状态</td><td>失败不留半包；当前 active 不变</td></tr>
+            <tr><td><span class="mono">activate(key, version)</span></td><td>key、目标版本</td><td>`ActivationResult`：旧版本、新版本、digest</td><td>原子切换；失败回退</td></tr>
+            <tr><td><span class="mono">rollback(key)</span></td><td>key</td><td>`RollbackResult`：从/到版本</td><td>仅切换到已安装版本</td></tr>
+            <tr><td><span class="mono">list()</span></td><td>过滤条件</td><td>已安装列表、active、锁定、隔离</td><td>只读</td></tr>
+            <tr><td><span class="mono">audit(key?, since?)</span></td><td>key、时间范围</td><td>审计事件列表</td><td>只读</td></tr>
+          </tbody>
+        </table>
+
+        <h3>4.6 建议模块</h3>
+        <pre><code>sdk/ate_drivers/shelf/
+├── __init__.py
+├── package.py       <span class="c"># .atepkg 读取、布局校验、解压</span>
+├── trust.py         <span class="c"># SHA256SUMS、Ed25519、信任库</span>
+├── manager.py       <span class="c"># inspect / install / activate / rollback</span>
+├── state.py         <span class="c"># active / installed / locks 原子读写</span>
+├── probe.py         <span class="c"># 子进程导入与仿真冒烟</span>
+├── catalog.py       <span class="c"># 静态 index.json 读取与缓存</span>
+└── audit.py         <span class="c"># JSONL 审计</span></code></pre>
+        <p class="small muted">该目录为目标态建议，当前尚未实现。现有 <span class="mono">kit/registry.py</span> 继续提供扫描与合并；<span class="mono">shelf</span> 只在其上增加安装事务，不复制清单解析逻辑。</p>
+
+        <h3>4.7 管理 API 与界面</h3>
+        <table>
+          <thead><tr><th>方法 / 路径</th><th>用途</th><th>权限</th></tr></thead>
+          <tbody>
+            <tr><td>`GET /api/drivers`</td><td>列出内置、货架、active、隔离项</td><td>登录用户</td></tr>
+            <tr><td>`POST /api/drivers/inspect`</td><td>预检包，不安装</td><td>集成/管理员</td></tr>
+            <tr><td>`POST /api/drivers/install`</td><td>安装并可选激活</td><td>管理员</td></tr>
+            <tr><td>`POST /api/drivers/{key}/activate`</td><td>切换 active 版本</td><td>管理员</td></tr>
+            <tr><td>`POST /api/drivers/{key}/rollback`</td><td>回滚到上一版</td><td>管理员</td></tr>
+            <tr><td>`GET /api/drivers/audit`</td><td>查询安装/激活/回滚记录</td><td>审计/管理员</td></tr>
+          </tbody>
+        </table>
+        <p>界面只展示四类信息：包身份（key/label/vendor/version）、适用范围（models/interfaces/backends）、信任状态（签名/哈希/兼容）、运行状态（active/锁定/隔离）。不得在界面提供“忽略签名继续安装”的常规按钮；私有包豁免必须走管理员审批与审计流程。</p>
+      </section>
+
+      <section id="s5">
+        <div class="sec-head"><span class="sec-num">05</span><h2>安装与回滚</h2></div>
+        <h3>5.1 安装事务</h3>
+        <ol class="steps">
+          <li><span class="n">01</span><h4>获取互斥锁</h4><p>锁定 `.state/.lock`；同一时刻只允许一个安装、激活或回滚事务。锁超时返回 `E_PKG_BUSY`，不排队阻塞 Runner。</p></li>
+          <li><span class="n">02</span><h4>结构检查</h4><p>检查 zip 条目数量、单文件与总解压大小、路径分隔符、绝对路径、`..`、符号链接、可执行文件类型；拒绝路径穿越与 zip bomb。</p></li>
+          <li><span class="n">03</span><h4>清单检查</h4><p>读取 `driver.json`，校验 schema、必填字段、key/version 格式、models 去重、interfaces/backends 合法、entry 形状。</p></li>
+          <li><span class="n">04</span><h4>信任与兼容</h4><p>校验 `SHA256SUMS` 与 `signature.ed25519`；检查 `api`、`min_platform`、Runner 版本、目标台架锁定；任一失败即拒绝。</p></li>
+          <li><span class="n">05</span><h4>冲突检查</h4><p>把候选包与当前注册表合并，执行 `model_conflicts`；同型号不同 key、同 key 低版本普通安装均拒绝。</p></li>
+          <li><span class="n">06</span><h4>暂存解压</h4><p>解压到 `.incoming/&lt;key&gt;-&lt;version&gt;-&lt;nonce&gt;/`；不直接写入最终目录，不覆盖现有版本。</p></li>
+          <li><span class="n">07</span><h4>子进程探测</h4><p>在独立进程中导入入口类，构造仿真驱动，执行 `identify` 与全部声明能力；设置超时与内存上限。探测失败则隔离，不激活。</p></li>
+          <li><span class="n">08</span><h4>原子落位</h4><p>把暂存目录重命名为 `drivers/&lt;key&gt;/&lt;version&gt;`；更新 `installed.json`；按需切换 `active.json`；写审计。</p></li>
+          <li><span class="n">09</span><h4>失败清理</h4><p>任何步骤失败：删除暂存目录，保留原 active；坏包移入 `.quarantine/` 并记录原因。不得留下可被扫描到的半包。</p></li>
+        </ol>
+
+        <h3>5.2 激活与回滚</h3>
+        <pre><code><span class="c"># 激活：只改指针，不复制文件</span>
+candidate = installed[key][version]
+assert candidate.status in ("staged", "superseded")
+assert verify(candidate)                       <span class="c"># 激活前再次验签/哈希</span>
+new = dict(active)
+new[key] = {<span class="s">"version"</span>: version, <span class="s">"digest"</span>: candidate.digest}
+atomic_write(active_json, new)                 <span class="c"># temp + os.replace</span>
+audit(<span class="s">"activate"</span>, key, version, digest)
+
+<span class="c"># 回滚：只能回到仍在本地的上一版</span>
+previous = installed[key].previous_active
+assert previous.exists and verify(previous)
+atomic_write(active_json, {**active, key: previous.ref})
+audit(<span class="s">"rollback"</span>, key, previous.version, previous.digest)</code></pre>
+        <p>激活失败时，旧 `active.json` 保持不变；如果 `os.replace()` 成功但运行时加载失败，下一次启动应回退到上一个可用版本，并记录 `activation_failed`。保留版本数建议为 2（当前 + 上一版），磁盘占用与回滚能力平衡。</p>
+
+        <h3>5.3 离线与多台分发</h3>
+        <table>
+          <thead><tr><th>方式</th><th>流程</th><th>适用</th><th>约束</th></tr></thead>
+          <tbody>
+            <tr><td>手动拉取</td><td>在驱动管理中检查仓库 → 选版本 → install</td><td>单台工位</td><td>包仍需验签；私钥不进入现场</td></tr>
+            <tr><td>静态索引</td><td>读取签名 `index.json` → 下载/复制包 → 同一安装事务</td><td>车间内多台 Runner</td><td>索引与包分离签名；不要求常驻服务</td></tr>
+            <tr><td>MES 推送</td><td>运维平台下发包与目标台架清单</td><td>多产线统一版本</td><td>需要资产台账、审批、回滚窗口</td></tr>
+          </tbody>
+        </table>
+        <p>三种方式共用同一包格式、同一验签实现、同一状态机。差异只在“包如何到达机器”，不得为离线与在线各维护一套安装逻辑。</p>
+      </section>
+
+      <section id="s6">
+        <div class="sec-head"><span class="sec-num">06</span><h2>安全与测试</h2></div>
+        <h3>6.1 安全控制</h3>
+        <table>
+          <thead><tr><th>控制点</th><th>要求</th><th>对应风险</th></tr></thead>
+          <tbody>
+            <tr><td>签名</td><td>Ed25519 对规范化 `SHA256SUMS` 签名；信任库只读；支持 key_id 轮换与吊销</td><td>包被替换、内网仓库被篡改</td></tr>
+            <tr><td>哈希</td><td>逐文件 SHA-256；解压前校验；拒绝未列出的文件</td><td>半包、夹带文件</td></tr>
+            <tr><td>路径</td><td>拒绝绝对路径、`..`、符号链接、NTFS ADS、保留设备名</td><td>zip slip、覆盖系统文件</td></tr>
+            <tr><td>资源</td><td>限制包大小、条目数、解压后总大小、单文件大小、探测超时</td><td>zip bomb、导入卡死</td></tr>
+            <tr><td>权限</td><td>`app/`、`runtime/` 只读；`drivers/` 仅管理员/服务账号可写；`.state` 与包目录分离</td><td>普通用户替换驱动</td></tr>
+            <tr><td>代码执行</td><td>禁止安装脚本；入口只在探测与激活后导入；子进程隔离与超时</td><td>恶意包获得 Runner 权限</td></tr>
+            <tr><td>审计</td><td>记录操作者、来源、包哈希、key_id、结果、时间</td><td>无法追溯现场变更</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.2 错误码</h3>
+        <table>
+          <thead><tr><th>错误码</th><th>场景</th><th>处置</th></tr></thead>
+          <tbody>
+            <tr><td>`E_PKG_LAYOUT`</td><td>zip 结构非法、路径穿越、符号链接、超限</td><td>拒绝并隔离</td></tr>
+            <tr><td>`E_PKG_MANIFEST`</td><td>清单缺字段、格式非法、models 为空或重复</td><td>拒绝，提示字段</td></tr>
+            <tr><td>`E_PKG_HASH`</td><td>文件哈希不匹配、缺失文件、额外文件</td><td>隔离，保留证据</td></tr>
+            <tr><td>`E_PKG_SIGNATURE`</td><td>签名无效、key_id 未授信、证书吊销</td><td>隔离，提示信任库</td></tr>
+            <tr><td>`E_PKG_COMPAT`</td><td>api 不兼容、min_platform 不满足</td><td>拒绝，提示升级方向</td></tr>
+            <tr><td>`E_PKG_VERSION`</td><td>同 key 低版本被当作普通安装</td><td>拒绝；仅显式回滚可用</td></tr>
+            <tr><td>`E_PKG_CONFLICT`</td><td>同型号被不同 key 声明</td><td>拒绝，保留当前 active</td></tr>
+            <tr><td>`E_PKG_PROBE`</td><td>入口导入失败、仿真冒烟失败、超时</td><td>隔离，记录堆栈</td></tr>
+            <tr><td>`E_PKG_LOAD`</td><td>入口命名空间冲突、受控加载器拒绝导入</td><td>拒绝激活，保留当前 active</td></tr>
+            <tr><td>`E_PKG_BUSY`</td><td>安装/激活锁超时</td><td>事务终止，可重试</td></tr>
+            <tr><td>`E_PKG_STATE`</td><td>状态文件损坏、锁超时、原子替换失败</td><td>停止事务，人工恢复</td></tr>
+            <tr><td>`E_PKG_PINNED_MISSING`</td><td>台架锁定版本不在本地</td><td>拒绝运行该台架</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.3 测试矩阵</h3>
+        <table>
+          <thead><tr><th>类别</th><th>用例</th><th>预期</th></tr></thead>
+          <tbody>
+            <tr><td>正常安装</td><td>签名包、型号无冲突、兼容</td><td>进入 STAGED；激活后 active 指向新版本</td></tr>
+            <tr><td>篡改</td><td>修改 `driver.py` 或 `SHA256SUMS`</td><td>`E_PKG_HASH` 或 `E_PKG_SIGNATURE`，隔离</td></tr>
+            <tr><td>错误密钥</td><td>用未授信 key 签名</td><td>`E_PKG_SIGNATURE`，不激活</td></tr>
+            <tr><td>路径攻击</td><td>`../`、绝对路径、符号链接、ADS</td><td>`E_PKG_LAYOUT`，不写目标目录</td></tr>
+            <tr><td>型号冲突</td><td>两个 key 声明同一型号</td><td>`E_PKG_CONFLICT`，当前 active 不变</td></tr>
+            <tr><td>低版本</td><td>普通安装低于 active 的版本</td><td>`E_PKG_VERSION`；显式回滚可用</td></tr>
+            <tr><td>契约不兼容</td><td>api major 不等或 min_platform 不满足</td><td>`E_PKG_COMPAT`，安装阶段拒绝</td></tr>
+            <tr><td>探测失败</td><td>入口 import 报错、仿真能力抛错</td><td>`E_PKG_PROBE`，隔离</td></tr>
+            <tr><td>回滚</td><td>激活后回滚到 N-1</td><td>active 精确回到旧版本，审计完整</td></tr>
+            <tr><td>升级保留</td><td>Runner 升级 app/web/runtime</td><td>`drivers/` 与 `.state/` 不变</td></tr>
+            <tr><td>并发</td><td>两个安装事务同时开始</td><td>一个获得锁，另一个 `E_PKG_BUSY`</td></tr>
+            <tr><td>断网</td><td>无网络，只读缓存索引</td><td>不提供本地导入，界面明确显示离线态</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.4 与内核的边界测试</h3>
+        <p>货架测试不得只验证“文件复制成功”。必须把安装后的包交给内核注册表，验证 <span class="mono">merge_specs</span> 的覆盖规则、<span class="mono">resolve_spec</span> 的型号命中、<span class="mono">model_conflicts</span> 的冲突检测和 <span class="mono">resolve_entry</span> 的导入结果。安装成功但内核无法派发，视为安装失败。</p>
+      </section>
+
+      <section id="s7">
+        <div class="sec-head"><span class="sec-num">07</span><h2>演进与验收</h2></div>
+        <h3>7.1 分阶段落地</h3>
+        <table>
+          <thead><tr><th>阶段</th><th>范围</th><th>行为变化</th><th>退出条件</th></tr></thead>
+          <tbody>
+            <tr><td><strong>S0 目录与状态</strong></td><td>创建 `drivers/`、`.state/active.json`、安装台账；扫描器排除临时目录</td><td>Runner 可识别货架；升级保留</td><td>空货架启动正常；升级不丢状态</td></tr>
+            <tr><td><strong>S1 安装事务</strong></td><td>inspect / install / activate / rollback；哈希与清单校验</td><td>现场可导入包，不再手工拷贝</td><td>正常包可激活；坏包被隔离</td></tr>
+            <tr><td><strong>S2 签名与信任</strong></td><td>Ed25519、信任库、key_id、索引签名</td><td>安装必须验签；私有包走审批</td><td>篡改包全部拒绝</td></tr>
+            <tr><td><strong>S3 版本治理</strong></td><td>同 key 版本门槛、台架锁定、冲突拒绝、回滚窗口</td><td>生产版本可复现</td><td>低版本/冲突/锁定缺失均按预期失败</td></tr>
+            <tr><td><strong>S4 多台分发</strong></td><td>静态索引、MES 推送、审计汇总</td><td>多产线统一版本</td><td>离线与在线共用同一包格式</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.2 验收判据</h3>
+        <ul class="checks">
+          <li><strong>包可验证</strong>：签名、哈希、清单、入口四类检查均有独立错误码。</li>
+          <li><strong>安装原子</strong>：失败不留下可扫描的半包，当前 active 不变。</li>
+          <li><strong>激活可控</strong>：同 key 单 active；旧版本保留且可回滚。</li>
+          <li><strong>冲突拒绝</strong>：同型号不同 key 在激活前失败，并列出双方。</li>
+          <li><strong>契约前置</strong>：api 与 min_platform 在安装阶段判定。</li>
+          <li><strong>内核可派发</strong>：安装后的包能被注册表解析到正确型号。</li>
+          <li><strong>升级保留</strong>：Runner 升级后货架与状态不丢失。</li>
+          <li><strong>在线可用</strong>：工位直连、车间镜像、MES 推送使用同一验签逻辑。</li>
+          <li><strong>审计完整</strong>：可回答谁在何时安装/激活/回滚了哪个哈希。</li>
+          <li><strong>权限隔离</strong>：代码目录只读，货架目录仅管理员可写。</li>
+        </ul>
+
+        <h3>7.3 关键风险</h3>
+        <table>
+          <thead><tr><th>风险</th><th>影响</th><th>控制</th></tr></thead>
+          <tbody>
+            <tr><td>把货架做成第二个包管理器</td><td>依赖、卸载、注册表污染，难以回滚</td><td>只管理 `.atepkg` 与状态；不执行任意安装脚本</td></tr>
+            <tr><td>签名实现与清单实现分叉</td><td>同一包在不同入口判断不一致</td><td>单一 `trust.py` 与 `load_manifest` 实现；UI 不重复判断</td></tr>
+            <tr><td>同 key 无条件覆盖</td><td>现场旧版覆盖官方修复</td><td>版本门槛；低版本仅显式回滚</td></tr>
+            <tr><td>包目录污染模块命名空间</td><td>不同厂商同名模块互相遮蔽</td><td>包名带 key 前缀；受控 loader；禁止全局 `sys.path` 注入</td></tr>
+            <tr><td>探测阶段执行恶意代码</td><td>Runner 权限被滥用</td><td>签名信任 + 子进程 + 超时 + 最小环境；后续再评估 OS 沙箱</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        <span>ATE Platform · External Driver Shelf Design</span>
+        <span>D:\ATE\docs\driver-shelf-design.html · 2026-10-18</span>
+      </footer>
+      <p class="small muted">相关文档：<a href="driver-master-design.html">设计总纲</a>、<a href="driver-allinone-design.html">全量随包方案</a>、<a href="driver-logical-view.html">逻辑视图</a>、<a href="driver-design-patterns.html">设计模式</a>、<a href="driver-dev-guide.html">开发指导手册</a>、<a href="scope-api-reference.html">示波器函数清单</a>、<a href="tps-dev-guide.html">TPS 开发说明</a>、<a href="driver-kernel-design.html">内核设计</a>、<a href="driver-deployment-decision.html">部署决策（已废止）</a>、<a href="driver-distribution.html">在线分发（已废止）</a>、<a href="shelf-simulation.html">货架仿真（已废止）</a>。</p>
+</main>
+  </div>
+</div>
+</body>
+</html>

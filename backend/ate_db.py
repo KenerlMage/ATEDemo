@@ -9,7 +9,7 @@
   都会调用 `sync_from_registry()` 把注册信息**全量投影**到 `bench_registry` /
   `device_registry` 两张关系表；`ate.db` 与注册库不一致时，以注册库为准重建投影。
 * **谁读它**：TPS 运行时由公共 `conftest.py` 读取 `device_registry` 拿设备连接参数
-  （IP/端口/串口/波特率/资源地址）与 driver 型号（`driver` 列），再交给 `drivers` 包实例化。
+  （IP/端口/串口/波特率/资源地址）与设备类型（`device_type` 列），再交给 `drivers` 包实例化。
 * 表结构变更走 `SCHEMA_SQL` + `init_db()`（幂等 `CREATE TABLE IF NOT EXISTS`）。
 """
 
@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS device_registry (
     vendor        TEXT,
     category      TEXT,
     role          TEXT,
+    device_type   TEXT,
     programmable  INTEGER DEFAULT 0,
     interface     TEXT,
     protocol      TEXT,
@@ -103,6 +104,9 @@ def init_db(path: Optional[Path] = None) -> Path:
     with _LOCK:
         with connect(path) as conn:
             conn.executescript(SCHEMA_SQL)
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(device_registry)")}
+            if "device_type" not in cols:
+                conn.execute("ALTER TABLE device_registry ADD COLUMN device_type TEXT")
     return path or DB_PATH
 
 
@@ -116,13 +120,13 @@ def _now() -> str:
 
 
 def _driver_key_of(dev: dict) -> str:
-    """解析该设备应使用的 driver 规格名（失败不抛异常，回退 generic-scpi）"""
+    """读取注册时选定的设备类型；缺失/非法时保留空值，绝不回退到相似驱动。"""
     try:
         from drivers.factory import resolve_driver_key
 
         return resolve_driver_key(dev)
     except Exception:
-        return "generic-scpi"
+        return ""
 
 
 def _device_rows(bench: dict) -> list[dict]:
@@ -147,6 +151,7 @@ def _device_rows(bench: dict) -> list[dict]:
             "programmable": bool(dev.get("programmable")),
             "category": dev.get("category") or "",
             "model": dev.get("model") or "",
+            "device_type": dev.get("device_type") or "",
         }
         rows.append(
             {
@@ -157,6 +162,7 @@ def _device_rows(bench: dict) -> list[dict]:
                 "vendor": dev.get("vendor") or "",
                 "category": dev.get("category") or "",
                 "role": dev.get("role") or "",
+                "device_type": dev.get("device_type") or "",
                 "programmable": 1 if dev.get("programmable") else 0,
                 "interface": (dev.get("interface") or "NONE").upper(),
                 "protocol": dev.get("protocol") or "",
@@ -224,10 +230,10 @@ def sync_from_bench_rows(benches: list[dict], source: str = "registry", path: Op
             )
             conn.executemany(
                 """INSERT INTO device_registry
-                   (bench_id, device_id, name, model, vendor, category, role, programmable, interface,
+                   (bench_id, device_id, name, model, vendor, category, role, device_type, programmable, interface,
                     protocol, host, port, serial_port, baudrate, address, channel, required, configured,
                     note, driver, timeout, config_json)
-                   VALUES (:bench_id, :device_id, :name, :model, :vendor, :category, :role, :programmable,
+                   VALUES (:bench_id, :device_id, :name, :model, :vendor, :category, :role, :device_type, :programmable,
                            :interface, :protocol, :host, :port, :serial_port, :baudrate, :address,
                            :channel, :required, :configured, :note, :driver, :timeout, :config_json)""",
                 device_rows,

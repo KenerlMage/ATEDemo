@@ -81,6 +81,8 @@ export const api = {
   // ---- 测试台注册 / 测试台导航 ----
   // 预设测试台类型 (含标准 BOM 清单)
   getTestbenchPresets: () => request('/api/testbench/presets'),
+  // 注册页受控设备类型清单（设备类型 -> 驱动实现）
+  getDeviceTypes: () => request('/api/testbench/device-types'),
   // 预设类型级联树: 产品 -> 子系统 -> 预设测试台类型
   getTestbenchTree: () => request('/api/testbench/tree'),
   getTestbenchPreset: (presetId) => request(`/api/testbench/presets/${encodeURIComponent(presetId)}`),

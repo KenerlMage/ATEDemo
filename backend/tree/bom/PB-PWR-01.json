@@ -21,7 +21,8 @@
       "default_address": "TCPIP0::192.168.10.21::inst0::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口"
+      "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
+      "device_type": "tektronix-mso5"
     },
     {
       "id": "itech-it6332a",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "CH1",
       "required": true,
-      "note": "双路 0-30V/6A；CH1 供 DUT，CH2 供辅助电路"
+      "note": "双路 0-30V/6A；CH1 供 DUT，CH2 供辅助电路",
+      "device_type": "generic-psu"
     },
     {
       "id": "keithley-6221",
@@ -59,7 +61,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "精密交直流电流源；漏电流测试精度可达 10 fA"
+      "note": "精密交直流电流源；漏电流测试精度可达 10 fA",
+      "device_type": "generic-scpi"
     },
     {
       "id": "itech-it8512a",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "150V/30A/300W，供效率曲线扫描"
+      "note": "150V/30A/300W，供效率曲线扫描",
+      "device_type": "generic-eload"
     },
     {
       "id": "fluke-8846a",
@@ -97,7 +101,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "6.5 位；作校准基准，建议每年送检"
+      "note": "6.5 位；作校准基准，建议每年送检",
+      "device_type": "generic-dmm"
     },
     {
       "id": "keysight-34972a",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "配 34901A 20 通道多路复用板卡"
+      "note": "配 34901A 20 通道多路复用板卡",
+      "device_type": "generic-scpi"
     },
     {
       "id": "uart-dut",
@@ -135,7 +141,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "用于读取 DUT 版本号与写入测试标志位"
+      "note": "用于读取 DUT 版本号与写入测试标志位",
+      "device_type": "generic-scpi"
     },
     {
       "id": "fixture-probe",
@@ -154,7 +161,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "易损件，建议 180 天更换并登记寿命"
+      "note": "易损件，建议 180 天更换并登记寿命",
+      "device_type": "passive-device"
     }
   ]
 }

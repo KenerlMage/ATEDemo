@@ -21,7 +21,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "600V/17A；需配置过压保护点"
+      "note": "600V/17A；需配置过压保护点",
+      "device_type": "generic-psu"
     },
     {
       "id": "keithley-6221b",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "为电流传感器提供精密激励"
+      "note": "为电流传感器提供精密激励",
+      "device_type": "generic-scpi"
     },
     {
       "id": "tek-mdo34",
@@ -59,7 +61,8 @@
       "default_address": "TCPIP0::192.168.30.43::inst0::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "配电流探头 TCP0030A"
+      "note": "配电流探头 TCP0030A",
+      "device_type": "tektronix-mso5"
     },
     {
       "id": "yokogawa-wt310e",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-scpi"
     },
     {
       "id": "ni-cdaq9185",
@@ -97,7 +101,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "配 NI-9213 热电偶模块"
+      "note": "配 NI-9213 热电偶模块",
+      "device_type": "generic-scpi"
     },
     {
       "id": "chroma-63204a",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": ""
+      "note": "",
+      "device_type": "generic-eload"
     },
     {
       "id": "uart-encoder",
@@ -135,7 +141,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-scpi"
     },
     {
       "id": "motor-fixture",
@@ -154,7 +161,8 @@
       "default_address": "",
       "default_channel": "",
       "required": false,
-      "note": "易损件, 建议 180 天更换"
+      "note": "易损件, 建议 180 天更换",
+      "device_type": "passive-device"
     }
   ]
 }

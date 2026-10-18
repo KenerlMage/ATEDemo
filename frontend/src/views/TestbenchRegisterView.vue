@@ -41,6 +41,7 @@ const subsystems = computed(() => (product.value ? product.value.subsystems : []
 const curSubsystem = computed(() => subsystems.value.find((s) => s.subsystem === subsystemId.value) || null)
 const presetOptions = computed(() => (curSubsystem.value ? curSubsystem.value.presets : []))
 const presetInfo = ref(null)        // { preset, summary }
+const deviceTypes = ref([])
 const bom = ref([])
 const devices = ref([])
 const savedId = ref('')
@@ -59,6 +60,10 @@ const configuredCount = computed(() => programmable.value.filter((d) => isConfig
 
 const checkClass = (s) => (s === 'pass' ? 'c-pass' : s === 'fail' ? 'c-fail' : 'c-skip')
 const checkText = (s) => (s === 'pass' ? '通过' : s === 'fail' ? '失败' : '跳过')
+const typeLabel = (key) => {
+  const hit = deviceTypes.value.find((t) => t.key === key)
+  return hit ? hit.label : (key || '未选择')
+}
 
 function isNet(d) { return NET.includes((d.interface || '').toUpperCase()) }
 function isSer(d) { return SER.includes((d.interface || '').toUpperCase()) }
@@ -78,6 +83,7 @@ function buildDevices(list) {
     vendor: d.vendor || '',
     category: d.category || '',
     role: d.role || '',
+    device_type: d.device_type || d.driver || '',
     programmable: !!d.programmable,
     interface: (d.interface || 'NONE').toUpperCase(),
     host: d.host || d.default_host || '',
@@ -104,6 +110,16 @@ async function loadTree() {
     error.value = `无法连接后端：${e.message}`
   } finally {
     loading.value = false
+  }
+}
+
+async function loadDeviceTypes() {
+  try {
+    const res = await api.getDeviceTypes()
+    if (res.success) deviceTypes.value = res.types || []
+  } catch (e) {
+    tipErr.value = true
+    tip.value = `读取设备类型失败：${e.message}`
   }
 }
 
@@ -201,6 +217,12 @@ function validateStep(n) {
     if (!devices.value.length) errs.push('BOM 设备清单为空，请重新选择测试台类型')
   }
   if (n === 2) {
+    devices.value.forEach((d) => {
+      if (!d.device_type) errs.push(`${d.name}：请选择设备类型`)
+      else if (deviceTypes.value.length && !deviceTypes.value.some((t) => t.key === d.device_type)) {
+        errs.push(`${d.name}：设备类型「${d.device_type}」不在受控清单中`)
+      }
+    })
     programmable.value.forEach((d) => {
       if (isNet(d)) {
         if (!String(d.host || '').trim()) errs.push(`${d.name}：缺少 IP 地址`)
@@ -241,6 +263,7 @@ function payload(status, st) {
       vendor: d.vendor,
       category: d.category,
       role: d.role,
+      device_type: d.device_type,
       programmable: d.programmable,
       interface: d.interface,
       host: String(d.host || '').trim(),
@@ -352,6 +375,7 @@ function resetAll() {
 }
 
 onMounted(async () => {
+  await loadDeviceTypes()
   await loadTree()
   if (route.query.id) await loadForEdit(String(route.query.id))
 })
@@ -460,7 +484,7 @@ onMounted(async () => {
           <div class="table-wrap">
             <table class="tbr-table">
               <thead>
-                <tr><th>#</th><th>设备</th><th>型号 / 厂商</th><th>接口</th><th>用途</th><th>程控</th><th>BOM 默认配置</th></tr>
+                <tr><th>#</th><th>设备</th><th>型号 / 厂商</th><th>接口</th><th>设备类型</th><th>用途</th><th>程控</th><th>BOM 默认配置</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(d, i) in bom" :key="d.id">
@@ -471,6 +495,7 @@ onMounted(async () => {
                     <div class="td-muted">{{ d.vendor || '—' }}</div>
                   </td>
                   <td><span class="iface">{{ (d.interface || 'NONE').toUpperCase() }}</span></td>
+                  <td class="td-muted">{{ typeLabel(d.device_type) }}</td>
                   <td class="td-muted">{{ d.role || '—' }}</td>
                   <td>
                     <span class="badge" :class="d.programmable ? 'accent' : 'idle'">{{ d.programmable ? '可编程' : '手动' }}</span>
@@ -538,6 +563,16 @@ onMounted(async () => {
             <div class="dev-meta">{{ d.model || '—' }} · {{ d.vendor || '—' }}<span v-if="d.role"> · {{ d.role }}</span></div>
 
             <div class="dev-form">
+              <label class="field field-wide">
+                <span class="field-label">设备类型 <em>*</em></span>
+                <select v-model="d.device_type" class="input sel">
+                  <option value="" disabled>请选择驱动类型</option>
+                  <option v-for="t in deviceTypes" :key="t.key" :value="t.key">
+                    {{ t.label }}
+                  </option>
+                </select>
+                <span class="field-hint">运行时按此类型取驱动，不再根据型号或关键词自动匹配</span>
+              </label>
               <template v-if="isNet(d)">
                 <label class="field">
                   <span class="field-label">IP 地址 <em>*</em></span>
@@ -589,7 +624,7 @@ onMounted(async () => {
           <div class="sub-title">非程控设备 / 工装（无需填写连接参数）</div>
           <div class="passive-list">
             <span v-for="d in passive" :key="d.id" class="passive-item">
-              {{ d.name }} <span class="td-muted">{{ d.model }}</span>
+              {{ d.name }} <span class="td-muted">{{ d.model }} · {{ typeLabel(d.device_type) }}</span>
             </span>
           </div>
         </template>

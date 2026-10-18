@@ -315,6 +315,12 @@ class UpdateManager:
         out: dict = {}
         for name in runner_info.PRESERVED_PATHS:
             p = runner_info.RUNNER_HOME / name
+            # 安装形态下 ate.db / testresource 位于 <RUNNER_HOME>/app，只按根解析
+            # 会把它们记成 absent，使"升级前后数据一致"的校验形同虚设。
+            if not p.exists():
+                alt = runner_info.RUNNER_HOME / "app" / name
+                if alt.exists():
+                    p = alt
             if p.is_file():
                 st = p.stat()
                 out[name] = {"kind": "file", "size": st.st_size, "mtime": int(st.st_mtime)}

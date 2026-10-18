@@ -1,0 +1,27 @@
+{
+  "schema": "ate.driver.manifest.v1",
+  "key": "pi-hexapod",
+  "version": "1.0.0",
+  "family": "motion",
+  "api": "1.2",
+  "label": "六足并联定位平台 · PI H-811 / H-820 / H-840",
+  "vendor": "Physik Instrumente",
+  "entry": "ate_drivers.vendors.pi_hexapod.driver:PiHexapod",
+  "interfaces": ["LAN", "SERIAL"],
+  "backends": ["native", "visa"],
+  "models": ["H-811", "H-820", "H-840", "H-850"],
+  "capabilities": [
+    "identify",
+    "reset",
+    "state",
+    "motion.move",
+    "motion.read_position",
+    "vendor.pi.home",
+    "vendor.pi.stop",
+    "vendor.pi.servo"
+  ],
+  "simulate": true,
+  "min_platform": "1.0.0",
+  "depends": [],
+  "signature": ""
+}

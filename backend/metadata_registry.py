@@ -370,6 +370,7 @@ def _norm_bom_item(raw: dict) -> dict:
         "vendor": _text(raw.get("vendor"), 60),
         "category": _text(raw.get("category"), 40),
         "role": _text(raw.get("role"), 160),
+        "device_type": _text(raw.get("device_type"), 40),
         "programmable": bool(raw.get("programmable")),
         "interface": iface,
         "protocol": _text(raw.get("protocol"), 60),

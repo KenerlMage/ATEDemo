@@ -21,7 +21,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "0-150V/10A，母线电压可编程斜率上电"
+      "note": "0-150V/10A，母线电压可编程斜率上电",
+      "device_type": "generic-psu"
     },
     {
       "id": "tek-mdo34",
@@ -40,7 +41,8 @@
       "default_address": "TCPIP0::192.168.40.52::inst0::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "4 通道 + 16 路逻辑探头"
+      "note": "4 通道 + 16 路逻辑探头",
+      "device_type": "tektronix-mso5"
     },
     {
       "id": "yokogawa-wt310-sd",
@@ -59,7 +61,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-scpi"
     },
     {
       "id": "itech-it8512a-sd",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-eload"
     },
     {
       "id": "enc-sim",
@@ -97,7 +101,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "可编程线数与转速"
+      "note": "可编程线数与转速",
+      "device_type": "generic-awg"
     },
     {
       "id": "zlg-usbcan",
@@ -116,7 +121,8 @@
       "default_address": "USB0::0x1234::0x5678::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "USB 接口不支持自动连通探测，需人工确认枚举成功"
+      "note": "USB 接口不支持自动连通探测，需人工确认枚举成功",
+      "device_type": "generic-scpi"
     },
     {
       "id": "dyno-rig",
@@ -135,7 +141,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "手动加载；自动化加载需后续接入伺服加载控制器"
+      "note": "手动加载；自动化加载需后续接入伺服加载控制器",
+      "device_type": "passive-device"
     }
   ]
 }

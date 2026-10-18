@@ -39,6 +39,7 @@ class DeviceConfig:
     vendor: str = ""
     category: str = ""
     role: str = ""
+    device_type: str = ""
     interface: str = "NONE"
     protocol: str = ""
     host: str = ""
@@ -69,6 +70,7 @@ class DeviceConfig:
             vendor=str(data.get("vendor") or ""),
             category=str(data.get("category") or ""),
             role=str(data.get("role") or ""),
+            device_type=str(data.get("device_type") or data.get("driver") or ""),
             interface=iface,
             protocol=str(data.get("protocol") or ""),
             host=str(data.get("host") or ""),
@@ -135,6 +137,7 @@ class DeviceConfig:
             "model": self.model,
             "vendor": self.vendor,
             "category": self.category,
+            "device_type": self.device_type,
             "interface": self.interface,
             "resource": self.resource,
             "programmable": self.programmable,

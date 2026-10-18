@@ -102,6 +102,14 @@ Get-ChildItem (Join-Path $payload "app") -Recurse -File -Include "*.pyc", "*.log
 Remove-Item (Join-Path $payload "app\ate.db") -Force -ErrorAction SilentlyContinue
 Info ("      app/  <- " + (Get-ChildItem (Join-Path $payload "app") -Recurse -File).Count + " files")
 
+# ---------------------------------------------------------------- 2.5 driver gate
+# All instrument drivers ship inside app\drivers. Refuse to build a package
+# whose drivers cannot be instantiated, or whose testbench registry points at
+# device types that no longer exist in the bundle.
+Info "2.5/6 checking bundled drivers (gate)..."
+& $Python (Join-Path $pkgDir "check_drivers.py") --backend (Join-Path $payload "app")
+if ($LASTEXITCODE -ne 0) { Die "driver gate failed - fix drivers before packaging" }
+
 # ---------------------------------------------------------------- 3. embedded python runtime
 Info "3/6 preparing embedded Python runtime..."
 $pyExe = Join-Path $payload "runtime\python.exe"

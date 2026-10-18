@@ -32,7 +32,8 @@
           "channel": "",
           "required": true,
           "note": "8 通道；建议固定 IP，端口 4000 为 VXI-11 默认端口",
-          "configured": true
+          "configured": true,
+          "device_type": "tektronix-mso5"
         },
         {
           "id": "rh-dmm",
@@ -52,7 +53,8 @@
           "channel": "",
           "required": true,
           "note": "6.5 位；作读头阻值与偏置电压的测量基准，建议每年送检",
-          "configured": true
+          "configured": true,
+          "device_type": "generic-dmm"
         },
         {
           "id": "rh-psu",
@@ -72,7 +74,8 @@
           "channel": "CH1",
           "required": true,
           "note": "双路 0-30V/6A；CH1 供读头本体，CH2 供前置放大电路",
-          "configured": true
+          "configured": true,
+          "device_type": "generic-psu"
         },
         {
           "id": "rh-eload",
@@ -92,7 +95,8 @@
           "channel": "",
           "required": false,
           "note": "150V/30A/300W，用于动态拉载与纹波测试",
-          "configured": true
+          "configured": true,
+          "device_type": "generic-eload"
         },
         {
           "id": "rh-awg",
@@ -112,7 +116,8 @@
           "channel": "",
           "required": true,
           "note": "20 MHz；扫频与脉冲激励，配合示波器做动态响应分析",
-          "configured": true
+          "configured": true,
+          "device_type": "generic-awg"
         },
         {
           "id": "rh-spin",
@@ -132,7 +137,8 @@
           "channel": "",
           "required": true,
           "note": "用于转速扫描下的输出一致性验证；转速范围 0-12000 rpm",
-          "configured": true
+          "configured": true,
+          "device_type": "serial-motion"
         },
         {
           "id": "rh-fixture",
@@ -152,7 +158,8 @@
           "channel": "",
           "required": false,
           "note": "易损件，建议 180 天更换并登记寿命",
-          "configured": false
+          "configured": false,
+          "device_type": "passive-device"
         }
       ],
       "step": 3,

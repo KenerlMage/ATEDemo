@@ -21,7 +21,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "600V/8A，需确认高压联锁回路已闭合"
+      "note": "600V/8A，需确认高压联锁回路已闭合",
+      "device_type": "generic-psu"
     },
     {
       "id": "chroma-63204a",
@@ -40,7 +41,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "600V/80A/4kW"
+      "note": "600V/80A/4kW",
+      "device_type": "generic-eload"
     },
     {
       "id": "yokogawa-wt310",
@@ -59,7 +61,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "DC/DC 效率测试精度 0.1%"
+      "note": "DC/DC 效率测试精度 0.1%",
+      "device_type": "generic-scpi"
     },
     {
       "id": "fluke-8846a-hv",
@@ -78,7 +81,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": "配高压衰减探头"
+      "note": "配高压衰减探头",
+      "device_type": "generic-dmm"
     },
     {
       "id": "hioki-st5520",
@@ -97,7 +101,8 @@
       "default_address": "GPIB0::22::INSTR",
       "default_channel": "",
       "required": true,
-      "note": "1500V 耐压；GPIB 需 NI-488.2 驱动，不支持自动连通探测"
+      "note": "1500V 耐压；GPIB 需 NI-488.2 驱动，不支持自动连通探测",
+      "device_type": "generic-scpi"
     },
     {
       "id": "uart-dut-hv",
@@ -116,7 +121,8 @@
       "default_address": "",
       "default_channel": "",
       "required": true,
-      "note": ""
+      "note": "",
+      "device_type": "generic-scpi"
     }
   ]
 }

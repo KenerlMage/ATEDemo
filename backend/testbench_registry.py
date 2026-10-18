@@ -40,6 +40,8 @@ from typing import Any, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from drivers.factory import DRIVER_TYPE_MAP, default_device_type, list_driver_types
+
 SERIAL_RE = re.compile(r"^SPMTS[0-9]{12}$")
 NET_INTERFACES = {"LAN", "ETHERNET", "TCP", "IP"}
 SERIAL_INTERFACES = {"SERIAL", "RS232", "RS485", "UART", "COM"}
@@ -118,6 +120,7 @@ class DeviceConfig(BaseModel):
     vendor: str = ""
     category: str = ""
     role: str = ""
+    device_type: str = ""
     programmable: bool = False
     interface: str = "NONE"
     host: str = ""
@@ -152,8 +155,8 @@ class VerifyRequest(BaseModel):
 class DeviceConfigPatch(BaseModel):
     """可编程设备属性修改请求。
 
-    只允许改连接参数 (IP / 端口 / 串口 / 波特率 / 资源地址 / 通道 / 协议 / 备注),
-    BOM 元信息 (型号 / 厂商 / 类别 / 用途) 不允许通过此接口改动。
+    允许改连接参数 (IP / 端口 / 串口 / 波特率 / 资源地址 / 通道 / 协议 / 备注)
+    与设备类型；BOM 元信息 (型号 / 厂商 / 类别 / 用途) 不允许通过此接口改动。
     reset_defaults=true 时恢复为该预设类型 BOM 中的默认连接值。
     """
     host: Optional[str] = None
@@ -163,6 +166,7 @@ class DeviceConfigPatch(BaseModel):
     baudrate: Optional[int] = None
     address: Optional[str] = None
     channel: Optional[str] = None
+    device_type: Optional[str] = None
     note: Optional[str] = None
     reset_defaults: bool = False
 
@@ -315,6 +319,17 @@ def _bom_of_presets() -> dict[str, dict]:
     return table
 
 
+def _with_device_types(preset: dict) -> dict:
+    """对外返回的预设 BOM 补齐设备类型，旧 BOM 只做一次类别映射。"""
+    out = dict(preset)
+    out["bom"] = [
+        dict(d, device_type=d.get("device_type") or default_device_type(d))
+        for d in (preset.get("bom") or [])
+        if isinstance(d, dict)
+    ]
+    return out
+
+
 def _devices_from_preset(preset: dict) -> list[dict]:
     devices = []
     for d in preset.get("bom") or []:
@@ -326,6 +341,7 @@ def _devices_from_preset(preset: dict) -> list[dict]:
                 "vendor": d.get("vendor", ""),
                 "category": d.get("category", ""),
                 "role": d.get("role", ""),
+                "device_type": d.get("device_type") or default_device_type(d),
                 "programmable": bool(d.get("programmable")),
                 "interface": (d.get("interface") or "NONE").upper(),
                 "host": d.get("default_host", ""),
@@ -358,6 +374,11 @@ def _merge_devices(devices: list[dict], preset_id: str) -> list[dict]:
             "vendor": raw.get("vendor") or base.get("vendor", ""),
             "category": raw.get("category") or base.get("category", ""),
             "role": raw.get("role") or base.get("role", ""),
+            "device_type": (
+                raw.get("device_type")
+                or base.get("device_type")
+                or default_device_type({**base, **raw})
+            ).strip(),
             "programmable": bool(raw.get("programmable", base.get("programmable", False))),
             "interface": (raw.get("interface") or base.get("interface") or "NONE").upper(),
             "host": (raw.get("host") or "").strip(),
@@ -431,6 +452,11 @@ def _preset_meta_table() -> dict[str, dict]:
 def _public(item: dict) -> dict:
     """对外返回的测试台对象 (补一个自检摘要, 便于列表页直接渲染标签)"""
     out = dict(item)
+    out["devices"] = [
+        dict(d, device_type=d.get("device_type") or default_device_type(d))
+        for d in (item.get("devices") or [])
+        if isinstance(d, dict)
+    ]
     ver = item.get("verification") or {}
     out["verify_summary"] = {
         "overall": ver.get("overall", ""),
@@ -501,6 +527,8 @@ def find_device(bench_id: str, device_id: str) -> tuple[Optional[dict], Optional
         if not item:
             return None, None
         dev = next((d for d in (item.get("devices") or []) if d.get("id") == device_id), None)
+        if dev is not None:
+            dev = dict(dev, device_type=dev.get("device_type") or default_device_type(dev))
         return item, dev
 
 
@@ -512,7 +540,9 @@ ADDRESS_RE = re.compile(r"^[A-Za-z0-9:;._/\- ]{1,80}$")
 CHANNEL_RE = re.compile(r"^[A-Za-z0-9._\-]{0,16}$")
 
 # 允许通过属性配置接口修改的字段
-PATCHABLE_FIELDS = ("host", "port", "protocol", "serial_port", "baudrate", "address", "channel", "note")
+PATCHABLE_FIELDS = (
+    "host", "port", "protocol", "serial_port", "baudrate", "address", "channel", "device_type", "note",
+)
 
 
 def _bench_lines(reg: dict) -> tuple[list[dict], list[dict]]:
@@ -525,7 +555,7 @@ def _bench_lines(reg: dict) -> tuple[list[dict], list[dict]]:
     for item in reg.get("testbenches", []):
         pub = _public(item)
         st = item.get("station") or {}
-        devs = item.get("devices") or []
+        devs = pub.get("devices") or []
         benches.append(
             {
                 "id": item.get("id", ""),
@@ -590,6 +620,13 @@ def _validate_device_patch(dev: dict, patch: dict) -> list[str]:
     """校验待写入的设备属性 (与前端表单校验保持同一套规则)"""
     iface = str(dev.get("interface", "")).upper()
     errs: list[str] = []
+
+    if "device_type" in patch:
+        dt = str(patch.get("device_type") or "").strip()
+        if not dt:
+            errs.append("设备类型不能为空")
+        elif dt not in DRIVER_TYPE_MAP:
+            errs.append(f"未知设备类型: {dt}")
 
     if "host" in patch:
         host = str(patch.get("host") or "").strip()
@@ -684,6 +721,8 @@ def _apply_device_patch(dev: dict, patch: dict, preset_id: str) -> dict:
             dev["protocol"] = str(patch.get("protocol") or "").strip()
         if "note" in patch:
             dev["note"] = str(patch.get("note") or "")[:200]
+        if "device_type" in patch:
+            dev["device_type"] = str(patch.get("device_type") or "").strip()
 
     dev["configured"] = _device_configured(dev)
     dev["updated_at"] = _now()
@@ -738,6 +777,7 @@ def _probe_device(dev: dict, timeout: float, mode: str) -> dict:
         "label": dev.get("name") or dev.get("id") or "未命名设备",
         "model": dev.get("model", ""),
         "category": dev.get("category", ""),
+        "device_type": dev.get("device_type") or "",
         "interface": iface,
         "programmable": bool(dev.get("programmable")),
         "required": bool(dev.get("required", True)),
@@ -828,6 +868,28 @@ def _static_checks(item: dict) -> list[dict]:
             "label": "可编程设备配置完整 (IP/端口 或 串口)",
             "status": "pass" if prog and len(prog_ok) == len(prog) else ("fail" if not prog else "fail"),
             "detail": f"已配置 {len(prog_ok)}/{len(prog)} 台可编程设备",
+        }
+    )
+
+    bad_types = [
+        d for d in devices
+        if not str(d.get("device_type") or "").strip()
+        or str(d.get("device_type") or "").strip() not in DRIVER_TYPE_MAP
+    ]
+    checks.append(
+        {
+            "key": "device_type",
+            "kind": "config",
+            "label": "全部设备已选择有效类型",
+            "status": "pass" if not bad_types else "fail",
+            "detail": (
+                "全部设备类型有效"
+                if not bad_types
+                else "、".join(
+                    f"{d.get('name') or d.get('id') or '?'}({d.get('device_type') or '未选择'})"
+                    for d in bad_types
+                )
+            ),
         }
     )
 
@@ -984,6 +1046,11 @@ def register_routes(app: FastAPI, tps_dir: Path) -> None:
 
     # ---------- 预设测试台类型 ----------
 
+    @app.get("/api/testbench/device-types")
+    def device_types():
+        """注册页设备类型下拉框：受控清单，不接受自由文本。"""
+        return {"success": True, "types": list_driver_types()}
+
     @app.get("/api/testbench/presets")
     def list_presets():
         try:
@@ -1011,6 +1078,7 @@ def register_routes(app: FastAPI, tps_dir: Path) -> None:
         preset = _find_preset(preset_id)
         if not preset:
             return {"success": False, "message": f"预设测试台类型不存在: {preset_id}"}
+        preset = _with_device_types(preset)
         return {"success": True, "preset": preset, "summary": _preset_summary(preset)}
 
     # ---------- 已注册测试台 ----------
@@ -1098,6 +1166,22 @@ def register_routes(app: FastAPI, tps_dir: Path) -> None:
             devices = _merge_devices(req.devices, preset_id)
             if not devices and preset:
                 devices = _devices_from_preset(preset)
+
+            if step >= 2:
+                bad_types = [
+                    d for d in devices
+                    if str(d.get("device_type") or "").strip() not in DRIVER_TYPE_MAP
+                ]
+                if bad_types:
+                    detail = "、".join(
+                        f"{d.get('name') or d.get('id') or '?'}({d.get('device_type') or '未选择'})"
+                        for d in bad_types
+                    )
+                    return {
+                        "success": False,
+                        "message": f"设备类型缺失或非法: {detail}",
+                        "errors": [f"设备类型缺失或非法: {detail}"],
+                    }
 
             item.update(
                 {
