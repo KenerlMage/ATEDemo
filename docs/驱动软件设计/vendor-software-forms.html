@@ -1,0 +1,122 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff;font-family:"Microsoft YaHei","微软雅黑",sans-serif;color:#141414}
+  .page{width:1600px;height:900px;padding:34px 40px 26px;display:flex;flex-direction:column}
+  .hdr h1{font-size:31px;letter-spacing:.5px}
+  .hdr .sub{margin-top:9px;font-size:14.5px;color:#5c5c56;line-height:1.45}
+  .hdr{border-bottom:2.5px solid #8B0F1A;padding-bottom:14px}
+  .cols{flex:1;display:flex;align-items:stretch;gap:0;margin-top:18px}
+  .col{display:flex;flex-direction:column}
+  .coltitle{font-size:13px;font-weight:700;color:#8B0F1A;letter-spacing:.6px;margin-bottom:8px}
+  .c1{width:236px}
+  .c2{width:474px;margin-left:14px}
+  .c3{width:704px;margin-left:14px}
+  .arrowcol{width:56px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px}
+  .arrowcol .g{font-size:11.5px;color:#6b6b66;text-align:center;line-height:1.3;width:56px}
+  .tri{width:0;height:0;border-left:13px solid #8B0F1A;border-top:9px solid transparent;border-bottom:9px solid transparent}
+  .card{background:#fff;border:1.4px solid #8B0F1A;border-radius:4px;padding:11px 12px}
+  .c1 .card{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}
+  .c1 .item{background:#ECECEC;border-radius:4px;padding:11px 8px;text-align:center;font-size:14.5px;line-height:1.35}
+  .c1 .item b{display:block;font-size:15.5px;margin-bottom:4px}
+  .c1 .item span{font-size:12.5px;color:#4a4a45}
+  .c2list{flex:1;display:flex;flex-direction:column;gap:8px}
+  .ad{flex:1;display:flex;align-items:center;gap:10px;background:#FBFBF9;border:1.1px solid #d9d6cd;border-radius:4px;padding:8px 11px}
+  .num{flex:0 0 24px;height:24px;border-radius:50%;background:#0F4C81;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .ad .txt b{display:block;font-size:14.5px;margin-bottom:3px}
+  .ad .txt span{font-size:12px;color:#5c5c56;line-height:1.35}
+  .fam{flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:7px}
+  .famhead{font-size:13px;font-weight:700;color:#0F4C81;background:#E8F0F7;border-radius:3px;padding:5px 9px}
+  .items{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .it{background:#fff;border:1.1px solid #c9c9c2;border-radius:4px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .it .nm{font-size:13px;line-height:1.3}
+  .badges{display:flex;gap:3px;flex:0 0 auto}
+  .bg{width:17px;height:17px;border-radius:3px;background:#8B0F1A;color:#fff;font-size:10.5px;display:flex;align-items:center;justify-content:center}
+  .foot{margin-top:12px;border-top:1.1px solid #d9d6cd;padding-top:9px;font-size:12.5px;color:#5c5c56;display:flex;justify-content:space-between;gap:18px}
+  .foot b{color:#8B0F1A}
+</style></head><body>
+<div class="page">
+  <div class="hdr">
+    <h1>供应商设备软件的形态与 ATE 接入方式</h1>
+    <div class="sub">同一台设备可能同时提供多种形态；ATE 侧以统一的设备抽象层屏蔽差异，测试用例只面向能力接口编程，不直接依赖供应商实现</div>
+  </div>
+
+  <div class="cols">
+    <div class="col c1">
+      <div class="coltitle">① ATE 测试执行层</div>
+      <div class="card">
+        <div class="item"><b>测试用例</b><span>pytest 用例 / 测试程序</span></div>
+        <div class="item"><b>能力调用</b><span>连接 · 配置 · 触发 · 采集 · 判定</span></div>
+        <div class="item"><b>结果与追溯</b><span>测量值、判定、日志与报告</span></div>
+      </div>
+    </div>
+
+    <div class="arrowcol">
+      <div class="tri"></div>
+      <div class="g">统一能力接口<br>（与形态无关）</div>
+    </div>
+
+    <div class="col c2">
+      <div class="coltitle">② 设备抽象与适配层</div>
+      <div class="c2list">
+        <div class="ad"><div class="num">1</div><div class="txt"><b>C-ABI 封装</b><span>ctypes / CFFI 加载 DLL，按头文件声明结构体与函数原型</span></div></div>
+        <div class="ad"><div class="num">2</div><div class="txt"><b>Python 适配器</b><span>直接导入供应商包，包装为统一设备类</span></div></div>
+        <div class="ad"><div class="num">3</div><div class="txt"><b>VISA / SCPI 客户端</b><span>PyVISA 打开资源，按手册下发命令、解析响应</span></div></div>
+        <div class="ad"><div class="num">4</div><div class="txt"><b>COM / .NET 桥</b><span>comtypes 或 pythonnet 调 ActiveX、.NET 程序集</span></div></div>
+        <div class="ad"><div class="num">5</div><div class="txt"><b>进程调用器</b><span>subprocess 调厂商 exe，解析返回码与输出文件</span></div></div>
+        <div class="ad"><div class="num">6</div><div class="txt"><b>协议实现器</b><span>按私有协议手册自建串口 / CAN / TCP 报文收发与校验</span></div></div>
+      </div>
+    </div>
+
+    <div class="arrowcol">
+      <div class="tri"></div>
+      <div class="g">按形态选<br>适配方式</div>
+    </div>
+
+    <div class="col c3">
+      <div class="coltitle">③ 供应商提供的软件形态</div>
+
+      <div class="fam">
+        <div class="famhead">二进制接口类（随驱动包分发）</div>
+        <div class="items">
+          <div class="it"><div class="nm">DLL + 头文件（C/C++ SDK）</div><div class="badges"><i class="bg">1</i></div></div>
+          <div class="it"><div class="nm">COM / ActiveX 组件</div><div class="badges"><i class="bg">4</i></div></div>
+          <div class="it"><div class="nm">.NET 程序集（含 NuGet 包）</div><div class="badges"><i class="bg">4</i></div></div>
+          <div class="it"><div class="nm">IVI / VXIplug&amp;play 驱动</div><div class="badges"><i class="bg">1</i><i class="bg">3</i></div></div>
+        </div>
+      </div>
+
+      <div class="fam">
+        <div class="famhead">语言绑定类（按语言分发）</div>
+        <div class="items">
+          <div class="it"><div class="nm">Python 库（whl / .pyd）</div><div class="badges"><i class="bg">2</i></div></div>
+          <div class="it"><div class="nm">LabVIEW VI 库 / 驱动</div><div class="badges"><i class="bg">5</i></div></div>
+          <div class="it"><div class="nm">MATLAB / .mex 工具箱</div><div class="badges"><i class="bg">5</i></div></div>
+          <div class="it"><div class="nm">Java JAR / JNI</div><div class="badges"><i class="bg">5</i></div></div>
+        </div>
+      </div>
+
+      <div class="fam">
+        <div class="famhead">协议命令类（只给文档）</div>
+        <div class="items">
+          <div class="it"><div class="nm">VISA 接口手册（SCPI 命令集）</div><div class="badges"><i class="bg">3</i></div></div>
+          <div class="it"><div class="nm">私有协议手册（串口 / CAN 报文）</div><div class="badges"><i class="bg">6</i></div></div>
+        </div>
+      </div>
+
+      <div class="fam" style="margin-bottom:0">
+        <div class="famhead">可执行与服务类（黑盒调用）</div>
+        <div class="items">
+          <div class="it"><div class="nm">命令行工具（厂商 exe）</div><div class="badges"><i class="bg">5</i></div></div>
+          <div class="it"><div class="nm">REST / gRPC / Socket 服务</div><div class="badges"><i class="bg">6</i></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div><b>图例</b>：① C-ABI 封装　② Python 适配器　③ VISA/SCPI 客户端　④ COM/.NET 桥　⑤ 进程调用　⑥ 协议实现</div>
+    <div>形态越靠“文档”、封装工作量越大；同一设备多形态时优先选二进制接口或官方 Python 库</div>
+  </div>
+</div>
+</body></html>
