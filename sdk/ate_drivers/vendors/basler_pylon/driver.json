@@ -1,0 +1,42 @@
+{
+  "schema": "ate.driver.manifest.v1",
+  "key": "basler-pylon",
+  "version": "1.0.0",
+  "family": "camera",
+  "api": "1.2",
+  "label": "工业相机 · Basler pylon 8.0.0",
+  "vendor": "Basler",
+  "entry": "ate_drivers.vendors.basler_pylon.driver:BaslerPylonCamera",
+  "interfaces": ["USB", "GIGE"],
+  "backends": ["native"],
+  "models": [
+    "acA640-90gm",
+    "acA1300-60gm",
+    "acA1920-40gm",
+    "acA1920-48gm",
+    "acA2440-75um",
+    "acA2500-14gm",
+    "a2A1920-160umBAS",
+    "a2A2590-60umBAS",
+    "a2A3840-45umBAS",
+    "daA1920-160um",
+    "daA2500-60um",
+    "boA1936-400um"
+  ],
+  "capabilities": [
+    "identify",
+    "reset",
+    "state",
+    "camera.enumerate",
+    "camera.configure",
+    "camera.grab",
+    "camera.snap",
+    "camera.sequence",
+    "camera.stats",
+    "camera.trigger"
+  ],
+  "simulate": true,
+  "min_platform": "1.0.0",
+  "depends": ["pypylon>=8,<9"],
+  "signature": ""
+}

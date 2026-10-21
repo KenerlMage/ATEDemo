@@ -49,6 +49,15 @@ class Capability:
     MOTION_MOVE = "motion.move"
     MOTION_READ_POS = "motion.read_position"
 
+    # —— 相机家族（工业视觉：控制面是节点参数，数据面是帧）——
+    CAMERA_ENUMERATE = "camera.enumerate"
+    CAMERA_CONFIGURE = "camera.configure"
+    CAMERA_GRAB = "camera.grab"
+    CAMERA_SNAP = "camera.snap"
+    CAMERA_SEQUENCE = "camera.sequence"
+    CAMERA_STATS = "camera.stats"
+    CAMERA_TRIGGER = "camera.trigger"
+
 
 CORE_CAPABILITIES: tuple[str, ...] = (
     Capability.IDENTIFY,
@@ -72,6 +81,15 @@ FAMILY_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "psu": (Capability.PSU_SET, Capability.PSU_MEASURE),
     "awg": (Capability.AWG_SET, Capability.AWG_OUTPUT),
     "motion": (Capability.MOTION_MOVE, Capability.MOTION_READ_POS),
+    "camera": (
+        Capability.CAMERA_ENUMERATE,
+        Capability.CAMERA_CONFIGURE,
+        Capability.CAMERA_GRAB,
+        Capability.CAMERA_SNAP,
+        Capability.CAMERA_SEQUENCE,
+        Capability.CAMERA_STATS,
+        Capability.CAMERA_TRIGGER,
+    ),
     "passive": (),
     "generic": (),
 }
@@ -83,6 +101,7 @@ REQUIRED_BY_FAMILY: dict[str, tuple[str, ...]] = {
     "psu": (Capability.PSU_MEASURE,),
     "awg": (Capability.AWG_SET,),
     "motion": (Capability.MOTION_MOVE,),
+    "camera": (Capability.CAMERA_GRAB, Capability.CAMERA_STATS),
     "passive": (),
     "generic": (),
 }

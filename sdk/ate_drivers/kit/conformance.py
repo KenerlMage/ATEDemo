@@ -244,7 +244,7 @@ def c14_aliases_valid(ctx) -> tuple[bool, str]:
 
 
 #: 可选运行时依赖：只允许**惰性导入**（函数体内），缺它时给出可读错误并降级，不算硬依赖
-OPTIONAL_RUNTIME = ("serial", "pyvisa")
+OPTIONAL_RUNTIME = ("serial", "pyvisa", "pypylon", "numpy")
 
 
 def _import_names(node) -> list:

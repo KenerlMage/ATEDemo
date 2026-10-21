@@ -13,6 +13,7 @@
 from .errors import DriverError, DriverNotFound, TransportError  # noqa: F401
 from .models import DeviceConfig  # noqa: F401
 from .base import Driver  # noqa: F401
+from .camera import CameraChannel, CameraDriver, frame_stats, write_png  # noqa: F401
 from .factory import (  # noqa: F401
     DRIVER_TYPE_KEYS,
     DRIVER_TYPE_MAP,
@@ -28,6 +29,10 @@ from .factory import (  # noqa: F401
 
 __all__ = [
     "Driver",
+    "CameraDriver",
+    "CameraChannel",
+    "frame_stats",
+    "write_png",
     "DeviceConfig",
     "DriverError",
     "DriverNotFound",

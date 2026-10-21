@@ -20,9 +20,15 @@
 `DRIVERS` 由 `ate_drivers.factory` 在导入时读走，用于自动登记型号。
 """
 
+from .basler_pylon.driver import BaslerPylonCamera
 from .rohde_schwarz_mxo.driver import RsMxoScope
 from .tektronix_mso.driver import TekMsoScope
 
+#: 示波器家族（由 ate_drivers.factory 登记，按型号派发）
 DRIVERS = (TekMsoScope, RsMxoScope)
 
-__all__ = ["DRIVERS", "RsMxoScope", "TekMsoScope"]
+#: 相机家族（由 ate_drivers.camera_factory 登记；相机的连接方式是 USB3/GigE，
+#: 不能混进示波器的型号表，否则 self_check 的连接方式门禁会互相误判）
+CAMERA_DRIVERS = (BaslerPylonCamera,)
+
+__all__ = ["CAMERA_DRIVERS", "DRIVERS", "BaslerPylonCamera", "RsMxoScope", "TekMsoScope"]

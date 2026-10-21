@@ -9,5 +9,29 @@
 """
 
 from .scope import ChannelSetup, Measurement, ScopeDriver, TimebaseSetup, Waveform  # noqa: F401
+from .camera import (  # noqa: F401
+    CameraChannel,
+    CameraDriver,
+    CameraSetup,
+    FrameInfo,
+    downsample,
+    frame_stats,
+    simulate_frame,
+    write_png,
+)
 
-__all__ = ["ChannelSetup", "Measurement", "ScopeDriver", "TimebaseSetup", "Waveform"]
+__all__ = [
+    "CameraChannel",
+    "CameraDriver",
+    "CameraSetup",
+    "ChannelSetup",
+    "FrameInfo",
+    "Measurement",
+    "ScopeDriver",
+    "TimebaseSetup",
+    "Waveform",
+    "downsample",
+    "frame_stats",
+    "simulate_frame",
+    "write_png",
+]

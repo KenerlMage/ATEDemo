@@ -13,6 +13,7 @@ from typing import Any, Optional
 from .base import Driver, PassiveDriver
 from .errors import DriverNotFound
 from .models import DeviceConfig
+from .camera import CameraDriver
 from .scope import ScopeDriver
 from .scpi import AwgDriver, DmmDriver, ELoadDriver, GenericScpiDriver, MotionDriver, PsuDriver
 
@@ -61,6 +62,13 @@ DRIVER_TYPES: list[dict] = [
         "description": "通过串口控制转速、位置或扫描运动",
     },
     {
+        "key": "basler-pylon",
+        "family": "camera",
+        "label": "工业相机 · Basler pylon 8.0.0",
+        "cls": CameraDriver,
+        "description": "Basler GigE / USB3 相机，pylon 8.0.0（pypylon，惰性加载）",
+    },
+    {
         "key": "passive-device",
         "family": "passive",
         "label": "被动设备（无通讯）",
@@ -89,6 +97,9 @@ LEGACY_CATEGORY_TYPE: dict[str, str] = {
     "波形": "generic-awg",
     "运动控制": "serial-motion",
     "串口": "generic-scpi",
+    "相机": "basler-pylon",
+    "工业相机": "basler-pylon",
+    "视觉": "basler-pylon",
     "夹具": "passive-device",
     "台架": "passive-device",
 }

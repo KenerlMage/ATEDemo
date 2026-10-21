@@ -68,6 +68,24 @@ from .endpoint import (  # noqa: F401
     SUPPORTED_INTERFACES, VISA, Endpoint, backends_of, endpoint_from, interfaces_of,
     normalize_backend, normalize_interface, resolve_backend, visa_resource_for,
 )
+from .family.camera import (  # noqa: F401
+    CameraChannel,
+    CameraDriver,
+    CameraSetup,
+    FrameInfo,
+    frame_stats,
+    simulate_frame,
+    write_png,
+)
+from .camera_factory import (  # noqa: F401
+    camera_class,
+    camera_entries,
+    camera_entry,
+    camera_models,
+    open_camera,
+    register_camera_driver,
+)
+from .api_camera import Camera  # noqa: F401
 from .api import Scope  # noqa: F401
 from .factory import driver_class, entries, models, open_scope, self_check  # noqa: F401
 
@@ -92,6 +110,20 @@ __all__ = [
     "ProtocolError",
     "ScopeDriver",
     "Scope",
+    "Camera",
+    "CameraChannel",
+    "CameraDriver",
+    "CameraSetup",
+    "FrameInfo",
+    "camera_class",
+    "camera_entries",
+    "camera_entry",
+    "camera_models",
+    "frame_stats",
+    "open_camera",
+    "register_camera_driver",
+    "simulate_frame",
+    "write_png",
     "Endpoint",
     "SERIAL_DEFAULTS",
     "AUTO",
