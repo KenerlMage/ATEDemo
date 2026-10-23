@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
-"""ATE Runner 应用图标 v9：Q 版光刻机（龙门机架式）× 大写 A
+"""ATE 应用图标家族 v10：Q 版光刻机 × 大写 A（暖底 + 底部文字）
 
-v6–v8 的“方正机身 + 大屏”构图被读成复古电视/微波炉，属构图层问题，非配色问题。
-v9 改为**非对称龙门剪影**：左侧立柱 + 顶部悬臂 + 右端下垂镜筒 + 下方工件台，
-光刻机（mask aligner）的真实轮廓就是这样，一眼就是设备而不是家电。
-A 不再放“屏幕”里，而是被投影在工件台上（竖向压扁，带透视）。
+三项变更（相对 v9）：
+  ① 背景改暖：深暖褐 → 近黑（原来冷蓝），主光晕改暖琥珀，青色 A 与之形成冷暖互补；
+  ② 图案整体上移并缩至 0.88，让出底部文字带；
+  ③ 底部加字，按文字产出三版：Controller / Runner / Data。
+     每版共用同一台机器与同一个 A，只用底部强调线的颜色区分身份（琥珀 / 青 / 青绿）。
+
+小尺寸策略：≥64px 带文字；48 及以下不带文字（5px 高的字只会糊成噪点），
+改为“机架 + A”居中放大，保证识别度。
 """
 from __future__ import annotations
 
@@ -28,8 +32,19 @@ DARK = (12, 32, 48)
 CYAN = (95, 224, 246)
 CYAN_D = (57, 198, 224)
 RED = (224, 69, 90)
-BG_T = (16, 42, 66)
-BG_B = (7, 21, 35)
+
+# 暖色背景（上暖褐、下近黑）
+BG_T = (58, 41, 29)
+BG_B = (22, 16, 12)
+GLOW = (232, 162, 60)          # 暖琥珀光晕
+LIGHT_T = (252, 245, 235)
+LIGHT_B = (238, 224, 208)
+
+VARIANTS = (
+    ("controller", "Controller", (240, 169, 59)),   # 琥珀
+    ("runner", "Runner", (95, 224, 246)),           # 青
+    ("data", "Data", (111, 211, 160)),              # 青绿
+)
 
 
 def sc(v: float) -> int:
@@ -57,6 +72,14 @@ def squircle_mask(radius: float) -> Image.Image:
     m = Image.new("L", (U, U), 0)
     ImageDraw.Draw(m).rounded_rectangle([0, 0, U - 1, U - 1], radius=sc(radius), fill=255)
     return m
+
+
+def font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    path = r"C:\Windows\Fonts\msyhbd.ttc" if bold else r"C:\Windows\Fonts\msyh.ttc"
+    try:
+        return ImageFont.truetype(path, size)
+    except Exception:
+        return ImageFont.load_default()
 
 
 def letter_a(layer, cx, cy, h, stroke, c_top, c_bot, glow: int = 0) -> None:
@@ -100,87 +123,129 @@ def rrect(layer, x0, y0, x1, y1, r, fill, outline=INK, w=16) -> None:
         outline=outline, width=sc(w) if outline else 0)
 
 
-def build(tier: str = "full", light: bool = False) -> Image.Image:
+def draw_machine(layer, tier: str, light: bool) -> None:
     full = tier == "full"
     shell = (250, 252, 253) if light else SHELL
     shell_d = (222, 231, 236) if light else SHELL_D
 
-    layer = Image.new("RGBA", (U, U), (0, 0, 0, 0))
-
     if tier == "tiny":
-        # 16–24px：极简剪影 = 底座 + 立柱 + 深色大字 A
-        rrect(layer, 402, 196, 622, 366, 40, shell, INK, 26)
-        rrect(layer, 150, 340, 874, 850, 150, shell, INK, 28)
-        letter_a(layer, 512, 612, 420, 100, INK, INK)
+        # 16–24px：剪影化——机身 + 顶部凸起 + 极粗的 A，只求这三个形可辨
+        rrect(layer, 392, 168, 632, 360, 44, shell, INK, 30)
+        rrect(layer, 148, 322, 876, 862, 152, shell, INK, 32)
+        letter_a(layer, 512, 598, 470, 158, INK, INK)
+        return
+
+    # 小尺寸（48/32）用更粗的墨线，抵消降采样后的糊化
+    st = 16 if full else 30
+    # 底座
+    rrect(layer, 164, 712, 860, 804, 46, shell_d, INK, st)
+    # 立柱
+    rrect(layer, 190, 306, 314, 748, 58, shell, INK, st)
+    # 悬臂
+    rrect(layer, 244, 286, 730, 388, 56, shell, INK, st)
+    # 镜筒
+    rrect(layer, 584, 356, 714, 496, 40, shell_d, INK, st)
+    rrect(layer, 602, 462, 696, 500, 16, CYAN_D, INK, st - 6)
+
+    # 立柱细节
+    if full:
+        rrect(layer, 216, 452, 292, 522, 16, DARK, INK, 11)
+        d = ImageDraw.Draw(layer, "RGBA")
+        d.ellipse(box(230, 468, 250, 488), fill=CYAN_D, outline=INK, width=sc(6))
+        d.ellipse(box(258, 468, 278, 488), fill=RED, outline=INK, width=sc(6))
+        for i in range(3):
+            y = 560 + i * 34
+            d.rounded_rectangle(box(222, y, 286, y + 14), radius=sc(7),
+                                fill=SHELL_D if not light else (208, 219, 227),
+                                outline=INK, width=sc(7))
+
+    # 工件台
+    plate = [(474, 566), (800, 566), (834, 706), (436, 706)]
+    ImageDraw.Draw(layer, "RGBA").polygon(poly(plate), fill=DARK, outline=INK,
+                                          width=sc(13 if full else 26))
+
+    # 光束
+    if full:
+        beam = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(beam, "RGBA")
+        bd.polygon(poly([(604, 500), (694, 500), (790, 566), (498, 566)]),
+                   fill=CYAN + (26,))
+        bd.polygon(poly([(626, 500), (672, 500), (738, 566), (556, 566)]),
+                   fill=CYAN + (52,))
+        layer.alpha_composite(beam)
+
+    # 台面上的 A（深色描边层 + 渐变主体）
+    a_layer = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+    a_h = 224 if full else 210
+    letter_a(a_layer, 638, 636, a_h, a_h * 0.25 + 26, INK, INK)
+    letter_a(a_layer, 638, 636, a_h, a_h * 0.25, (255, 255, 255), CYAN,
+             glow=160 if full else 0)
+    k = 0.70
+    sq = a_layer.resize((U, int(U * k)), Image.LANCZOS)
+    layer.alpha_composite(sq, (0, sc(636) - int(sc(636) * k)))
+
+    # 台沿亮边
+    if full:
+        ImageDraw.Draw(layer, "RGBA").line(poly([(482, 578), (792, 578)]),
+                                           fill=CYAN + (120,), width=sc(7))
+
+
+def master(tier: str = "full", light: bool = False, label: str | None = None,
+           accent=(95, 224, 246)) -> Image.Image:
+    """tier=full/mid/tiny；label 为底部文字；返回 2048² 母版"""
+    shell_layer = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+
+    # 暖底光晕（替代原来的青晕）
+    if tier == "full":
+        halo = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+        ImageDraw.Draw(halo, "RGBA").ellipse(box(150, 250, 880, 840), fill=GLOW + (46,))
+        shell_layer.alpha_composite(halo.filter(ImageFilter.GaussianBlur(sc(64))))
+
+    machine = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+    if tier == "full":
+        sh = Image.new("RGBA", (U, U), (0, 0, 0, 0))
+        ImageDraw.Draw(sh, "RGBA").ellipse(box(146, 790, 878, 856), fill=(0, 0, 0, 120))
+        machine.alpha_composite(sh.filter(ImageFilter.GaussianBlur(sc(15))))
+    draw_machine(machine, tier, light)
+
+    if label:
+        # 图案上移 + 缩到 0.88，让出底部文字带
+        k, dy = 0.80, 40
+        small = machine.resize((int(U * k), int(U * k)), Image.LANCZOS)
+        ox = (U - small.width) // 2
+        oy = int((U - small.height) / 2 + (0.5 - 0.5) * 0) + 0
+        oy = int((U * (1 - k)) / 2) - sc(dy)
+        shell_layer.alpha_composite(small, (ox, oy))
     else:
-        if full:
-            halo = Image.new("RGBA", (U, U), (0, 0, 0, 0))
-            ImageDraw.Draw(halo, "RGBA").ellipse(box(150, 250, 880, 840), fill=CYAN_D + (40,))
-            layer.alpha_composite(halo.filter(ImageFilter.GaussianBlur(sc(60))))
+        shell_layer.alpha_composite(machine)
 
-            sh = Image.new("RGBA", (U, U), (0, 0, 0, 0))
-            ImageDraw.Draw(sh, "RGBA").ellipse(box(146, 790, 878, 856), fill=(0, 0, 0, 118))
-            layer.alpha_composite(sh.filter(ImageFilter.GaussianBlur(sc(15))))
+    bg = linear_bg(LIGHT_T if light else BG_T, LIGHT_B if light else BG_B)
+    bg.alpha_composite(shell_layer)
 
-        # 底座（plinth）
-        rrect(layer, 164, 712, 860, 804, 46, shell_d, INK, 16)
+    if label:
+        d = ImageDraw.Draw(bg, "RGBA")
+        max_w = sc(660)
+        size = 240
+        while size > 40:
+            f = font(size)
+            if f.getbbox(label)[2] <= max_w:
+                break
+            size -= 4
+        f = font(size)
+        track = int(size * 0.05)
+        widths = [f.getbbox(ch)[2] for ch in label]
+        total = sum(widths) + track * (len(label) - 1)
+        x = (U - total) / 2
+        cy = sc(872)
+        for ch, w in zip(label, widths):
+            d.text((x, cy), ch, font=f, fill=(247, 242, 235, 255), anchor="lm")
+            x += w + track
+        # 身份强调线
+        bar_w, bar_h = sc(120), sc(9)
+        bx = (U - bar_w) / 2
+        d.rounded_rectangle([bx, sc(942), bx + bar_w, sc(942) + bar_h],
+                            radius=bar_h / 2, fill=accent + (235,))
 
-        # 立柱（左）
-        rrect(layer, 190, 306, 314, 748, 58, shell, INK, 16)
-
-        # 顶部悬臂（横梁，右端悬空）
-        rrect(layer, 244, 286, 730, 388, 56, shell, INK, 16)
-
-        # 镜筒（悬臂右端下垂，Q 版放大比例）
-        rrect(layer, 584, 356, 714, 496, 40, shell_d, INK, 16)
-        rrect(layer, 602, 462, 696, 500, 16, CYAN_D, INK, 12)
-
-        # 立柱细节：控制面板 + 散热槽（Q 版小按键）
-        if full:
-            rrect(layer, 216, 452, 292, 522, 16, DARK, INK, 11)
-            d = ImageDraw.Draw(layer, "RGBA")
-            d.ellipse(box(230, 468, 250, 488), fill=CYAN_D, outline=INK, width=sc(6))
-            d.ellipse(box(258, 468, 278, 488), fill=RED, outline=INK, width=sc(6))
-            for i in range(3):
-                y = 560 + i * 34
-                d.rounded_rectangle(box(222, y, 286, y + 14), radius=sc(7),
-                                    fill=SHELL_D if not light else (208, 219, 227),
-                                    outline=INK, width=sc(7))
-
-        # 工件台（透视盘），落在底座上
-        plate = [(474, 566), (800, 566), (834, 706), (436, 706)]
-        ImageDraw.Draw(layer, "RGBA").polygon(poly(plate), fill=DARK, outline=INK,
-                                              width=sc(13))
-
-        # 光束：镜筒 → 工件台（锐边）
-        if full:
-            beam = Image.new("RGBA", (U, U), (0, 0, 0, 0))
-            bd = ImageDraw.Draw(beam, "RGBA")
-            bd.polygon(poly([(604, 500), (694, 500), (790, 566), (498, 566)]),
-                       fill=CYAN + (26,))
-            bd.polygon(poly([(626, 500), (672, 500), (738, 566), (556, 566)]),
-                       fill=CYAN + (52,))
-            layer.alpha_composite(beam)
-
-        # A 投在工件台上（竖向压扁，带透视）
-        a_layer = Image.new("RGBA", (U, U), (0, 0, 0, 0))
-        a_h = 150 if full else 140
-        letter_a(a_layer, 638, 646, a_h, a_h * 0.25, (255, 255, 255), CYAN,
-                 glow=120 if full else 0)
-        k = 0.55
-        sq = a_layer.resize((U, int(U * k)), Image.LANCZOS)
-        layer.alpha_composite(sq, (0, sc(646) - int(sc(646) * k)))
-
-        # 对准标记（台面刻线，强化“光刻”语义）
-        if full:
-            d = ImageDraw.Draw(layer, "RGBA")
-            for x in (500, 776):
-                d.line([(sc(x), sc(668)), (sc(x + 34), sc(668))], fill=INK, width=sc(9))
-                d.line([(sc(x + 17), sc(651)), (sc(x + 17), sc(685))], fill=INK, width=sc(9))
-
-    bg = linear_bg((243, 246, 249) if light else BG_T,
-                   (222, 230, 236) if light else BG_B)
-    bg.alpha_composite(layer)
     out = Image.new("RGBA", (U, U), (0, 0, 0, 0))
     out.paste(bg, (0, 0), squircle_mask(218))
     return out
@@ -205,43 +270,34 @@ def write_ico(path: str, images: list) -> None:
     open(path, "wb").write(bytes(out))
 
 
-def montage(full, mid, tiny, light, ladder) -> None:
-    try:
-        f_t = ImageFont.truetype(r"C:\Windows\Fonts\msyhbd.ttc", 40)
-        f_s = ImageFont.truetype(r"C:\Windows\Fonts\msyh.ttc", 26)
-        f_x = ImageFont.truetype(r"C:\Windows\Fonts\msyh.ttc", 20)
-    except Exception:
-        f_t = f_s = f_x = ImageFont.load_default()
-
-    sheet = Image.new("RGB", (1600, 1010), (250, 250, 248))
+def family_preview(images: dict, ladder: dict) -> None:
+    sheet = Image.new("RGB", (1620, 1080), (250, 248, 244))
     d = ImageDraw.Draw(sheet)
-    d.text((60, 40), "ATE Runner · 应用图标（Q 版光刻机 × 大写 A）", font=f_t, fill=(24, 24, 26))
-    d.text((60, 96), "龙门机架：立柱 + 悬臂 + 下垂镜筒 + 工件台，A 被曝光在台面上",
-           font=f_s, fill=(110, 110, 116))
+    d.text((60, 40), "ATE 图标家族 · Q 版光刻机 × 大写 A", font=font(42), fill=(28, 24, 20))
+    d.text((60, 98), "Controller / Runner / Data —— 同一台机器，底部文字与强调线区分身份",
+           font=font(26, False), fill=(120, 112, 104))
 
-    items = [(full, "完整版（≥48px）"), (mid, "简化版（32px）"),
-             (tiny, "极小版（16–24px）"), (light, "浅色变体")]
-    for i, (img, label) in enumerate(items):
-        x = 60 + i * 300
-        im = img.resize((240, 240), Image.LANCZOS)
-        sheet.paste(im, (x, 156), im)
-        d.text((x, 408), label, font=f_x, fill=(72, 72, 78))
+    for i, (key, label, accent) in enumerate(VARIANTS):
+        x = 60 + i * 500
+        im = images[key].resize((420, 420), Image.LANCZOS)
+        sheet.paste(im, (x, 150), im)
+        d.text((x, 586), label, font=font(26), fill=tuple(accent))
 
-    d.text((60, 476), "尺寸阶梯（真实像素）", font=f_s, fill=(24, 24, 26))
+    d.text((60, 650), "Runner 尺寸阶梯（带文字 ≥64px）", font=font(26, False), fill=(28, 24, 20))
     x = 60
     for s in (256, 128, 64, 48, 32, 24, 16):
         im = ladder[s].convert("RGBA")
-        sheet.paste(im, (x, 545 + (256 - s) // 2), im)
-        d.text((x, 820), f"{s}px", font=f_x, fill=(110, 110, 116))
-        x += s + 38
-    sheet.save(os.path.join(OUT, "ate-runner-preview.png"))
+        sheet.paste(im, (x, 700 + (256 - s) // 2), im)
+        d.text((x, 980), f"{s}px", font=font(20, False), fill=(120, 112, 104))
+        x += s + 40
+    sheet.save(os.path.join(OUT, "ate-family-preview.png"))
 
 
 def diagnose(img: Image.Image, tag: str) -> None:
     a = np.asarray(img.convert("RGBA")).astype(np.int16)
     al = a[:, :, 3]
     lum = a[:, :, :3].mean(axis=2)
-    for name, m in (("亮部(机架)", (lum > 205) & (al > 128)),
+    for name, m in (("亮部(机架/文字)", (lum > 205) & (al > 128)),
                     ("青(A/光)", (a[:, :, 1] > 150) & (a[:, :, 2] > 170)
                      & (a[:, :, 0] < 170) & (al > 128))):
         ys, xs = np.nonzero(m)
@@ -251,27 +307,47 @@ def diagnose(img: Image.Image, tag: str) -> None:
 
 
 def main() -> None:
-    big = {k: build(k).resize((BASE, BASE), Image.LANCZOS) for k in ("full", "mid", "tiny")}
-    big["light"] = build("full", light=True).resize((BASE, BASE), Image.LANCZOS)
-    big["full"].save(os.path.join(OUT, "ate-runner-dark-1024.png"))
-    big["light"].save(os.path.join(OUT, "ate-runner-light-1024.png"))
+    masters = {}
+    for key, label, accent in VARIANTS:
+        big = master("full", False, label, accent)
+        masters[key] = big.resize((BASE, BASE), Image.LANCZOS)
+        masters[key].save(os.path.join(OUT, f"ate-{key}-dark-1024.png"))
+        if key == "runner":
+            master("full", True, label, accent).resize((BASE, BASE), Image.LANCZOS).save(
+                os.path.join(OUT, "ate-runner-light-1024.png"))
+
+    plain_full = master("full", False, None).resize((BASE, BASE), Image.LANCZOS)
+    plain_mid = master("mid", False, None).resize((BASE, BASE), Image.LANCZOS)
+    plain_tiny = master("tiny", False, None).resize((BASE, BASE), Image.LANCZOS)
 
     ladder = {}
-    for size in (512, 256, 128, 64, 48, 32, 24, 16):
-        src = big["full"] if size >= 48 else (big["mid"] if size >= 32 else big["tiny"])
-        ladder[size] = src.resize((size, size), Image.LANCZOS)
-        ladder[size].save(os.path.join(OUT, f"ate-runner-{size}.png"))
+    for key, label, accent in VARIANTS:
+        ladder[key] = {}
+        for size in (512, 256, 128, 64, 48, 32, 24, 16):
+            if size >= 64:
+                src = masters[key]
+            elif size == 48:
+                src = plain_mid
+            elif size == 32:
+                src = plain_mid
+            else:
+                src = plain_tiny
+            im = src.resize((size, size), Image.LANCZOS)
+            ladder[key][size] = im
+            im.save(os.path.join(OUT, f"ate-{key}-{size}.png"))
+        write_ico(os.path.join(OUT, f"ate-{key}.ico"),
+                  [im for s, im in sorted(ladder[key].items()) if s <= 256])
 
-    write_ico(os.path.join(OUT, "ate-runner.ico"),
-              [ladder[s].resize((s, s), Image.LANCZOS)
-               for s in (16, 24, 32, 48, 64, 128, 256)])
+    # 兼容旧命名：Runner 主体沿用 ate-runner-*、ate-runner.ico
+    for size, im in ladder["runner"].items():
+        im.save(os.path.join(OUT, f"ate-runner-{size}.png"))
 
-    montage(big["full"], big["mid"], big["tiny"], big["light"], ladder)
-    diagnose(big["full"], "[完整版]")
+    family_preview(masters, ladder["runner"])
+    diagnose(masters["runner"], "[Runner 完整版]")
 
     print("\n输出：")
     for f in sorted(os.listdir(OUT)):
-        if f.endswith((".png", ".ico")) and f.startswith("ate-runner"):
+        if f.endswith((".png", ".ico")):
             print(f"  {f:34s} {os.path.getsize(os.path.join(OUT, f)):>8} B")
 
 
