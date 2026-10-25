@@ -46,6 +46,7 @@
 | **`业界方案洞察-NI-图标版.pptx`** | **本轮主交付：拓扑节点改为图标/图片，三大组件改引官网原文，新增产业应用八项** | **汇报用** |
 | `ni-images/icons/` | 12 枚节点图标（线稿 PNG，由 gen-node-icons.py 生成） | 可复现 |
 | **`NI-节点图标总览.png`** | **图标总览图（1732×1022）** | **聊天/汇报插图** |
+| **`业界方案洞察-NI-含TPS谱系.pptx`** | **两页：P1 NI 拓扑（同图标版）；P2 TPS 脚本 DSL 谱系（ARINC ATLAS → IEEE 416/716 → 1641 / ATML）** | **本轮主交付** |
 | `ni-images/` | 自 ni.com 采集的 5 张产品图（TestStand、PXI 机箱、LabVIEW、InstrumentStudio、NI 标识） | PPT 可复现 |
 
 ---
