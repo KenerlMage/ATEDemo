@@ -160,7 +160,7 @@ def inode(x, y, w, h, label, icon, accent=BLUE, fill=WHITE, lsize=5.4):
     txt(x + 0.03, y + h - 0.175, w - 0.06, 0.15, label, lsize, True, INK, PP_ALIGN.CENTER)
 
 
-def head(x, y, w, text, color=RED, size=8.2):
+def head(x, y, w, text, color=RED, size=9.4):
     txt(x, y, w, 0.19, text, size, True, color)
     hline(x, y + 0.215, w, GRID, 0.010)
 
@@ -248,13 +248,13 @@ txt(0.56, 4.92, 5.80, 0.16,
 # ══════════ 左下：三大组件（官方描述 + 软件图标）══════════
 head(LX, 5.14, 5.80, "三大组件：官方功能描述（引自 ni.com）", color=BLUE)
 comps = [
-    ("1", "TestStand", "icons/ic_ts.jpg",
+    ("1", "TestStand", "ni_TestStand.jpg",
      "Off-the-shelf test management software for validation & production test.",
      "现成的测试管理软件，用于验证测试与生产测试。"),
-    ("2", "LabVIEW", "icons/ic_lv.jpg",
+    ("2", "LabVIEW", "ni_LabVIEW.jpg",
      "A graphical programming environment engineers use to develop automated production, validation & research test systems.",
      "工程师用于开发自动化生产、验证与研究类测试系统的图形化编程环境。"),
-    ("3", "TSM", "icons/ic_tsm.jpg",
+    ("3", "TSM", "ni_TSM.jpg",
      "Extends the TestStand environment to help you develop, debug, deploy, and maintain semiconductor test systems.",
      "在 TestStand 环境之上扩展，用于开发、调试、部署与维护半导体测试系统。"),
 ]
@@ -271,32 +271,25 @@ for no, nm, ic, en, cn in comps:
 # ══════════ 右：两段完整文字 ══════════
 RX, RW = 6.94, 5.82
 
-head(RX, 1.70, RW, "NI 的软件拓扑思想")
-hi(RX, 1.98, RW, 1.94,
-   "NI 的软件拓扑是一个**五层单向依赖**的结构：最上为业务与数据（MES、程序库、结果库、分析平台），"
-   "其下为测试执行（TestStand 与 TSM），再下为测量开发（LabVIEW 程序），再下为仪器访问（NI-VISA 会话与 IVI 类驱动），"
-   "最下为硬件承载（PXI 机箱与模块、开关矩阵、外挂仪器）及被测对象（夹具、针床、DUT）。"
-   "依赖只向下、不向上：上层仅通过相邻下层的**标准接口**调用，任一层的实现被替换，其上层程序的语义不变。"
-   "该约束带来三个直接效果——仪器选型与测试开发解耦，同一程序可运行于不同厂商、不同形态的仪器；"
-   "测量逻辑与硬件配置解耦，机型变化以配置完成而非改码；数据格式与测试程序解耦，结果以统一格式（如 STDF）"
-   "流向 MES 与分析侧。软件拓扑的价值不在分层本身，而在**每层边界处都有可被第三方实现的公开接口**，"
-   "使平台能够吸纳外部仪器、外部程序与外部分析工具。",
-   8.4, RGBColor(0x2A, 0x2A, 0x2A), BLUE2, True, 1.68)
+head(RX, 1.74, RW, "NI 的软件拓扑思想", color=RED, size=11.5)
+hi(RX, 2.12, RW, 1.72,
+   "NI 把测试软件分成五层：最上面是产线与数据，接着是管测试流程的，再往下是写测试程序的、连仪器的，"
+   "最下面是机箱与仪器本身。规则只有一条——**上层调用紧邻的下层，下层不反过来依赖上层**。"
+   "这样换一台仪器，只要最下面的接口没变，上面的测试程序一行都不用改；增加一个机型，也只需换配置。"
+   "测量结果以统一格式交给产线系统，测试程序不负责出报表。",
+   12.0, RGBColor(0x2A, 0x2A, 0x2A), BLUE2, True, 1.70)
 
-head(RX, 4.00, RW, "NI 的设备虚拟化思想")
-hi(RX, 4.30, RW, 2.04,
-   "设备虚拟化把仪器从**一台设备**变为**一组可描述的能力**：仪器被抽象为通道数、量程、采样率、触发方式与精度等属性的集合，"
-   "测试程序按能力编写、不按型号编写；具体设备由驱动层声明自身满足哪些能力，因此同一逻辑仪器可映射到不同厂商、"
-   "不同总线、不同形态的实现上。在此之上给出三个可操作的结果：其一是**仿真**，以仿真设备替代实机即可跑通流程、"
-   "判定与数据通道，实机到位只替换会话而不改程序，联调期与硬件到货解耦；其二是**互换**，类驱动把同一逻辑仪器"
-   "指向不同具体驱动，替换仪器只需修改配置并重跑验证项；其三是**跨形态复用**，同一程序既可在 PXI 模块上运行，"
-   "也可在台式仪器与远程仪器上运行，机型切换由配置完成。其实质是把硬件的物理差异**收敛到驱动与配置两处**，"
-   "其余各层只看到能力，因而测试能力的演进不再受制于某台具体硬件的生命周期。",
-   8.4, RGBColor(0x2A, 0x2A, 0x2A), BLUE2, True, 1.68)
+head(RX, 4.10, RW, "NI 的设备虚拟化思想", color=RED, size=11.5)
+hi(RX, 4.48, RW, 1.85,
+   "NI 把仪器当作**一组能力**来看：几个通道、多大范围、多快的采样、怎么触发，而不是一个具体型号。"
+   "程序按能力写，具体是哪台仪器，由驱动去对应。于是没有实机也能先用仿真设备把流程跑通，联调不必等设备到货；"
+   "要换仪器，只改驱动与配置；同一套程序在机箱模块和台式仪器上都能用。仪器的差别被收在**驱动和配置两处**，"
+   "其余部分只看见能力。",
+   12.0, RGBColor(0x2A, 0x2A, 0x2A), BLUE2, True, 1.70)
 
 # 页脚
 txt(0.56, 6.98, 10.9, 0.20,
-    "资料来源：NI 公开产品资料与技术文档（TestStand、LabVIEW、TSM、NI-VISA、IVI、PXI）；英文引文引自 ni.com，中文为直译；架构归纳与洞察结论为本文观点。",
+    "资料来源：NI 公开产品资料与技术文档（TestStand、LabVIEW、TSM、NI-VISA、IVI、PXI）；英文引文与产品图标引自 ni.com，中文为直译；架构归纳与洞察结论为本文观点。",
     5.8, False, DIM)
 txt(12.28, 7.02, 0.52, 0.20, "1 / 1", 7.4, False, DIM, PP_ALIGN.RIGHT)
 
