@@ -781,6 +781,131 @@ def import_tps(req: TpsImportRequest):
     return {"success": True, "message": f"TPS 导入成功: {tps_id}（已加入装备树）", "tps": _tps_summary(data)}
 
 
+class TpsZipImportRequest(BaseModel):
+    name: str = ""
+    content_base64: str
+    overwrite: bool = True
+
+
+@app.post("/api/tps/import/zip")
+def import_tps_zip(req: TpsZipImportRequest):
+    """压缩包导入 TPS：包内 tps.json + testcase/ (+ resource/) 解包到 TPS 目录。
+
+    * 支持单层根目录（zip 自带一层文件夹）与直接放文件两种打包方式；
+    * v2 包 -> <TPS目录>/<id>/，v1 单文件清单 -> <TPS目录>/<id>.json；
+    * 拒绝路径穿越、绝对路径、超大文件；同名 TPS 需 overwrite=true 才覆盖。
+    """
+    import base64
+    import io
+    import shutil
+    import tempfile
+    import zipfile
+
+    try:
+        raw = base64.b64decode(req.content_base64 or "")
+    except Exception:
+        return {"success": False, "message": "压缩包内容不是有效的 base64"}
+    if not raw:
+        return {"success": False, "message": "压缩包内容为空"}
+    if len(raw) > 64 * 1024 * 1024:
+        return {"success": False, "message": "压缩包超过 64 MB，请拆分后导入"}
+
+    tmp = Path(tempfile.mkdtemp(prefix="tps_zip_"))
+    try:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                names = [n for n in zf.namelist() if not n.endswith("/")]
+                if len(names) > 4000:
+                    return {"success": False, "message": "压缩包文件数超过 4000，请检查打包内容"}
+                total = sum(zf.getinfo(n).file_size for n in names)
+                if total > 200 * 1024 * 1024:
+                    return {"success": False, "message": "解压后超过 200 MB，请检查打包内容"}
+                for n in names:
+                    pure = Path(n.replace("\\", "/"))
+                    if pure.is_absolute() or ".." in pure.parts:
+                        return {"success": False, "message": f"压缩包内含非法路径: {n}"}
+                zf.extractall(tmp)
+        except zipfile.BadZipFile:
+            return {"success": False, "message": "文件不是有效的 ZIP 压缩包"}
+
+        # 定位 tps.json（根目录或唯一一层子目录）
+        cand = list(tmp.glob("tps.json")) + list(tmp.glob("*/tps.json"))
+        if not cand:
+            return {"success": False, "message": "压缩包内未找到 tps.json（TPS 清单）"}
+        manifest_path = cand[0]
+        root = manifest_path.parent
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            return {"success": False, "message": f"tps.json 不是有效 JSON: {exc}"}
+        if not isinstance(data, dict):
+            return {"success": False, "message": "tps.json 必须是 JSON 对象"}
+        tps_id = str(data.get("id", "")).strip()
+        if not tps_id or not re.match(r"^[A-Za-z0-9_\-]{1,64}$", tps_id):
+            return {"success": False, "message": "tps.json 的 id 非法（英文/数字/下划线/短横线，1-64 位）"}
+
+        v2 = tps_runtime.is_v2(data)
+        target_dir = TPS_DIR / tps_id
+        target_single = TPS_DIR / f"{tps_id}.json"
+        if not req.overwrite and (target_dir.exists() or target_single.exists()):
+            return {"success": False, "message": f"TPS 已存在: {tps_id}（勾选覆盖后可重新导入）"}
+
+        if v2:
+            errors = tps_runtime.validate_v2(data)
+            if errors:
+                return {"success": False, "message": "校验未通过: " + "；".join(errors), "errors": errors}
+            if target_single.exists():
+                target_single.unlink()
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            shutil.copytree(root, target_dir)
+            for junk in target_dir.rglob("__pycache__"):
+                shutil.rmtree(junk, ignore_errors=True)
+            if not (target_dir / "testcase").exists():
+                (target_dir / "testcase").mkdir(parents=True, exist_ok=True)
+                (target_dir / "testcase" / "__init__.py").write_text(
+                    '"""TPS 用例实现包"""\n', encoding="utf-8")
+            tps = tps_runtime.normalize_tps(data, target_dir)
+            files = len([p for p in target_dir.rglob("*") if p.is_file()])
+            return {
+                "success": True,
+                "message": f"压缩包导入成功: {tps_id}（{files} 个文件已解包）",
+                "tps": tps_runtime.summary_tps(tps),
+                "kind": "v2",
+                "path": str(target_dir),
+            }
+
+        steps = data.get("steps")
+        if not isinstance(steps, list) or not steps:
+            return {"success": False, "message": "tps.json 既不是 v2 清单（缺 cmd_suit），也没有 steps"}
+        for i, step in enumerate(steps, 1):
+            if not isinstance(step, dict) or not step.get("name"):
+                return {"success": False, "message": f"steps[{i}] 缺少 name 字段"}
+            stype = step.get("type", "test")
+            if stype not in ("init", "test", "teardown"):
+                return {"success": False, "message": f"steps[{i}] type 必须是 init/test/teardown"}
+            if stype == "test" and not step.get("testcase_id"):
+                return {"success": False, "message": f"steps[{i}] (test) 缺少 testcase_id"}
+            if stype != "test" and not step.get("script"):
+                return {"success": False, "message": f"steps[{i}] ({stype}) 缺少 script"}
+        data.setdefault("name", tps_id)
+        data.setdefault("version", "1.0.0")
+        data.setdefault("project", "导入项目")
+        data.setdefault("dut", "导入 DUT")
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        target_single.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {
+            "success": True,
+            "message": f"压缩包导入成功: {tps_id}（v1 单文件清单）",
+            "tps": _tps_summary(data),
+            "kind": "v1",
+            "path": str(target_single),
+        }
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 TPS_TASKS: dict[str, dict] = {}
 TPS_TASKS_LOCK = threading.Lock()
 
@@ -1445,6 +1570,22 @@ def _run_tps_task(task_id: str) -> None:
             task["report"] = f"reports/{report_name}"
         except Exception:
             task["report"] = None
+    # ---- 收尾 4/4: 按 TPS 绑定的机器常数模型生成 XML (未绑定则整段跳过) ----
+    try:
+        xml_info = machine_constants.write_run_xml(task, tps, REPORT_DIR)
+        if xml_info:
+            with TPS_TASKS_LOCK:
+                task["constant_xml"] = xml_info
+            _tps_log(
+                task, log_path,
+                f"[{now_str()}] 机器常数 XML: {xml_info['file']} "
+                f"(version={xml_info['version']} pn={xml_info['pn']} "
+                f"filled={xml_info['filled']} missing={xml_info['missing']})",
+                level="info",
+            )
+    except Exception as _ce:
+        _tps_log(task, log_path, f"[{now_str()}] 机器常数 XML 生成失败: {_ce}", level="warning")
+
     # 日志收尾
     _tps_log(
         task, log_path,
@@ -2081,6 +2222,18 @@ testbench_registry.register_routes(app, TPS_DIR)
 #       POST   /api/metadata/presets/{id}/bom/items
 #       DELETE /api/metadata/products/{id} | /subsystems/{id} | /presets/{id} | /presets/{id}/bom/items/{dev}
 import metadata_registry  # noqa: E402
+
+# ==================== 机器常数模型 (PN 维度, 装备树组织) ====================
+# 常数模型 = 结构(字段/类型/单位/范围), 标定后才产生值; 一个版本是一次全量导入,
+# 同版本再次导入为覆盖(默认保留仍存在字段的标定值)。
+# 数据落 backend/ate.db 的 constant_version / constant_model / constant_value 三张表。
+# 接口: GET  /api/constants/overview | /api/constants/versions | /api/constants/models
+#            /api/constants/pn | /api/tps/{id}/constants
+#       POST /api/constants/preview | /api/constants/import | /api/constants/values
+#            /api/constants/resolve | /api/constants/xml | /api/constants/versions/active
+#       PUT  /api/tps/{id}/constants
+import machine_constants  # noqa: E402
+machine_constants.register_routes(app, BASE_DIR, TPS_DIR, ate_db.DB_PATH)
 
 metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
 

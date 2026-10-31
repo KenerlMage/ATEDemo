@@ -94,6 +94,52 @@ CREATE TABLE IF NOT EXISTS mode_permission (
     updated_at  TEXT,
     PRIMARY KEY (mode, capability)
 );
+
+-- 机器常数模型: 版本头 / 模型结构 / 标定值 (见 machine_constants.py)
+CREATE TABLE IF NOT EXISTS constant_version (
+    version      TEXT PRIMARY KEY,
+    label        TEXT,
+    source       TEXT,
+    note         TEXT,
+    model_count  INTEGER DEFAULT 0,
+    field_count  INTEGER DEFAULT 0,
+    imported_at  TEXT,
+    imported_by  TEXT,
+    is_active    INTEGER DEFAULT 0,
+    checksum     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS constant_model (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    version         TEXT NOT NULL,
+    pn              TEXT NOT NULL,
+    product         TEXT,
+    subsystem       TEXT,
+    model_key       TEXT NOT NULL,
+    name            TEXT,
+    category        TEXT,
+    description     TEXT,
+    unit            TEXT,
+    fields_json     TEXT,
+    field_count     INTEGER DEFAULT 0,
+    struct_checksum TEXT,
+    updated_at      TEXT,
+    UNIQUE (version, pn, model_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_constant_model_pn ON constant_model (pn, version);
+
+CREATE TABLE IF NOT EXISTS constant_value (
+    version     TEXT NOT NULL,
+    pn          TEXT NOT NULL,
+    model_key   TEXT NOT NULL,
+    field_key   TEXT NOT NULL,
+    value       TEXT,
+    unit        TEXT,
+    source      TEXT,
+    updated_at  TEXT,
+    PRIMARY KEY (version, pn, model_key, field_key)
+);
 """
 
 

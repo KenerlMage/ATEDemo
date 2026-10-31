@@ -8,6 +8,8 @@ import TestbenchNavView from '../views/TestbenchNavView.vue'
 import TestbenchRegisterView from '../views/TestbenchRegisterView.vue'
 import MetadataTreeView from '../views/MetadataTreeView.vue'
 import MetadataBomView from '../views/MetadataBomView.vue'
+import ConstantsView from '../views/ConstantsView.vue'
+import TpsCreateView from '../views/TpsCreateView.vue'
 import SettingsView from '../views/SettingsView.vue'
 
 const router = createRouter({
@@ -32,6 +34,10 @@ const router = createRouter({
     { path: '/metadata/tree', name: 'metadata-tree', component: MetadataTreeView, meta: { requiresAuth: true } },
     //  子页面二: 测试台BOM管理 (编辑生成某测试台类型的 BOM + 属性, 供新建测试台使用)
     { path: '/metadata/bom', name: 'metadata-bom', component: MetadataBomView, meta: { requiresAuth: true } },
+    //  子页面三: 机器常数模型 (按 PN 维度管理常数结构 + 标定值, 全量导入按版本覆盖)
+    { path: '/metadata/constants', name: 'metadata-constants', component: ConstantsView, meta: { requiresAuth: true } },
+    // TPS 创建 (文本编辑 / 压缩包导入 / 空白模板, 并可关联机器常数模型)
+    { path: '/tps/create', name: 'tps-create', component: TpsCreateView, meta: { requiresAuth: true } },
     // 系统设置 (当前仅一个页签: 模式权限矩阵 —— 按运行档位限制功能项)
     { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true } }
   ]

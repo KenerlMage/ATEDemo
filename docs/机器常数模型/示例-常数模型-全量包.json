@@ -1,0 +1,146 @@
+{
+  "version": "V2.1.0",
+  "label": "2026Q4 整机标定",
+  "source": "TB-03 标定工位 / 2026-10-28",
+  "note": "示例包：结构与标定值可同包提供，也可先导结构、标定后回填值",
+  "groups": [
+    {
+      "product": "1000-A",
+      "subsystem": "SPM",
+      "pn": "SPM-3200-A1",
+      "models": [
+        {
+          "model_key": "SPM_PWR_TRIM",
+          "name": "电源纹波补偿系数",
+          "category": "电源",
+          "description": "标定工位在 25℃ 下测得，用于上电时序与纹波修正",
+          "fields": [
+            {
+              "key": "k_gain",
+              "label": "增益系数",
+              "type": "float",
+              "min": 0.8,
+              "max": 1.2,
+              "default": 1.0,
+              "calibrated_by": "频率响应标定",
+              "desc": "与实际增益相乘，修正通道衰减"
+            },
+            {
+              "key": "k_offset",
+              "label": "偏置修正",
+              "type": "float",
+              "unit": "mV",
+              "default": 0.0,
+              "calibrated_by": "零输入标定"
+            },
+            {
+              "key": "mode",
+              "label": "补偿模式",
+              "type": "enum",
+              "options": [
+                "off",
+                "linear",
+                "adaptive"
+              ],
+              "default": "linear"
+            }
+          ],
+          "values": {
+            "k_gain": 1.0123,
+            "k_offset": -0.35,
+            "mode": "linear"
+          }
+        },
+        {
+          "model_key": "SPM_THERM",
+          "name": "温漂模型",
+          "category": "温控",
+          "fields": [
+            {
+              "key": "t_coef",
+              "label": "温度系数",
+              "type": "float",
+              "unit": "1/℃",
+              "min": -0.01,
+              "max": 0.01,
+              "calibrated_by": "高低温循环标定"
+            },
+            {
+              "key": "t_ref",
+              "label": "参考温度",
+              "type": "float",
+              "unit": "℃",
+              "default": 25.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "product": "1000-A",
+      "subsystem": "SD",
+      "pn": "SD-1180-B2",
+      "models": [
+        {
+          "model_key": "SD_GAIN",
+          "name": "伺服增益",
+          "category": "运动控制",
+          "fields": [
+            {
+              "key": "kp",
+              "label": "位置环增益",
+              "type": "float",
+              "min": 0.1,
+              "max": 20.0,
+              "calibrated_by": "阶跃响应标定"
+            },
+            {
+              "key": "ki",
+              "label": "积分增益",
+              "type": "float",
+              "min": 0.0,
+              "max": 5.0,
+              "calibrated_by": "阶跃响应标定"
+            },
+            {
+              "key": "ctrl_mode",
+              "label": "控制模式",
+              "type": "enum",
+              "options": [
+                "pos",
+                "vel",
+                "torque"
+              ],
+              "default": "pos"
+            }
+          ],
+          "values": {
+            "kp": 3.2,
+            "ki": 0.45,
+            "ctrl_mode": "pos"
+          }
+        }
+      ]
+    },
+    {
+      "pn": "SPM-3200-A1",
+      "models": [
+        {
+          "model_key": "SPM_FIXTURE_COMP",
+          "name": "夹具补偿常数",
+          "category": "夹具",
+          "description": "同一 PN 可分多条 groups 追加模型；此处演示夹具更换后的补偿项",
+          "fields": [
+            {
+              "key": "probe_delay",
+              "label": "探针延时补偿",
+              "type": "float",
+              "unit": "ns",
+              "default": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

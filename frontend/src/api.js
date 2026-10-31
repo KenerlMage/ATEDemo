@@ -235,6 +235,39 @@ export const api = {
   savePermissions: (matrix) =>
     request('/api/settings/permissions', { method: 'PUT', body: JSON.stringify({ matrix }) }),
 
+  // ---- 机器常数模型 (PN 维度, 装备树组织; 落库 ate.db) ----
+  // 版本 + PN 维度的装备树(产品 -> 子系统 -> PN) + 统计
+  getConstantsOverview: (version = '') =>
+    request(`/api/constants/overview${version ? `?version=${encodeURIComponent(version)}` : ''}`),
+  getConstantVersions: () => request('/api/constants/versions'),
+  setActiveConstantVersion: (version) =>
+    request('/api/constants/versions/active', { method: 'POST', body: JSON.stringify({ version }) }),
+  // 某 PN 下的模型结构 + 标定值
+  getConstantsByPn: (pn, version = '') => {
+    const q = new URLSearchParams({ pn })
+    if (version) q.set('version', version)
+    return request(`/api/constants/pn?${q.toString()}`)
+  },
+  // 全量导入: {content | content_base64, filename, mode, keep_values}
+  previewConstants: (payload) =>
+    request('/api/constants/preview', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  importConstants: (payload) =>
+    request('/api/constants/import', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  saveConstantValues: (payload) =>
+    request('/api/constants/values', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  constantsXml: (payload) =>
+    request('/api/constants/xml', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  // TPS 与常数模型的关联 (写入 TPS 清单 constant_model 字段)
+  getTpsConstants: (tpsId) => request(`/api/tps/${encodeURIComponent(tpsId)}/constants`),
+  saveTpsConstants: (tpsId, binding) =>
+    request(`/api/tps/${encodeURIComponent(tpsId)}/constants`, {
+      method: 'PUT',
+      body: JSON.stringify({ binding: binding || {} })
+    }),
+  // 压缩包导入 TPS: {name, content_base64, overwrite}
+  importTpsZip: (payload) =>
+    request('/api/tps/import/zip', { method: 'POST', body: JSON.stringify(payload || {}) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }
