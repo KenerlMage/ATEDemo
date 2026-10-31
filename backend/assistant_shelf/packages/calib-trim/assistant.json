@@ -1,0 +1,17 @@
+{
+  "id": "calib-trim",
+  "name": "常数标定计算助手",
+  "version": "2.0.0",
+  "vendor": "ATE 装备组",
+  "summary": "由标定测量值推算机器常数并校验",
+  "description": "读取标定工步的测量结果，按常数模型的字段定义推算标定值，做量程与单调性校验后导出，可直接回填到机器常数模型。",
+  "tags": [
+    "机器常数",
+    "标定",
+    "计算"
+  ],
+  "requires": "Windows 10/11 · 可访问机器常数库",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-10-26 16:20:00"
+}

@@ -2241,8 +2241,12 @@ metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
 # ==================== 装备助手 (仪器控制工具, 独立模块) ====================
 # 工具卡片 / 示波器连接与 SCPI 操作 (泰克 MSO54 方案, 支持离线模拟)
 import instrument_tools  # noqa: E402
+import assistant_shelf  # noqa: E402
 
 instrument_tools.register_routes(app, TPS_DIR)
+
+# 装备助手货架（本地清单演示远端下发；安装包与已安装目录均在 BASE_DIR/assistant_shelf 下）
+assistant_shelf.register_routes(app, BASE_DIR)
 
 
 # ==================== 测试台装备运维 (独立模块) ====================

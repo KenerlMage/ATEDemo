@@ -1,0 +1,17 @@
+{
+  "id": "log-pack",
+  "name": "测试日志归集助手",
+  "version": "1.1.4",
+  "vendor": "ATE 装备组",
+  "summary": "按任务令归集日志与报告，打包留档",
+  "description": "按任务令号扫描执行日志、报告与常数 XML，统一命名后打包，便于问题追溯与产线归档。",
+  "tags": [
+    "日志",
+    "归档",
+    "追溯"
+  ],
+  "requires": "Windows 10/11 · 可读写 reports 目录",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-10-15 10:05:00"
+}

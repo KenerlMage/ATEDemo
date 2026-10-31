@@ -1,0 +1,17 @@
+{
+  "id": "micro-mark",
+  "name": "显微镜标记检测助手",
+  "version": "1.2.0",
+  "vendor": "ATE 装备组",
+  "summary": "相机取图 + 标记识别，输出坐标与偏差",
+  "description": "面向显微镜相机的标记检测：枚举相机、设定曝光与增益、单帧取图后做模板匹配，输出标记中心坐标与相对偏差。不进入 TPS 主流程，供现场复核与抽检使用。",
+  "tags": [
+    "机器视觉",
+    "Basler pylon",
+    "标记检测"
+  ],
+  "requires": "Windows 10/11 · Basler pylon 8.0 运行时 · 相机 USB3/GigE",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-10-20 09:30:00"
+}

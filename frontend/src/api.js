@@ -268,6 +268,16 @@ export const api = {
   importTpsZip: (payload) =>
     request('/api/tps/import/zip', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
+  // ---- 装备助手货架（清单与安装包当前由后端本地持有，等价于远端下发）----
+  getAssistantCatalog: () => request('/api/assistants/catalog'),
+  getInstalledAssistants: () => request('/api/assistants/installed'),
+  installAssistant: (id) =>
+    request('/api/assistants/install', { method: 'POST', body: JSON.stringify({ id }) }),
+  launchAssistant: (id) =>
+    request('/api/assistants/launch', { method: 'POST', body: JSON.stringify({ id }) }),
+  uninstallAssistant: (id) =>
+    request('/api/assistants/uninstall', { method: 'POST', body: JSON.stringify({ id }) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

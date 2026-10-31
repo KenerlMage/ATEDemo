@@ -1,0 +1,17 @@
+{
+  "id": "scope-live",
+  "name": "示波器实时观测助手",
+  "version": "1.0.3",
+  "vendor": "ATE 装备组",
+  "summary": "SCPI 采集波形，长时间连续观测与测量",
+  "description": "绑定已注册测试台的示波器，按设定时基连续采集并绘制波形，支持峰值、频率、上升时间等测量项。断连自动重试，无硬件时可切内置仿真信号源。",
+  "tags": [
+    "SCPI",
+    "波形",
+    "连续采集"
+  ],
+  "requires": "Windows 10/11 · 示波器开放 SCPI socket（默认 4000）",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-09-28 14:10:00"
+}

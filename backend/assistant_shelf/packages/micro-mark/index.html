@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>显微镜标记检测助手 1.2.0</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 48px; background: #F7F2EA; color: #1A1A1A;
+         font-family: "Microsoft YaHei", "微软雅黑", sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid #E2D8C8; }
+  .head { display: flex; align-items: center; gap: 18px; padding: 24px 28px; border-bottom: 1px solid #E2D8C8; }
+  .head img { width: 64px; height: 64px; }
+  h1 { font-size: 21px; margin: 0 0 6px; }
+  .meta { font-size: 13px; color: #6B6B6B; }
+  .body { padding: 24px 28px 30px; }
+  .lead { font-size: 14px; line-height: 1.9; color: #333; margin: 0 0 18px; }
+  h2 { font-size: 14px; color: #8B1A1A; margin: 0 0 10px; }
+  ul { margin: 0 0 20px; padding-left: 22px; font-size: 14px; line-height: 1.9; }
+  .note { border-left: 3px solid #8B1A1A; padding: 10px 14px; background: #FBF7F1;
+           font-size: 13px; line-height: 1.8; color: #444; }
+  .foot { margin-top: 22px; font-size: 12px; color: #8A8A8A; }
+  code { background: #F2EDE4; padding: 1px 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <img src="icon.png" alt="" />
+    <div>
+      <h1>显微镜标记检测助手</h1>
+      <div class="meta">版本 1.2.0 · ATE 装备组 · 发布于 2026-10-20 09:30:00</div>
+    </div>
+  </div>
+  <div class="body">
+    <p class="lead">面向显微镜相机的标记检测：枚举相机、设定曝光与增益、单帧取图后做模板匹配，输出标记中心坐标与相对偏差。不进入 TPS 主流程，供现场复核与抽检使用。</p>
+    <h2>主要功能</h2>
+    <ul><li>相机枚举与型号派发（按序列号优先）</li><li>曝光 / 增益 / 触发方式设定</li><li>单帧取图与标记模板匹配</li><li>坐标与偏差输出（CSV 导出）</li></ul>
+    <h2>版本说明</h2>
+    <p class="lead">新增多标记批量识别；曝光自动收敛改为按帧统计；修复大分辨率下坐标偏移。</p>
+    <div class="note">
+      本助手由 ATE Runner 的装备货架下载并启动，当前为演示件：页面内容用于验证
+      「下载 → 出现在装备助手页 → 启动脚本拉起」的完整链路。正式发布时该目录内为
+      可执行程序，<code>start.bat</code> 负责以约定参数拉起主程序。
+    </div>
+    <div class="foot">运行环境要求：Windows 10/11 · Basler pylon 8.0 运行时 · 相机 USB3/GigE</div>
+  </div>
+</div>
+</body>
+</html>

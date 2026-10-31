@@ -1,0 +1,17 @@
+{
+  "id": "therm-log",
+  "name": "温控曲线记录助手",
+  "version": "0.9.1",
+  "vendor": "ATE 装备组",
+  "summary": "多路温度曲线记录与超温告警",
+  "description": "按固定周期读取温控表温度，绘制多路曲线并记录超温事件；支持导出与测试任务令关联，便于定位热漂移导致的测试异常。",
+  "tags": [
+    "温控",
+    "曲线记录",
+    "告警"
+  ],
+  "requires": "Windows 10/11 · 温控表支持 Modbus TCP/RTU",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-10-08 11:45:00"
+}

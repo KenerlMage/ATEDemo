@@ -1,0 +1,94 @@
+{
+  "source": "local",
+  "channel": "demo",
+  "remote_url": "",
+  "updated_at": "2026-10-31 18:00:00",
+  "note": "本次为演示：货架清单与安装包均随程序本地持有（assistant_shelf/catalog.json 与 packages/），等价于远端服务下发的结果；接入远端时把 catalog 的来源替换为接口返回即可。",
+  "items": [
+    {
+      "id": "micro-mark",
+      "name": "显微镜标记检测助手",
+      "version": "1.2.0",
+      "vendor": "ATE 装备组",
+      "summary": "相机取图 + 标记识别，输出坐标与偏差",
+      "description": "面向显微镜相机的标记检测：枚举相机、设定曝光与增益、单帧取图后做模板匹配，输出标记中心坐标与相对偏差。不进入 TPS 主流程，供现场复核与抽检使用。",
+      "tags": [
+        "机器视觉",
+        "Basler pylon",
+        "标记检测"
+      ],
+      "requires": "Windows 10/11 · Basler pylon 8.0 运行时 · 相机 USB3/GigE",
+      "release_note": "新增多标记批量识别；曝光自动收敛改为按帧统计；修复大分辨率下坐标偏移。",
+      "published_at": "2026-10-20 09:30:00",
+      "size_hint": "10 KB"
+    },
+    {
+      "id": "scope-live",
+      "name": "示波器实时观测助手",
+      "version": "1.0.3",
+      "vendor": "ATE 装备组",
+      "summary": "SCPI 采集波形，长时间连续观测与测量",
+      "description": "绑定已注册测试台的示波器，按设定时基连续采集并绘制波形，支持峰值、频率、上升时间等测量项。断连自动重试，无硬件时可切内置仿真信号源。",
+      "tags": [
+        "SCPI",
+        "波形",
+        "连续采集"
+      ],
+      "requires": "Windows 10/11 · 示波器开放 SCPI socket（默认 4000）",
+      "release_note": "连续采集增加丢帧统计；测量项支持批量勾选；修复长时运行内存增长。",
+      "published_at": "2026-09-28 14:10:00",
+      "size_hint": "13 KB"
+    },
+    {
+      "id": "therm-log",
+      "name": "温控曲线记录助手",
+      "version": "0.9.1",
+      "vendor": "ATE 装备组",
+      "summary": "多路温度曲线记录与超温告警",
+      "description": "按固定周期读取温控表温度，绘制多路曲线并记录超温事件；支持导出与测试任务令关联，便于定位热漂移导致的测试异常。",
+      "tags": [
+        "温控",
+        "曲线记录",
+        "告警"
+      ],
+      "requires": "Windows 10/11 · 温控表支持 Modbus TCP/RTU",
+      "release_note": "首个可试用版本；支持 8 路采集；告警阈值可按通道设置。",
+      "published_at": "2026-10-08 11:45:00",
+      "size_hint": "9 KB"
+    },
+    {
+      "id": "calib-trim",
+      "name": "常数标定计算助手",
+      "version": "2.0.0",
+      "vendor": "ATE 装备组",
+      "summary": "由标定测量值推算机器常数并校验",
+      "description": "读取标定工步的测量结果，按常数模型的字段定义推算标定值，做量程与单调性校验后导出，可直接回填到机器常数模型。",
+      "tags": [
+        "机器常数",
+        "标定",
+        "计算"
+      ],
+      "requires": "Windows 10/11 · 可访问机器常数库",
+      "release_note": "支持按 PN 批量推算；新增量程越界与单调性校验；导出格式对齐常数导入包。",
+      "published_at": "2026-10-26 16:20:00",
+      "size_hint": "13 KB"
+    },
+    {
+      "id": "log-pack",
+      "name": "测试日志归集助手",
+      "version": "1.1.4",
+      "vendor": "ATE 装备组",
+      "summary": "按任务令归集日志与报告，打包留档",
+      "description": "按任务令号扫描执行日志、报告与常数 XML，统一命名后打包，便于问题追溯与产线归档。",
+      "tags": [
+        "日志",
+        "归档",
+        "追溯"
+      ],
+      "requires": "Windows 10/11 · 可读写 reports 目录",
+      "release_note": "新增常数 XML 一并归集；打包支持分卷；修复中文路径下压缩失败。",
+      "published_at": "2026-10-15 10:05:00",
+      "size_hint": "6 KB"
+    }
+  ]
+}

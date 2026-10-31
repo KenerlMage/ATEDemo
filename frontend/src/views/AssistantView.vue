@@ -7,11 +7,14 @@
  *    自动设置、时基、通道、波形显示(canvas)、参数测量、SCPI 命令日志
  */
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api'
 
 const loading = ref(true)
 const error = ref('')
+const router = useRouter()
 const tools = ref([])
+const shelfTools = ref([])     // 货架已下载的助手（来源 assistant_shelf/installed）
 const selectedId = ref('')
 const running = ref('')            // 已运行的工具 id
 
@@ -126,7 +129,9 @@ async function quickSim() {
 const logBox = ref(null)
 const canvas = ref(null)
 
-const tool = computed(() => tools.value.find((t) => t.id === selectedId.value) || null)
+const allTools = computed(() => [...tools.value, ...shelfTools.value])
+const tool = computed(() => allTools.value.find((t) => t.id === selectedId.value) || null)
+const isShelf = computed(() => !!(tool.value && tool.value.source === 'shelf'))
 const bindsGrouped = computed(() => {
   const real = binds.value.filter((b) => !b.virtual && b.bench_id !== '__sim__')
   const scope = real.filter((b) => b.is_scope)
@@ -154,6 +159,15 @@ async function loadTools() {
   }
 }
 
+async function loadShelf() {
+  try {
+    const res = await api.getInstalledAssistants()
+    shelfTools.value = (res && res.items) || []
+  } catch (e) {
+    shelfTools.value = []
+  }
+}
+
 async function loadBindings() {
   try {
     const res = await api.getOscilloscopeBindings()
@@ -169,7 +183,7 @@ async function loadBindings() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTools(), loadBindings()])
+  await Promise.all([loadTools(), loadBindings(), loadShelf()])
   loading.value = false
 })
 
@@ -177,10 +191,23 @@ onMounted(async () => {
 function selectCard(t) {
   selectedId.value = t.id
 }
+async function launchAssistant(t) {
+  if (!t) return
+  try {
+    const res = await api.launchAssistant(t.id)
+    if (!res || res.success === false) throw new Error((res && res.message) || '启动失败')
+    flash(res.message || '已启动助手')
+    await loadShelf()
+  } catch (e) {
+    flash(`启动失败：${e.message}`, 'warn')
+  }
+}
+
 function runSelected() {
   const t = tool.value
   if (!t) { flash('请先点选一张工具卡片', 'warn'); return }
   if (!t.available) { flash(`「${t.name}」尚在规划中，请先使用数字示波器`, 'warn'); return }
+  if (t.source === 'shelf') { launchAssistant(t); return }
   running.value = t.id
   if (t.id === 'oscilloscope') {
     setTimeout(() => canvas.value && draw(), 60)
@@ -414,8 +441,12 @@ const MEAS_LABEL = {
         <span v-if="tool" class="sel-chip">
           已选：<b>{{ tool.name }}</b>
         </span>
+        <button class="btn ghost shelf-btn" @click="router.push('/assistant/shelf')">
+          ⛁ 装备货架
+          <span v-if="shelfTools.length" class="shelf-badge">{{ shelfTools.length }}</span>
+        </button>
         <button class="btn primary run-btn" :disabled="!tool || !tool.available" @click="runSelected">
-          ▶ 运行工具
+          {{ isShelf ? '▶ 启动助手' : '▶ 运行工具' }}
         </button>
       </div>
     </section>
@@ -450,6 +481,42 @@ const MEAS_LABEL = {
           <span class="hint">{{ t.available ? '单击选中 · 双击直接运行' : '敬请期待' }}</span>
         </div>
       </article>
+    </section>
+
+    <!-- 货架已下载的助手 -->
+    <section v-if="shelfTools.length" class="shelf-sec">
+      <div class="sec-head">
+        <span class="sec-title">货架已下载</span>
+        <span class="sec-sub">共 {{ shelfTools.length }} 个 · 来自装备货架，运行即调用本机启动脚本</span>
+        <button class="btn ghost sec-more" @click="router.push('/assistant/shelf')">管理</button>
+      </div>
+      <div class="cards">
+        <article
+          v-for="t in shelfTools"
+          :key="t.id"
+          class="tool shelf"
+          :class="{ on: selectedId === t.id, running: running === t.id }"
+          @click="selectCard(t)"
+          @dblclick="selectCard(t); runSelected()"
+        >
+          <div class="tool-top">
+            <img class="tool-img" :src="t.icon_url" :alt="t.name" loading="lazy" />
+            <span class="tag ok">已下载</span>
+            <span class="tag src">货架</span>
+            <span v-if="selectedId === t.id" class="tag sel">已选中</span>
+          </div>
+          <div class="tool-name">{{ t.name }}</div>
+          <div class="tool-sub">v{{ t.version }} · {{ t.vendor }}</div>
+          <div class="tool-desc">{{ t.summary || t.description }}</div>
+          <div class="tool-caps">
+            <span v-for="c in (t.tags || []).slice(0, 3)" :key="c" class="cap">{{ c }}</span>
+          </div>
+          <div class="tool-foot">
+            <span class="proto">{{ t.size_text }} · 已启动 {{ t.launch_count || 0 }} 次</span>
+            <button class="btn mini" @click.stop="launchAssistant(t)">启动</button>
+          </div>
+        </article>
+      </div>
     </section>
 
     <!-- 示波器工作区 -->
@@ -832,4 +899,24 @@ const MEAS_LABEL = {
 .sr-range:disabled { opacity: 0.55; }
 .sr-v { width: 84px; text-align: right; font-size: 11.5px; }
 .sim-note { margin-top: 9px; font-size: 11px; color: var(--muted); line-height: 1.55; }
+.shelf-btn { padding: 9px 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.shelf-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.shelf-sec { display: flex; flex-direction: column; gap: 10px; }
+.sec-head { display: flex; align-items: center; gap: 10px; }
+.sec-title { font-size: 14px; font-weight: 800; }
+.sec-sub { font-size: 11.5px; color: var(--muted); }
+.sec-more { margin-left: auto; padding: 5px 12px; font-size: 12px; }
+
+.tool.shelf { border-left: 3px solid rgba(var(--accent-rgb), 0.55); }
+.tool-img {
+  width: 34px; height: 34px; border-radius: 9px; flex: 0 0 34px;
+  border: 1px solid var(--border); background: #F7F0E6; object-fit: cover;
+}
+.tag.src { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.08); }
+.btn.mini { padding: 4px 12px; font-size: 12px; }
 </style>

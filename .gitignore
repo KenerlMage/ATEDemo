@@ -75,3 +75,6 @@ workspace/**/run_*/
 /.git_commit_msg.txt
 /.git_diff_tmp.txt
 
+
+# 装备货架运行目录（下载安装 / 移除归档，不入库）
+**/assistant_shelf/installed/

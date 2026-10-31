@@ -3,6 +3,7 @@ import LoginView from '../views/LoginView.vue'
 import ExecuteView from '../views/ExecuteView.vue'
 import EquipmentView from '../views/EquipmentView.vue'
 import AssistantView from '../views/AssistantView.vue'
+import AssistantShelfView from '../views/AssistantShelfView.vue'
 import RecordsView from '../views/RecordsView.vue'
 import TestbenchNavView from '../views/TestbenchNavView.vue'
 import TestbenchRegisterView from '../views/TestbenchRegisterView.vue'
@@ -22,6 +23,8 @@ const router = createRouter({
     { path: '/equipment', name: 'equipment', component: EquipmentView, meta: { requiresAuth: true } },
     // 装备助手页 (控制装备的小工具集: 数字示波器等)
     { path: '/assistant', name: 'assistant', component: AssistantView, meta: { requiresAuth: true } },
+// 装备货架页 (从装备助手页右上角进入: 下载助手到本机 / 启动 / 移除)
+{ path: '/assistant/shelf', name: 'assistant-shelf', component: AssistantShelfView, meta: { requiresAuth: true } },
     // 历史测试记录查询页 (与装备清单并列)
     { path: '/records', name: 'records', component: RecordsView, meta: { requiresAuth: true } },
     // 测试台导航页: 已注册测试台以独立标签展示 + 其他页面导航入口
