@@ -2120,6 +2120,34 @@ except Exception:
     pass
 
 
+# ==================== 系统设置: 模式权限矩阵 ====================
+# 按运行档位(生产 / 调试 / 仿真)逐项开关功能, 落库 backend/ate.db 的 mode_permission 表。
+# 执行侧取生效值统一走 ate_db.permission_of(mode, capability), 不在前端传布尔值。
+# 接口: GET /api/settings/permissions, PUT /api/settings/permissions
+class PermissionMatrixBody(BaseModel):
+    """整体保存的请求体: {模式: {功能项: 是否允许}}"""
+
+    matrix: dict[str, dict[str, bool]] = {}
+
+
+@app.get("/api/settings/permissions")
+def get_settings_permissions():
+    """读取模式权限矩阵(含档位与功能项元信息, 缺失项按默认值补齐)。"""
+    return {"success": True, **ate_db.permissions_payload()}
+
+
+@app.put("/api/settings/permissions")
+def save_settings_permissions(body: PermissionMatrixBody):
+    """整体保存权限矩阵; 非法档位或功能项返回 400, 不产生半成品写入。"""
+    from fastapi.responses import JSONResponse as _JSONResponse
+
+    try:
+        matrix = ate_db.save_permissions(body.matrix)
+    except ValueError as exc:
+        return _JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+    return {"success": True, "matrix": matrix, "message": "权限矩阵已保存"}
+
+
 # ==================== Runner 版本升级 (发布 -> 推送 -> 通知 -> 升级) ====================
 # 接口: GET  /api/runner/version, /api/updates/status, /api/updates/check,
 #            /api/updates/release-note/{version}

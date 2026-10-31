@@ -1,7 +1,7 @@
 <script setup>
 /**
  * 应用外壳：左侧垂直导航（工业风紫色主题）+ 右侧内容区
- * 导航项顺序：测试执行 / 装备属性配置 / 装备助手 / 测试记录 / 测试台导航（最后一项）
+ * 导航项顺序：测试执行 / 装备属性配置 / 装备助手 / 测试记录 / 元数据管理 / 系统设置 / 测试台导航（最后一项）
  */
 import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -78,6 +78,14 @@ const NAV = [
       { to: '/metadata/tree', name: '装备树管理', short: '装备树', code: 'TREE', match: (p) => p === '/metadata/tree' || p === '/metadata' },
       { to: '/metadata/bom', name: '测试台BOM管理', short: '测试台BOM', code: 'BOM', match: (p) => p.startsWith('/metadata/bom') }
     ]
+  },
+  {
+    to: '/settings',
+    icon: '⛭',
+    name: '系统设置',
+    desc: '权限矩阵 · 运行约束',
+    code: 'SET',
+    match: (p) => p.startsWith('/settings')
   },
   {
     to: '/testbenches',

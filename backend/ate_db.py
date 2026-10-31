@@ -86,7 +86,105 @@ CREATE TABLE IF NOT EXISTS bench_sync_log (
     device_count INTEGER,
     source       TEXT
 );
+
+CREATE TABLE IF NOT EXISTS mode_permission (
+    mode        TEXT NOT NULL,
+    capability  TEXT NOT NULL,
+    allowed     INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT,
+    PRIMARY KEY (mode, capability)
+);
 """
+
+
+# ---------------------------------------------------------------- 模式权限矩阵
+# 运行档位三种：生产 / 调试 / 仿真。每档位对五项功能逐项授权，落库 mode_permission 表。
+# 顺序即界面列顺序；capability 的 key 一经发布不得改名（TPS 与执行侧按 key 读取）。
+PERMISSION_MODES: list[dict] = [
+    {
+        "key": "production",
+        "label": "生产模式",
+        "short": "生产",
+        "desc": "产线量产执行：真机连接、留存记录、结果上报云端，按节拍连续运行。",
+    },
+    {
+        "key": "debug",
+        "label": "调试模式",
+        "short": "调试",
+        "desc": "工程调测：可单步、可切仿真，结果只留本地，不强制工单。",
+    },
+    {
+        "key": "simulate",
+        "label": "仿真模式",
+        "short": "仿真",
+        "desc": "无硬件联调：不连接真实设备，结果不外发，用于流程与脚本验证。",
+    },
+]
+
+PERMISSION_CAPABILITIES: list[dict] = [
+    {
+        "key": "real_device",
+        "label": "真机连接",
+        "desc": "允许打开真实设备并下发控制命令；关闭后只能走仿真通道。",
+        "scope": "设备通道",
+        "risk": True,
+    },
+    {
+        "key": "save_records",
+        "label": "本地记录留存",
+        "desc": "允许把本轮结果写入本地记录库；关闭后只保留运行日志。",
+        "scope": "记录库",
+        "risk": False,
+    },
+    {
+        "key": "upload_results",
+        "label": "结果上报云端",
+        "desc": "允许把真实测试结果回传云端数据库；仿真结果始终不上报。",
+        "scope": "云端上报",
+        "risk": True,
+    },
+    {
+        "key": "single_step",
+        "label": "单步执行",
+        "desc": "允许用例逐工步暂停并人工确认；生产档位关闭以保证节拍。",
+        "scope": "调度器",
+        "risk": False,
+    },
+    {
+        "key": "require_work_order",
+        "label": "工单校验",
+        "desc": "执行前必须填写合法的 12 位工单号，否则拒绝启动。",
+        "scope": "执行闸门",
+        "risk": False,
+    },
+]
+
+PERMISSION_DEFAULTS: dict[str, dict[str, bool]] = {
+    "production": {
+        "real_device": True,
+        "save_records": True,
+        "upload_results": True,
+        "single_step": False,
+        "require_work_order": True,
+    },
+    "debug": {
+        "real_device": True,
+        "save_records": True,
+        "upload_results": False,
+        "single_step": True,
+        "require_work_order": False,
+    },
+    "simulate": {
+        "real_device": False,
+        "save_records": True,
+        "upload_results": False,
+        "single_step": True,
+        "require_work_order": False,
+    },
+}
+
+_PERMISSION_MODE_KEYS = [m["key"] for m in PERMISSION_MODES]
+_PERMISSION_CAP_KEYS = [c["key"] for c in PERMISSION_CAPABILITIES]
 
 
 # ---------------------------------------------------------------- 连接 / 初始化
@@ -107,6 +205,7 @@ def init_db(path: Optional[Path] = None) -> Path:
             cols = {row[1] for row in conn.execute("PRAGMA table_info(device_registry)")}
             if "device_type" not in cols:
                 conn.execute("ALTER TABLE device_registry ADD COLUMN device_type TEXT")
+            _seed_permissions(conn)
     return path or DB_PATH
 
 
@@ -396,4 +495,101 @@ def stats(path: Optional[Path] = None) -> dict:
         "bench_count": benches,
         "device_count": devices,
         "recent_sync": [dict(r) for r in log],
+    }
+
+
+# ---------------------------------------------------------------- 模式权限矩阵读写
+
+
+def _seed_permissions(conn: sqlite3.Connection) -> None:
+    """首次建库时写入默认值；已有记录不覆盖（INSERT OR IGNORE）。"""
+    rows = [
+        (mode, cap, 1 if allowed else 0, _now())
+        for mode, caps in PERMISSION_DEFAULTS.items()
+        for cap, allowed in caps.items()
+    ]
+    conn.executemany(
+        "INSERT OR IGNORE INTO mode_permission (mode, capability, allowed, updated_at) "
+        "VALUES (?, ?, ?, ?)",
+        rows,
+    )
+
+
+def default_permissions() -> dict[str, dict[str, bool]]:
+    """默认矩阵（深拷贝，调用方可随意修改）。"""
+    return {m: dict(caps) for m, caps in PERMISSION_DEFAULTS.items()}
+
+
+def get_permissions(path: Optional[Path] = None) -> dict[str, dict[str, bool]]:
+    """读取矩阵；库中缺失的行按默认值补齐（不回写，避免掩盖配置错误）。"""
+    init_db(path)
+    matrix = default_permissions()
+    with connect(path) as conn:
+        for row in conn.execute("SELECT mode, capability, allowed FROM mode_permission"):
+            mode, cap = row["mode"], row["capability"]
+            if mode in matrix and cap in matrix[mode]:
+                matrix[mode][cap] = bool(row["allowed"])
+    return matrix
+
+
+def save_permissions(
+    matrix: dict, path: Optional[Path] = None
+) -> dict[str, dict[str, bool]]:
+    """整体保存矩阵。
+
+    * 未知的模式或功能项直接 ValueError（不做静默丢弃），避免前后端字段漂移；
+    * 只更新出现的键，未出现的键保持原值；
+    * 返回保存后的完整矩阵。
+    """
+    if not isinstance(matrix, dict):
+        raise ValueError("矩阵格式不正确：应为 {模式: {功能项: 是否允许}}")
+
+    updates: list[tuple] = []
+    for mode, caps in matrix.items():
+        if mode not in _PERMISSION_MODE_KEYS:
+            raise ValueError(f"未知的运行档位：{mode}")
+        if not isinstance(caps, dict):
+            raise ValueError(f"档位 {mode} 的取值应为 {{功能项: 是否允许}}")
+        for cap, allowed in caps.items():
+            if cap not in _PERMISSION_CAP_KEYS:
+                raise ValueError(f"未知的功能项：{cap}")
+            updates.append((1 if allowed else 0, _now(), mode, cap))
+
+    if updates:
+        init_db(path)
+        with _LOCK:
+            with connect(path) as conn:
+                conn.executemany(
+                    "UPDATE mode_permission SET allowed = ?, updated_at = ? "
+                    "WHERE mode = ? AND capability = ?",
+                    updates,
+                )
+                # 库中缺行时补插（例如新增功能项后老库升级）
+                conn.executemany(
+                    "INSERT OR IGNORE INTO mode_permission "
+                    "(mode, capability, allowed, updated_at) VALUES (?, ?, ?, ?)",
+                    [(u[2], u[3], u[0], u[1]) for u in updates],
+                )
+    return get_permissions(path)
+
+
+def permission_of(mode: str, capability: str, path: Optional[Path] = None) -> bool:
+    """单点查询某档位某项功能是否放开（执行侧闸门用）。"""
+    matrix = get_permissions(path)
+    return bool(matrix.get(mode, {}).get(capability, False))
+
+
+def permissions_payload(path: Optional[Path] = None) -> dict:
+    """界面所需的完整载荷：档位、功能项、当前矩阵、默认值、更新时间。"""
+    init_db(path)
+    updated = ""
+    with connect(path) as conn:
+        row = conn.execute("SELECT MAX(updated_at) AS ts FROM mode_permission").fetchone()
+        updated = (row["ts"] or "") if row else ""
+    return {
+        "modes": PERMISSION_MODES,
+        "capabilities": PERMISSION_CAPABILITIES,
+        "matrix": get_permissions(path),
+        "defaults": default_permissions(),
+        "updated_at": updated,
     }

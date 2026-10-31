@@ -229,6 +229,12 @@ export const api = {
   // 可复用设备模板库 (从所有已纳管 BOM 去重汇总)
   getMetadataDeviceCatalog: () => request('/api/metadata/device-catalog'),
 
+  // ---- 系统设置: 模式权限矩阵 ----
+  // 列 = 运行档位(production/debug/simulate), 行 = 功能项; 保存为整体覆盖式写入
+  getPermissions: () => request('/api/settings/permissions'),
+  savePermissions: (matrix) =>
+    request('/api/settings/permissions', { method: 'PUT', body: JSON.stringify({ matrix }) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

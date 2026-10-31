@@ -8,6 +8,7 @@ import TestbenchNavView from '../views/TestbenchNavView.vue'
 import TestbenchRegisterView from '../views/TestbenchRegisterView.vue'
 import MetadataTreeView from '../views/MetadataTreeView.vue'
 import MetadataBomView from '../views/MetadataBomView.vue'
+import SettingsView from '../views/SettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,7 +31,9 @@ const router = createRouter({
     //  子页面一: 装备树管理 (新增/维护 产品 -> 子系统 -> 测试台类型 节点, 落盘后端 tree 文件夹)
     { path: '/metadata/tree', name: 'metadata-tree', component: MetadataTreeView, meta: { requiresAuth: true } },
     //  子页面二: 测试台BOM管理 (编辑生成某测试台类型的 BOM + 属性, 供新建测试台使用)
-    { path: '/metadata/bom', name: 'metadata-bom', component: MetadataBomView, meta: { requiresAuth: true } }
+    { path: '/metadata/bom', name: 'metadata-bom', component: MetadataBomView, meta: { requiresAuth: true } },
+    // 系统设置 (当前仅一个页签: 模式权限矩阵 —— 按运行档位限制功能项)
+    { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true } }
   ]
 })
 
