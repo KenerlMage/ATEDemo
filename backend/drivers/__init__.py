@@ -22,9 +22,11 @@ from .factory import (  # noqa: F401
     get_driver,
     list_driver_types,
     list_specs,
+    registry_report,
     release_all,
     resolve_driver_class,
     resolve_driver_key,
+    self_check,
 )
 
 __all__ = [
@@ -43,6 +45,8 @@ __all__ = [
     "resolve_driver_key",
     "list_driver_types",
     "list_specs",
+    "registry_report",
+    "self_check",
     "DRIVER_TYPES",
     "DRIVER_TYPE_KEYS",
     "DRIVER_TYPE_MAP",

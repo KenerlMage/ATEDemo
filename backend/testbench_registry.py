@@ -40,7 +40,8 @@ from typing import Any, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from drivers.factory import DRIVER_TYPE_MAP, default_device_type, list_driver_types
+from drivers.factory import (DRIVER_TYPE_MAP, default_device_type, list_driver_types,
+                            registry_report, self_check)
 
 SERIAL_RE = re.compile(r"^SPMTS[0-9]{12}$")
 NET_INTERFACES = {"LAN", "ETHERNET", "TCP", "IP"}
@@ -1048,8 +1049,23 @@ def register_routes(app: FastAPI, tps_dir: Path) -> None:
 
     @app.get("/api/testbench/device-types")
     def device_types():
-        """注册页设备类型下拉框：受控清单，不接受自由文本。"""
-        return {"success": True, "types": list_driver_types()}
+        """注册页设备类型下拉框：受控清单，不接受自由文本。
+
+        `types` 同时包含内置类型与自动发现的新增驱动（`source=discovered`），
+        前端按下拉框渲染即可，新增驱动无需改前端。
+        """
+        return {"success": True, "types": list_driver_types(), "registry": registry_report()}
+
+    @app.get("/api/testbench/driver-check")
+    def driver_check():
+        """驱动自检：契约合规 + 受控清单来源（发布前与现场排查用）"""
+        try:
+            contract = self_check()
+            registry = registry_report()
+            return {"success": True, "ok": bool(contract.get("ok") and registry.get("ok")),
+                    "self_check": contract, "registry": registry}
+        except Exception as e:
+            return {"success": False, "ok": False, "message": f"驱动自检失败: {e}"}
 
     @app.get("/api/testbench/presets")
     def list_presets():

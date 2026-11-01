@@ -2,23 +2,30 @@
 """驱动工厂：按测试台注册时选定的设备类型直接取驱动实现
 
 设备类型是注册记录中的显式字段 `device_type`，不再根据型号、厂商、类别或
-接口关键词做打分选型。新增型号时，注册人员从受控类型列表中选择；运行时只做
-一次精确查表，找不到就报错，不回退到相似驱动。
+接口关键词做打分选型；运行时只做一次精确查表，找不到就报错，不回退到相似驱动。
+
+受控清单 = 内置清单 + 自动发现。新增驱动只需在 `drivers/` 下放一个模块（`Driver`
+子类 + `driver_key` / `family` / `label`），进程启动时由 `discovery.scan()` 并入，
+无需修改本文件。扫描只发生一次，不监听文件变化，不支持运行时热插拔——新增或替换
+驱动仍须随 Runner 安装包发布。
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from .base import Driver, PassiveDriver
 from .errors import DriverNotFound
 from .models import DeviceConfig
 from .camera import CameraDriver
+from .discovery import scan as _scan_drivers
 from .scope import ScopeDriver
 from .scpi import AwgDriver, DmmDriver, ELoadDriver, GenericScpiDriver, MotionDriver, PsuDriver
 
 # 受控设备类型清单。key 同时是注册记录中的 device_type 与 driver_key。
-DRIVER_TYPES: list[dict] = [
+#: 内置受控类型（随 Runner 安装包发布）
+_BUILTIN_TYPES: list[dict] = [
     {
         "key": "tektronix-mso5",
         "family": "scope",
@@ -83,6 +90,15 @@ DRIVER_TYPES: list[dict] = [
         "description": "未归入上述家族、但支持 SCPI 的仪器",
     },
 ]
+
+#: 启动时扫描一次：新增驱动模块自动并入受控清单（与内置同 key 时内置优先）
+_DISCOVERY = _scan_drivers({item["key"] for item in _BUILTIN_TYPES})
+
+#: 受控类型清单（内置 + 自动发现），运行期唯一数据源
+DRIVER_TYPES: list[dict] = (
+    [dict(item, source=str(item.get("source") or "builtin")) for item in _BUILTIN_TYPES]
+    + _DISCOVERY["specs"]
+)
 
 DRIVER_TYPE_MAP: dict[str, dict] = {item["key"]: item for item in DRIVER_TYPES}
 DRIVER_TYPE_KEYS = [item["key"] for item in DRIVER_TYPES]
@@ -178,6 +194,51 @@ def release_all() -> int:
     return closed
 
 
+def registry_report() -> dict:
+    """受控类型清单的来源与健康状态（发布自检 / 现场排查用）"""
+    return {
+        "builtin": len(_BUILTIN_TYPES),
+        "discovered": len(_DISCOVERY["specs"]),
+        "total": len(DRIVER_TYPES),
+        "modules_scanned": _DISCOVERY["scanned"],
+        "discovered_keys": [item["key"] for item in _DISCOVERY["specs"]],
+        "duplicates": [dict(d) for d in _DISCOVERY["duplicates"]],
+        "errors": [dict(e) for e in _DISCOVERY["errors"]],
+        "ok": not _DISCOVERY["errors"] and not _DISCOVERY["duplicates"],
+    }
+
+
+def self_check() -> dict:
+    """驱动契约自检：key 唯一合法、必填元数据齐全、动作指向真实方法
+
+    发布前必须 `ok=True`。新增驱动最常犯的两类错误——key 与已有类型冲突、
+    `ACTIONS` 里写了不存在的方法名——都在这里拦下。
+    """
+    problems: list[str] = []
+    seen: dict = {}
+    for item in DRIVER_TYPES:
+        key = str(item.get("key") or "")
+        cls = item.get("cls")
+        module = str(item.get("module") or getattr(cls, "__module__", ""))
+        if not re.match(r"^[a-z0-9][a-z0-9._-]*$", key):
+            problems.append(f"类型 key 非法: {key!r}（应为小写字母、数字、点、下划线或连字符）")
+        if key in seen:
+            problems.append(f"类型 key 重复: {key}（{seen[key]} 与 {module}）")
+        seen[key] = module
+        for field in ("family", "label"):
+            if not str(getattr(cls, field, "") or "").strip():
+                problems.append(f"{key} 缺少 {field}")
+        actions = dict(getattr(cls, "ACTIONS", {}) or {})
+        if not actions:
+            problems.append(f"{key} 没有声明 ACTIONS")
+        for action, method in actions.items():
+            if not callable(getattr(cls, method, None)):
+                problems.append(f"{key} 的动作 {action} 指向不存在的方法 {method}")
+    return {"ok": not problems, "types": len(DRIVER_TYPES),
+            "builtin": len(_BUILTIN_TYPES), "discovered": len(_DISCOVERY["specs"]),
+            "problems": problems}
+
+
 def list_driver_types() -> list[dict]:
     """注册页设备类型下拉框的数据源。"""
     return [
@@ -187,6 +248,7 @@ def list_driver_types() -> list[dict]:
             "label": item["label"],
             "description": item["description"],
             "actions": sorted(set(item["cls"].ACTIONS)),
+            "source": item.get("source", "builtin"),
         }
         for item in DRIVER_TYPES
     ]
