@@ -255,6 +255,7 @@ def stage(
         "bench_preset_id": bench.get("preset_id", "") or str((tps.get("bench") or {}).get("preset_id", "")),
         "mode": (mode or "simulate").lower(),
         "on_driver_error": on_driver_error or os.environ.get("ATE_ON_DRIVER_ERROR", ""),
+        "rt_url": os.environ.get("ATE_RT_URL", ""),
         "conftest_version": mf_version(),
         "keep_runs": keep_runs,
         "generated_file": GENERATED_FILE,

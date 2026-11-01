@@ -475,6 +475,15 @@ async function loadTpsDetail(id) {
   }
 }
 
+// ---- 实时监视窗口 ----
+/** 以独立窗口打开监视控件；带当前任务号，便于直接看本轮数据 */
+function openMonitor() {
+  const id = (currentTask.value && currentTask.value.id) || ''
+  const url = id ? `/monitor?task=${encodeURIComponent(id)}` : '/monitor'
+  const win = window.open(url, 'ate-monitor', 'width=1280,height=840,menubar=no,toolbar=no,location=no,status=no')
+  if (win) win.focus()
+}
+
 // ---- 执行 ----
 async function startRun() {
   if (!selectedTpsId.value || running.value) return
@@ -728,6 +737,9 @@ onUnmounted(() => {
       <section class="steps-panel">
         <div class="panel-head">
           <h2 class="panel-title">测试步骤（{{ steps.length }}）</h2>
+          <button class="btn ghost small monitor-btn" title="打开独立窗口查看用例实时数据" @click="openMonitor">
+            📈 实时监视
+          </button>
         </div>
 
         <div class="uut-row">
@@ -1549,4 +1561,5 @@ onUnmounted(() => {
   .tps-wrap { grid-template-columns: 1fr; padding: 14px; }
   .report-frame { height: 320px; }
 }
+.monitor-btn { margin-left: auto; }
 </style>

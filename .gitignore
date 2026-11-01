@@ -78,3 +78,6 @@ workspace/**/run_*/
 
 # 装备货架运行目录（下载安装 / 移除归档，不入库）
 **/assistant_shelf/installed/
+
+# 实时数据监视的 SQLite 回退目录（运行期生成，不入库）
+**/.ate_rt/

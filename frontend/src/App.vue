@@ -21,6 +21,7 @@ import {
 
 const router = useRouter()
 const route = useRoute()
+const standalone = computed(() => !!route.meta.standalone)   // 独立控件窗口：不渲染侧边导航
 
 // 登录态: 用响应式 ref + 路由变化时同步, 避免 computed 读非响应式 localStorage 冻结
 const username = ref(localStorage.getItem('ate_username') || '')
@@ -142,7 +143,7 @@ function logout() {
 
     <!-- 已登录：左侧垂直导航 + 右侧内容 -->
     <template v-else>
-      <aside class="sidebar">
+      <aside v-if="!standalone" class="sidebar">
         <div class="hazard-rule side-top-rule"></div>
 
         <!-- 品牌 -->
@@ -236,7 +237,7 @@ function logout() {
         </div>
       </aside>
 
-      <main class="app-main">
+      <main class="app-main" :class="{ standalone }">
         <router-view />
       </main>
     </template>
@@ -483,6 +484,7 @@ function logout() {
 
 /* 右侧内容区 */
 .app-main { flex: 1; min-width: 0; display: flex; }
+.app-main.standalone { width: 100%; }
 
 /* ================= 响应式：窄屏改为顶部横向导航 ================= */
 @media (max-width: 900px) {

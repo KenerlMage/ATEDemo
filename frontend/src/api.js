@@ -278,6 +278,15 @@ export const api = {
   uninstallAssistant: (id) =>
     request('/api/assistants/uninstall', { method: 'POST', body: JSON.stringify({ id }) }),
 
+  // ---- 实时数据监视（用例经 ate_rt 写入；Redis KVS，缺服务时回落本地 SQLite）----
+  monitorInfo: () => request('/api/monitor/info'),
+  monitorTasks: (limit = 30, activeOnly = false) =>
+    request(`/api/monitor/tasks?limit=${limit}${activeOnly ? '&active_only=true' : ''}`),
+  monitorSnapshot: (task) => request(`/api/monitor/snapshot?task=${encodeURIComponent(task)}`),
+  monitorSeries: (task, channel, limit = 240) =>
+    request(`/api/monitor/series?task=${encodeURIComponent(task)}&channel=${encodeURIComponent(channel)}&limit=${limit}`),
+  monitorStore: () => request('/api/monitor/store'),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

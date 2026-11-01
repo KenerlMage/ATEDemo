@@ -12,6 +12,7 @@ import MetadataBomView from '../views/MetadataBomView.vue'
 import ConstantsView from '../views/ConstantsView.vue'
 import TpsCreateView from '../views/TpsCreateView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import MonitorView from '../views/MonitorView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +20,8 @@ const router = createRouter({
     { path: '/', redirect: '/login' },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/execute', name: 'execute', component: ExecuteView, meta: { requiresAuth: true } },
+    // 实时数据监视窗口（独立控件：由测试执行页按钮以新窗口打开，不显示侧边导航）
+    { path: '/monitor', name: 'monitor', component: MonitorView, meta: { requiresAuth: true, standalone: true } },
     // 装备属性配置页 (设备来自测试台注册 BOM, 可编程设备支持右键改址)
     { path: '/equipment', name: 'equipment', component: EquipmentView, meta: { requiresAuth: true } },
     // 装备助手页 (控制装备的小工具集: 数字示波器等)

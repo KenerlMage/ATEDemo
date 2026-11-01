@@ -1426,6 +1426,9 @@ def _run_tps_task(task_id: str) -> None:
                     pass
                 return
 
+    # 登记实时数据任务：监视窗口按任务号展示（不持锁，失败不影响执行）
+    realtime_monitor.begin_task(task_id, tps, task)
+
     total = len(tps["steps"])
     all_ok = True
     log_path = TEST_LOG_DIR / f"tps_{task_id}.log"
@@ -1560,6 +1563,9 @@ def _run_tps_task(task_id: str) -> None:
         task.pop("_t0", None)
         if upload is not None:
             task["cloud"] = upload
+
+    # ---- 收尾 2.5: 结束实时数据任务（监视窗口据此判断本轮已收尾）----
+    realtime_monitor.end_task(task_id, "completed" if all_ok else "failed")
 
     # ---- 收尾 3/3: 生成报告 (报告里带云端上报结果) ----
     with TPS_TASKS_LOCK:
@@ -2242,11 +2248,15 @@ metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
 # 工具卡片 / 示波器连接与 SCPI 操作 (泰克 MSO54 方案, 支持离线模拟)
 import instrument_tools  # noqa: E402
 import assistant_shelf  # noqa: E402
+import realtime_monitor  # noqa: E402  实时数据监视（Redis KVS）
 
 instrument_tools.register_routes(app, TPS_DIR)
 
 # 装备助手货架（本地清单演示远端下发；安装包与已安装目录均在 BASE_DIR/assistant_shelf 下）
 assistant_shelf.register_routes(app, BASE_DIR)
+
+# 实时数据监视：读取测试用例经 ate_rt 写入的数据（Redis，缺服务时回落 SQLite）
+realtime_monitor.register_routes(app)
 
 
 # ==================== 测试台装备运维 (独立模块) ====================
