@@ -287,6 +287,20 @@ export const api = {
     request(`/api/monitor/series?task=${encodeURIComponent(task)}&channel=${encodeURIComponent(channel)}&limit=${limit}`),
   monitorStore: () => request('/api/monitor/store'),
 
+  // ---- 工业相机装备助手（Basler pylon 8.0.0）----
+  cameraInfo: () => request('/api/tools/camera/info'),
+  cameraSessions: () => request('/api/tools/camera/sessions'),
+  connectCamera: (payload) => request('/api/tools/camera/connect', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  disconnectCamera: (payload) => request('/api/tools/camera/disconnect', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraState: (key = '') => request(`/api/tools/camera/state?key=${encodeURIComponent(key)}`),
+  cameraParams: (payload) => request('/api/tools/camera/params', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraExposure: (payload) => request('/api/tools/camera/exposure', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraAutoExposure: (payload) => request('/api/tools/camera/auto-exposure', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraGrab: (payload) => request('/api/tools/camera/grab', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraSequence: (payload) => request('/api/tools/camera/sequence', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cameraFrames: (limit = 12) => request(`/api/tools/camera/frames?limit=${limit}`),
+  cameraSave: (payload) => request('/api/tools/camera/save', { method: 'POST', body: JSON.stringify(payload || {}) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

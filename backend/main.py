@@ -2249,11 +2249,15 @@ metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
 import instrument_tools  # noqa: E402
 import assistant_shelf  # noqa: E402
 import realtime_monitor  # noqa: E402  实时数据监视（Redis KVS）
+import camera_tools  # noqa: E402  工业相机装备助手（Basler pylon 8.0.0）
 
 instrument_tools.register_routes(app, TPS_DIR)
 
 # 装备助手货架（本地清单演示远端下发；安装包与已安装目录均在 BASE_DIR/assistant_shelf 下）
 assistant_shelf.register_routes(app, BASE_DIR)
+
+# 工业相机装备助手：参数设置 / 曝光控制 / 数据保存（路由 /api/tools/camera/*）
+camera_tools.register_routes(app, BASE_DIR)
 
 # 实时数据监视：读取测试用例经 ate_rt 写入的数据（Redis，缺服务时回落 SQLite）
 realtime_monitor.register_routes(app)

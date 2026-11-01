@@ -9,6 +9,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import CameraPanel from '../components/CameraPanel.vue'
 
 const loading = ref(true)
 const error = ref('')
@@ -519,6 +520,9 @@ const MEAS_LABEL = {
       </div>
     </section>
 
+    <!-- 工业相机工作区（Basler pylon 8.0.0） -->
+    <CameraPanel v-if="running === 'camera-basler'" @close="running = ''" />
+
     <!-- 示波器工作区 -->
     <section v-if="running === 'oscilloscope'" class="work">
       <div class="work-head">
@@ -719,8 +723,8 @@ const MEAS_LABEL = {
     </section>
 
     <!-- 未运行提示 -->
-    <section v-else class="placeholder">
-      选中卡片后点右上角「运行工具」启动。首期已支持<b>数字示波器</b>（泰克 MSO54 方案），
+    <section v-else-if="!running" class="placeholder">
+      选中卡片后点右上角「运行工具」启动。已支持<b>数字示波器</b>（泰克 MSO54 方案）与<b>工业相机</b>（Basler pylon 8.0.0），
       支持离线模拟演示：无仪器也能看到波形、测量值与完整操作流程。
     </section>
   </div>
@@ -768,6 +772,10 @@ const MEAS_LABEL = {
 .ic-meter::after { border: 2px solid #fff; border-radius: 50%; inset: 10px; }
 .ic-power::after { background: #fff; border-radius: 50%; inset: 13px; }
 .ic-load::after { background: #fff; clip-path: polygon(0 100%, 50% 0, 100% 100%); inset: 9px 7px; }
+/* 相机图标：机身 + 镜头 + 取景凸起 */
+.ic-camera::after { background: #fff; border-radius: 4px; inset: 10px 7px 9px; }
+.ic-camera::before { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px;
+  margin: -4.5px 0 0 -4.5px; border: 2px solid var(--accent); border-radius: 50%; background: transparent; z-index: 1; }
 .tag {
   font-size: 11px; padding: 1px 7px; border-radius: 999px; color: var(--muted);
   border: 1px solid var(--border); background: var(--panel-2);

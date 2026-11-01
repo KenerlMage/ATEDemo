@@ -341,12 +341,18 @@ class CameraDriver(Driver):
         return {"value": devices, "count": len(devices)}
 
     def configure(self, **params) -> dict:
+        """批量设置采集参数。
+
+        先在副本上合并并校验，通过后再提交：非法入参不能把会话状态改坏
+        （曾出现 width=4 校验失败后 self.setup 被污染，后续抓帧一直是 4x480）。
+        """
+        merged = dict(self.setup)
         changed = {}
         for key, value in params.items():
-            if key in self.DEFAULTS and value is not None and self.setup.get(key) != value:
-                self.setup[key] = value
+            if key in self.DEFAULTS and value is not None and merged.get(key) != value:
+                merged[key] = value
                 changed[key] = value
-        self.setup = self._validate(self.setup)
+        self.setup = self._validate(merged)
         warnings = [] if self.simulate else self._apply(self.setup)
         self.warnings.extend(warnings)
         self.commands.append(f"Configure {changed}")
