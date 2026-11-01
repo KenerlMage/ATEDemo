@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '../api'
+import DeviceLinksPanel from '../components/DeviceLinksPanel.vue'
 
 const FT = { LAN: '网口', SERIAL: '串口', USB: 'USB', GPIB: 'GPIB', NONE: '无接口', MANUAL: '人工' }
 const NET = ['LAN', 'ETHERNET', 'TCP', 'IP']
@@ -26,6 +27,7 @@ const keyword = ref('')
 const TABS = [
   { id: 'equipment', icon: '⚙', label: '装备属性配置', desc: '设备清单来自各测试台注册时该类型 BOM 清单；右键可编程设备即可修改 IP / 端口 / 串口等连接属性，并在此导出待注册测试台。' },
   { id: 'selfcheck', icon: '✓', label: '测试台装备自检', desc: '对所选测试台执行装备初始化 / 终止 / 硬件自检；执行完直接弹出完整报告，支持离线模拟与真实探测两种模式。' },
+  { id: 'dm', icon: '🔌', label: '连接管理', desc: '装备管理模块持有全部仪器连接：在此建立/释放连接、查看句柄与调用统计、观察共享内存下发量；测试程序通过它与设备通信。' },
   { id: 'reports', icon: '▤', label: '装备报告中心', desc: '报告落盘目录、占用空间与历史报告清单；可直接打开本地资源管理器定位到具体文件。' }
 ]
 

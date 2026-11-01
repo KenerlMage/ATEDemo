@@ -308,6 +308,19 @@ export const api = {
   hudTopmost: (on) => request('/api/monitor/hud/topmost', { method: 'POST', body: JSON.stringify({ on }) }),
   hudVisible: (on) => request('/api/monitor/hud/visible', { method: 'POST', body: JSON.stringify({ on }) }),
 
+  // ---- 装备管理模块（DM）----
+  dmStatus: () => request('/api/dm/status'),
+  dmStart: (payload) => request('/api/dm/start', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  dmStop: () => request('/api/dm/stop', { method: 'POST', body: JSON.stringify({}) }),
+  dmDevices: (benchId = '') => request(`/api/dm/devices?bench_id=${encodeURIComponent(benchId)}`),
+  dmSessions: () => request('/api/dm/sessions'),
+  dmLog: (limit = 40) => request(`/api/dm/log?limit=${limit}`),
+  dmCaps: () => request('/api/dm/caps'),
+  dmConnect: (payload) => request('/api/dm/connect', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  dmDisconnect: (payload) => request('/api/dm/disconnect', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  dmCall: (payload) => request('/api/dm/call', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  dmBatch: (payload) => request('/api/dm/batch', { method: 'POST', body: JSON.stringify(payload || {}) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

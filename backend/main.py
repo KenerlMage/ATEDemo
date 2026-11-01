@@ -2252,6 +2252,7 @@ import instrument_tools  # noqa: E402
 import assistant_shelf  # noqa: E402
 import realtime_monitor  # noqa: E402  实时数据监视（Redis KVS）
 import monitor_hud  # noqa: E402  常驻置顶监视窗（Edge 独立窗 + Win32 置顶）
+import dm_service  # noqa: E402  装备管理模块（DM）服务层
 import camera_tools  # noqa: E402  工业相机装备助手（Basler pylon 8.0.0）
 
 instrument_tools.register_routes(app, TPS_DIR)
@@ -2267,6 +2268,10 @@ realtime_monitor.register_routes(app)
 
 # 常驻置顶监视窗：拉起 Edge 独立窗并置顶（/api/monitor/hud/*）
 monitor_hud.register_routes(app, BASE_DIR)
+
+# 装备管理模块：持有全部仪器连接，测试程序与界面都经它操作设备（/api/dm/*）
+DM_SERVICE = dm_service.register_routes(app, BASE_DIR)
+DM_SERVICE.bootstrap_async()
 
 
 # ==================== 测试台装备运维 (独立模块) ====================
