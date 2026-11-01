@@ -2,8 +2,8 @@
   "schema": "tps.v2",
   "id": "spm_rh_dyn",
   "name": "SPM读头动态测试",
-  "version": "2.0.0",
-  "description": "SPM 读头动态测试 TPS：上电 -> 激励加载 -> 转速闭环 -> 回放信号 -> 负载验证 -> 环境终止。测试台装备与阈值分别由 device_config / testconfig 描述，运行环境在 workspace 下按临时副本执行。",
+  "version": "2.1.0",
+  "description": "SPM 读头动态测试 TPS：上电 -> 激励加载 -> 转速闭环 -> 回放信号 -> 负载验证 -> 连续运行稳定性（90 s，过程中逐秒上传数据）-> 环境终止。测试台装备与阈值分别由 device_config / testconfig 描述，运行环境在 workspace 下按临时副本执行。",
   "project": "SPM 项目",
   "dut": "SPM 读头",
   "workspace_dir": "SPM读头动态测试",
@@ -15,27 +15,139 @@
   "environment": {
     "name": "SPM 读头动态测试环境",
     "device": "泰克 MSO54 + Fluke 8846A + ITECH IT6332A + ITECH IT8512A+ + Keysight 33500B + 读头转速控制盒 + 读头装夹夹具",
-    "interfaces": ["LAN (SCPI)", "串口 (COM6 115200)"],
+    "interfaces": [
+      "LAN (SCPI)",
+      "串口 (COM6 115200)"
+    ],
     "firmware": "v2.0.0",
     "location": "SPM 总装线 · 读头动态测试工位"
   },
   "device_config": {
-    "scope": { "device_id": "rh-scope", "role": "scope", "note": "回放信号波形观测" },
-    "dmm": { "device_id": "rh-dmm", "role": "dmm", "note": "电压 / 电流测量" },
-    "psu": { "device_id": "rh-psu", "role": "psu", "note": "读头供电" },
-    "eload": { "device_id": "rh-eload", "role": "eload", "note": "负载加载" },
-    "awg": { "device_id": "rh-awg", "role": "awg", "note": "回放激励" },
-    "spin": { "device_id": "rh-spin", "role": "motion", "note": "转速控制盒（串口）" },
-    "fixture": { "device_id": "rh-fixture", "role": "fixture", "note": "被动设备，仅登记信息" }
+    "scope": {
+      "device_id": "rh-scope",
+      "role": "scope",
+      "note": "回放信号波形观测"
+    },
+    "dmm": {
+      "device_id": "rh-dmm",
+      "role": "dmm",
+      "note": "电压 / 电流测量"
+    },
+    "psu": {
+      "device_id": "rh-psu",
+      "role": "psu",
+      "note": "读头供电"
+    },
+    "eload": {
+      "device_id": "rh-eload",
+      "role": "eload",
+      "note": "负载加载"
+    },
+    "awg": {
+      "device_id": "rh-awg",
+      "role": "awg",
+      "note": "回放激励"
+    },
+    "spin": {
+      "device_id": "rh-spin",
+      "role": "motion",
+      "note": "转速控制盒（串口）"
+    },
+    "fixture": {
+      "device_id": "rh-fixture",
+      "role": "fixture",
+      "note": "被动设备，仅登记信息"
+    }
   },
   "testconfig": {
-    "TC_VDD": { "label": "读头上电电压", "min": 3.135, "max": 3.465, "unit": "V", "nominal": 3.3 },
-    "TC_IDD": { "label": "读头工作电流", "min": 150, "max": 250, "unit": "mA" },
-    "TC_RPM": { "label": "读头转速", "min": 3560, "max": 3640, "unit": "rpm", "nominal": 3600 },
-    "TC_MOTION_HS": { "label": "运动控制握手响应", "min": 0, "max": 50, "unit": "ms" },
-    "TC_SIG_VPP": { "label": "回放信号幅度", "min": 2.3, "max": 2.5, "unit": "V" },
-    "TC_SIG_FREQ": { "label": "回放信号频率", "min": 990, "max": 1010, "unit": "Hz" },
-    "TC_ELOAD_V": { "label": "负载端电压", "min": 3.1, "max": 3.5, "unit": "V" }
+    "TC_VDD": {
+      "label": "读头上电电压",
+      "min": 3.135,
+      "max": 3.465,
+      "unit": "V",
+      "nominal": 3.3
+    },
+    "TC_IDD": {
+      "label": "读头工作电流",
+      "min": 150,
+      "max": 250,
+      "unit": "mA"
+    },
+    "TC_RPM": {
+      "label": "读头转速",
+      "min": 3560,
+      "max": 3640,
+      "unit": "rpm",
+      "nominal": 3600
+    },
+    "TC_MOTION_HS": {
+      "label": "运动控制握手响应",
+      "min": 0,
+      "max": 50,
+      "unit": "ms"
+    },
+    "TC_SIG_VPP": {
+      "label": "回放信号幅度",
+      "min": 2.3,
+      "max": 2.5,
+      "unit": "V"
+    },
+    "TC_SIG_FREQ": {
+      "label": "回放信号频率",
+      "min": 990,
+      "max": 1010,
+      "unit": "Hz"
+    },
+    "TC_ELOAD_V": {
+      "label": "负载端电压",
+      "min": 3.1,
+      "max": 3.5,
+      "unit": "V"
+    },
+    "TC_SOAK_VDD": {
+      "label": "稳态供电电压",
+      "min": 3.15,
+      "max": 3.45,
+      "unit": "V",
+      "nominal": 3.3
+    },
+    "TC_SOAK_IDD": {
+      "label": "连续运行最大工作电流",
+      "min": 150,
+      "max": 260,
+      "unit": "mA"
+    },
+    "TC_SOAK_RPM": {
+      "label": "稳态平均转速",
+      "min": 3540,
+      "max": 3660,
+      "unit": "rpm",
+      "nominal": 3600
+    },
+    "TC_SOAK_RAMP": {
+      "label": "斜坡跟踪最大偏差",
+      "min": 0,
+      "max": 40,
+      "unit": "rpm"
+    },
+    "TC_SOAK_VPP": {
+      "label": "稳态回放幅度",
+      "min": 2.25,
+      "max": 2.55,
+      "unit": "V"
+    },
+    "TC_SOAK_LOAD": {
+      "label": "加载后负载端电压",
+      "min": 3.0,
+      "max": 3.6,
+      "unit": "V"
+    },
+    "TC_SOAK_SAMPLES": {
+      "label": "过程数据上传组数",
+      "min": 60,
+      "max": 100000,
+      "unit": "组"
+    }
   },
   "setup": [
     {
@@ -60,8 +172,14 @@
       "name": "上电电压测试",
       "case": "testcase.power::power_on_voltage",
       "description": "供电 3.3V 后由数字万用表测量读头上电电压",
-      "params": { "psu_alias": "psu", "dmm_alias": "dmm", "voltage": 3.3 },
-      "checks": { "VDD": "TC_VDD" },
+      "params": {
+        "psu_alias": "psu",
+        "dmm_alias": "dmm",
+        "voltage": 3.3
+      },
+      "checks": {
+        "VDD": "TC_VDD"
+      },
       "step": true
     },
     {
@@ -78,8 +196,14 @@
       "name": "读头工作电流测试",
       "case": "testcase.power::read_head_current",
       "description": "转速稳定后测量读头工作电流",
-      "params": { "dmm_alias": "dmm", "spin_alias": "spin", "rpm": 3600 },
-      "checks": { "IDD": "TC_IDD" }
+      "params": {
+        "dmm_alias": "dmm",
+        "spin_alias": "spin",
+        "rpm": 3600
+      },
+      "checks": {
+        "IDD": "TC_IDD"
+      }
     },
     {
       "no": 4,
@@ -87,8 +211,14 @@
       "name": "转速闭环测试",
       "case": "testcase.comm::spin_speed",
       "description": "串口握手后设定 3600 rpm，回读实际转速与握手响应时间",
-      "params": { "motion_alias": "spin", "rpm": 3600 },
-      "checks": { "RPM": "TC_RPM", "HS_MS": "TC_MOTION_HS" },
+      "params": {
+        "motion_alias": "spin",
+        "rpm": 3600
+      },
+      "checks": {
+        "RPM": "TC_RPM",
+        "HS_MS": "TC_MOTION_HS"
+      },
       "step": true
     },
     {
@@ -105,8 +235,17 @@
       "name": "回放信号幅度与频率测试",
       "case": "testcase.comm::playback_signal",
       "description": "波形发生器回放 1 kHz / 2.4 Vpp 正弦，示波器测量峰峰值与频率",
-      "params": { "scope_alias": "scope", "signal": "sine", "freq": 1000, "vpp": 2.4, "points": 2000 },
-      "checks": { "VPP": "TC_SIG_VPP", "FREQ": "TC_SIG_FREQ" }
+      "params": {
+        "scope_alias": "scope",
+        "signal": "sine",
+        "freq": 1000,
+        "vpp": 2.4,
+        "points": 2000
+      },
+      "checks": {
+        "VPP": "TC_SIG_VPP",
+        "FREQ": "TC_SIG_FREQ"
+      }
     },
     {
       "no": 7,
@@ -114,8 +253,45 @@
       "name": "负载端电压测试",
       "case": "testcase.comm::load_voltage",
       "description": "电子负载 CC 0.5A 加载后测量负载端电压",
-      "params": { "eload_alias": "eload", "current": 0.5 },
-      "checks": { "VLOAD": "TC_ELOAD_V" }
+      "params": {
+        "eload_alias": "eload",
+        "current": 0.5
+      },
+      "checks": {
+        "VLOAD": "TC_ELOAD_V"
+      }
+    },
+    {
+      "no": 8,
+      "id": "TC006",
+      "name": "连续运行稳定性测试",
+      "case": "testcase.soak::continuous_run_soak",
+      "description": "转速 1200 -> 3600 rpm 斜坡 30 s、稳态 45 s、加载 15 s，合计 90 s；过程中逐秒把电压 / 电流 / 转速 / 回放幅度 / 负载电压写入实时数据通道，Runner「实时监视」窗口可在线查看曲线",
+      "params": {
+        "psu_alias": "psu",
+        "dmm_alias": "dmm",
+        "spin_alias": "spin",
+        "scope_alias": "scope",
+        "eload_alias": "eload",
+        "voltage": 3.3,
+        "rpm": 3600,
+        "load_current": 0.5,
+        "phase1_s": 30,
+        "phase2_s": 45,
+        "phase3_s": 15,
+        "sample_s": 1.0
+      },
+      "checks": {
+        "VDD_STEADY": "TC_SOAK_VDD",
+        "IDD_MAX": "TC_SOAK_IDD",
+        "RPM_STEADY": "TC_SOAK_RPM",
+        "RAMP_ERR_MAX": "TC_SOAK_RAMP",
+        "VPP_STEADY": "TC_SOAK_VPP",
+        "LOAD_V": "TC_SOAK_LOAD",
+        "SAMPLES": "TC_SOAK_SAMPLES"
+      },
+      "timeout_s": 180,
+      "step": true
     }
   ],
   "teardown": [
@@ -124,7 +300,11 @@
       "name": "环境终止",
       "case": "testcase.env_setup::teardown_environment",
       "description": "关闭供电与激励输出、停止转速，释放装备",
-      "params": { "psu_alias": "psu", "awg_alias": "awg", "spin_alias": "spin" }
+      "params": {
+        "psu_alias": "psu",
+        "awg_alias": "awg",
+        "spin_alias": "spin"
+      }
     }
   ]
 }

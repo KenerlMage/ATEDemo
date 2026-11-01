@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-ATECONFTEST_VERSION = 2
+ATECONFTEST_VERSION = 3
 
 ROOT = Path(__file__).resolve().parent
 

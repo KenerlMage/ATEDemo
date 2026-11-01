@@ -13,7 +13,7 @@
 6. **收集结果**：把每个用例的测量值、阈值判定、耗时写到 `run_result.json`，供 ATE Runner
    汇总成测试报告；会话结束统一释放仪器会话（含 OUTP OFF 等安全收尾）。
 
-版本标记：ATECONFTEST_VERSION = 2（后端用它判断是否需要覆盖更新）
+版本标记：ATECONFTEST_VERSION = 3（后端用它判断是否需要覆盖更新）
 """
 
 from __future__ import annotations
@@ -58,6 +58,20 @@ def _load_env() -> dict:
     # 运行环境文件是权威来源：让 ate_db 去读这一轮用的 SQLite 库
     if env.get("db_path"):
         os.environ["ATE_DB_PATH"] = str(env["db_path"])
+    # 实时数据发布库（ate_rt）：用例可直接 import，用于把测量值推给 Runner 的监视窗口
+    sdk_dir = ""
+    if backend:
+        for cand in (Path(backend).parent / "sdk", Path(backend) / "sdk"):
+            if (cand / "ate_rt").is_dir():
+                sdk_dir = str(cand)
+                break
+    if sdk_dir and sdk_dir not in sys.path:
+        sys.path.insert(0, sdk_dir)
+    env["ate_sdk"] = sdk_dir
+    if env.get("rt_url"):
+        os.environ.setdefault("ATE_RT_URL", str(env["rt_url"]))
+    if env.get("task_id"):
+        os.environ.setdefault("ATE_RT_TASK_ID", str(env["task_id"]))
     env["ate_backend"] = backend
     env["env_file"] = env_file
     env["run_dir"] = str(ROOT)
