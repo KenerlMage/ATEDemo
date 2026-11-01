@@ -1,10 +1,10 @@
 """实时数据监视 - 后端接口
 
-读取测试用例通过 `ate_rt` 库写入的实时数据（Redis KVS，缺 Redis 时回落本地 SQLite），
+读取测试用例通过 `ate_rt` 库写入的实时数据（Redis KVS，仅支持 Redis），
 供 Runner「测试执行」页的独立监视窗口按 1 Hz（最高 2 Hz）轮询。
 
 接口:
-  GET /api/monitor/info                     存储后端（redis / sqlite）与地址
+  GET /api/monitor/info                     存储后端（redis）与地址
   GET /api/monitor/tasks                    最近任务（测试用例）列表
   GET /api/monitor/snapshot?task=<id>       该任务全部数据项的最新值
   GET /api/monitor/series?task=&channel=    单个数据项的最近 N 个点（折线图）
@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -35,11 +36,10 @@ _STORE_KEY = ""
 
 
 def _store() -> Any:
-    """惰性打开存储；URL 变化时重开（便于运行中切换 Redis / SQLite）"""
+    """惰性打开存储；URL 变化时重开（便于运行中改指向另一实例）"""
     global _STORE, _STORE_KEY
-    import os
 
-    key = os.environ.get("ATE_RT_URL", "") + "|" + os.environ.get("ATE_RT_DB", "")
+    key = os.environ.get("ATE_RT_URL", "")
     if _STORE is not None and key == _STORE_KEY:
         return _STORE
     try:
@@ -47,7 +47,12 @@ def _store() -> Any:
             _STORE.close()
     except Exception:
         pass
-    _STORE = rt_store.open_store()
+    try:
+        _STORE = rt_store.open_store()
+    except Exception:
+        _STORE = None
+        _STORE_KEY = ""
+        raise
     _STORE_KEY = key
     return _STORE
 
@@ -106,9 +111,17 @@ def register_routes(app: FastAPI) -> None:
 
     @app.get("/api/monitor/info")
     def monitor_info():
-        info = rt_store.describe(_store())
+        """存储后端与地址；Redis 不可用时返回 ok=False（不抛 500）"""
+        try:
+            info = rt_store.describe(_store())
+            success = True
+        except Exception as exc:
+            target = os.environ.get("ATE_RT_URL") or rt_store.DEFAULT_REDIS_URL
+            info = {"backend": "redis", "ok": False,
+                    "url": rt_store.mask_url(target), "error": str(exc)}
+            success = False
         info["sdk_version"] = getattr(ate_rt, "__version__", "")
-        return {"success": True, **info}
+        return {"success": success, **info}
 
     @app.get("/api/monitor/tasks")
     def monitor_tasks(limit: int = 30, active_only: bool = False):
@@ -193,5 +206,5 @@ def register_routes(app: FastAPI) -> None:
                 "series": f"{rt_store.KEY_PREFIX}:task:<id>:ch:<name>:z  有序集合：时间戳 -> 数据点（保留最近 N 点）",
             },
             "retention_points": rt_store.DEFAULT_KEEP,
-            "fallback": "Redis 不可用时自动使用 SQLite（backend/.ate_rt/realtime.db）",
+            "backend": "仅 Redis：ATE_RT_URL 不可达时监视页提示未连接，测试执行不受影响",
         }

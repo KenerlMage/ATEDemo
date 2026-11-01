@@ -3,8 +3,8 @@
 测试用例在运行过程中把测量值、状态量、判据量写入实时数据通道，Runner「测试执行」页的
 监视窗口按 1 Hz（最高 2 Hz）刷新查看，并可对数值项绘制折线图。
 
-本库零第三方依赖：写 Redis 走内置 RESP 客户端，缺 Redis 时回落本地 SQLite，
-两种情况上限都不引入额外安装包（产线工控机可离线部署）。
+本库零第三方依赖：写 Redis 走内置 RESP 客户端，**只支持 Redis**，不再保留本地 SQLite 兜底。
+安装包仍然可以离线部署，但部署时必须提供一个可连通的 Redis 实例。
 
 ## 一、在测试用例里使用
 
@@ -36,7 +36,7 @@ with ate_rt.Monitor(task="T2", name="光学扫描", tps="spm_rh_dyn", uut="ABC12
 | `write_many({...})` | 批量写同一时刻的一组数据 |
 | `event(text)` | 写事件标记（文本项 `_event`） |
 | `close(status="done")` | 结束任务（`status` 取值 `done` / `error`） |
-| `store_info()` | 查看当前存储后端（redis / sqlite） |
+| `store_info()` | 查看当前存储后端（redis；不可用时返回 `ok=False`） |
 
 约定：
 
@@ -49,13 +49,28 @@ with ate_rt.Monitor(task="T2", name="光学扫描", tps="spm_rh_dyn", uut="ABC12
 
 | 环境变量 | 说明 |
 | --- | --- |
-| `ATE_RT_URL` | `redis://[:password@]host:port/db` 或 `sqlite:///<绝对路径>`；未设置时先试 `redis://127.0.0.1:6379/0` |
-| `ATE_RT_DB` | SQLite 文件路径（`ATE_RT_URL` 未指定 sqlite 时使用） |
-| `ATE_RT_STRICT` | `1` 表示 Redis 不可用时报错，不回落 SQLite（跑产线可开启，避免静默降级） |
+| `ATE_RT_URL` | `redis://<host>:<port>/<db>`，带凭据时写 `redis://user:secret@host:port/db`；未设置时使用 `redis://127.0.0.1:6379/0` |
 | `ATE_RT_DISABLE` | `1` 表示完全禁用本库（用于验证“关掉监视不影响测试”） |
 
-Redis 不可用且未设 `ATE_RT_STRICT` 时自动回落 SQLite（默认 `backend/.ate_rt/realtime.db`），
-监视窗口头部会显示「SQLite 回退」。
+`ATE_RT_URL` 只接受 Redis 地址。写成 `sqlite://` 会被直接拒绝并提示改回 Redis，
+避免旧配置文件在升级后静默生效。
+
+Redis 不可用时的行为（三处一致，都不影响测试执行）：
+
+| 位置 | 表现 |
+| --- | --- |
+| 用例侧 | `Monitor` 降级为空操作，`store_backend` 返回 `none`，stderr 提示一次后照常执行 |
+| 接口侧 | `GET /api/monitor/info` 返回 `ok=false` 与 `error`，不抛 500 |
+| 界面侧 | 监视窗口显示未连接与失败原因，不展示上一轮的陈旧数据 |
+
+### 为什么只保留 Redis
+
+| 取消 SQLite 的理由 | 说明 |
+| --- | --- |
+| 数据面单一 | 一套键空间、一份 TTL 语义，排障时不必再判断这台机器落在哪个库 |
+| 跨进程一致 | 多台架、多 Runner 读同一实例，才能看到同一份实时数据 |
+| 责任边界清晰 | 存储不可用属部署问题，由 `/api/monitor/info` 直接暴露，不再用降级掩盖 |
+| 交付形态收敛 | 现场组件清单稳定为「Runner + 一个 Redis 实例」，不再有隐藏的本地库文件 |
 
 ## 三、Redis 键空间
 

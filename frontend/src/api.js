@@ -278,7 +278,7 @@ export const api = {
   uninstallAssistant: (id) =>
     request('/api/assistants/uninstall', { method: 'POST', body: JSON.stringify({ id }) }),
 
-  // ---- 实时数据监视（用例经 ate_rt 写入；Redis KVS，缺服务时回落本地 SQLite）----
+  // ---- 实时数据监视（用例经 ate_rt 写入；Redis KVS，仅支持 Redis）----
   monitorInfo: () => request('/api/monitor/info'),
   monitorTasks: (limit = 30, activeOnly = false) =>
     request(`/api/monitor/tasks?limit=${limit}${activeOnly ? '&active_only=true' : ''}`),

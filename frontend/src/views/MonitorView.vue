@@ -2,7 +2,7 @@
 /**
  * 实时数据监视窗口（独立控件）
  *  - 入口：测试执行页「实时监视」按钮，以独立窗口打开本页（?task=<任务号>）
- *  - 数据来源：测试用例运行中通过 ate_rt 库写入（Redis KVS，缺 Redis 时回落本地 SQLite），
+ *  - 数据来源：测试用例运行中通过 ate_rt 库写入（Redis KVS，仅支持 Redis；连不上显示未连接），
  *              本页通过 /api/monitor/* 轮询读取：测试用例 -> 数据列表 -> 数据
  *  - 刷新：默认 1 Hz，可切 2 Hz（上限），支持暂停；折线图取每个选中数据项的最近 N 点
  */
@@ -16,6 +16,7 @@ const tasks = ref([])
 const taskId = ref('')
 const channels = ref([])
 const backend = ref('')
+const storeErr = ref('')          // 存储不可用原因（Redis 未连接、地址错误等）
 const taskMeta = ref({})
 const selected = ref([])          // 已选中的数据项名（用于折线图），最多 4 个
 const series = ref({})            // name -> [{ts_ms, v}]
@@ -90,11 +91,13 @@ async function loadSnapshot() {
     channels.value = res.channels || []
     taskMeta.value = res.task || {}
     backend.value = res.backend || ''
+    storeErr.value = ''
     err.value = ''
     lastAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     // 选中的数据项若已消失则剔除
     selected.value = selected.value.filter((n) => channels.value.some((c) => c.name === n && c.numeric))
   } catch (e) {
+    storeErr.value = e.message
     err.value = `读取实时数据失败：${e.message}`
   }
 }
@@ -349,7 +352,7 @@ watch(() => route.query.task, (v) => {
         <span class="hd-sub">{{ taskLabel }}</span>
         <span v-if="activeTask" class="chip" :class="activeTask.status">{{ activeTask.status }}</span>
         <span v-if="taskMeta.uut" class="chip ghost">UUT {{ taskMeta.uut }}</span>
-        <span class="chip ghost">{{ backend === 'redis' ? 'Redis KVS' : (backend === 'sqlite' ? 'SQLite 回退' : '存储未知') }}</span>
+        <span class="chip ghost" :class="{ warn: storeErr }" :title="storeErr">{{ storeErr ? '存储未连接' : (backend === 'redis' ? 'Redis KVS' : '存储未知') }}</span>
       </div>
       <div class="hd-right">
         <span v-if="hint" class="hint">{{ hint }}</span>

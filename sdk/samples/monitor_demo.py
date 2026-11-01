@@ -5,7 +5,7 @@
     python sdk/samples/monitor_demo.py --seconds 60 --rate 2 --task demo-001
 
 说明:
-  * 写入目标由 ATE_RT_URL 决定（未设置时先试 Redis，连不上回落 backend/.ate_rt/realtime.db）；
+  * 写入目标由 ATE_RT_URL 决定（未设置时用 redis://127.0.0.1:6379/0）；连不上时脚本报错退出；
   * Runner 的监视窗口打开后，在任务列表里选中本脚本的任务名即可看到实时值。
 """
 
@@ -32,6 +32,10 @@ def main() -> int:
 
     task = args.task or f"demo-{time.strftime('%Y%m%d%H%M%S')}"
     mon = ate_rt.Monitor(task=task, name="实时数据演示", tps="demo_monitor")
+    if mon.store_backend == "none":
+        print(f"[demo] 实时数据存储不可用，请先启动 Redis 或设置 ATE_RT_URL：{mon.last_error}")
+        mon.close()
+        return 2
     mon.declare("温度", unit="℃", group="温控", lo=15, hi=45)
     mon.declare("压力", unit="kPa", group="气路", lo=90, hi=110)
     mon.declare("振动", unit="g", group="机械", lo=0, hi=2)

@@ -2263,7 +2263,7 @@ assistant_shelf.register_routes(app, BASE_DIR)
 # 工业相机装备助手：参数设置 / 曝光控制 / 数据保存（路由 /api/tools/camera/*）
 camera_tools.register_routes(app, BASE_DIR)
 
-# 实时数据监视：读取测试用例经 ate_rt 写入的数据（Redis，缺服务时回落 SQLite）
+# 实时数据监视：读取测试用例经 ate_rt 写入的数据（Redis 专用，无本地兜底）
 realtime_monitor.register_routes(app)
 
 # 常驻置顶监视窗：拉起 Edge 独立窗并置顶（/api/monitor/hud/*）

@@ -19,8 +19,8 @@
 
 约定:
   * 任务号默认取环境变量 ATE_RT_TASK_ID（Runner 启动用例时注入），也可显式传 task=...；
-  * 存储位置由 ATE_RT_URL 决定（redis://127.0.0.1:6379/0 或 sqlite:///<path>），
-    Redis 不可用时自动回落本地 SQLite，库不会因为缺服务而抛错中断测试；
+  * 存储位置由 ATE_RT_URL 决定，形如 redis://[[user:]pass@]host:port/db；
+    **仅支持 Redis**，连不上时本库降级为空操作，不抛错、不中断测试；
   * 本库任何存储异常都不会向上抛给用例，只在 stderr 打一行提示，保证测试稳定性优先。
 """
 
@@ -37,14 +37,14 @@ from typing import Any, Optional
 from .store import (  # noqa: F401  （对外暴露）
     DEFAULT_KEEP,
     KEY_PREFIX,
-    RtUnavailable,
-    SqliteStore,
     RedisStore,
+    RtUnavailable,
     describe,
     open_store,
+    probe,
 )
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"          # 2.0：取消 SQLite 后端，仅保留 Redis
 
 _WARNED = {"logged": False}
 _EVENT_CHANNEL = "_event"
@@ -212,7 +212,8 @@ class Monitor:
 
     @property
     def degraded(self) -> bool:
-        return bool(getattr(self._store, "degraded", False))
+        """保留字段：改为 Redis 专用后不再有降级后端，恒为 False"""
+        return False
 
     def info(self) -> dict:
         return {
@@ -267,7 +268,7 @@ def reset() -> None:
 
 
 def store_info() -> dict:
-    """当前存储后端信息（Redis / SQLite 回退）"""
+    """当前存储后端信息（Redis 专用；不可用时返回 ok=False）"""
     try:
         store = open_store()
         info = describe(store)
@@ -290,10 +291,10 @@ __all__ = [
     "close",
     "reset",
     "store_info",
-    "SqliteStore",
     "RedisStore",
     "open_store",
     "describe",
+    "probe",
     "RtUnavailable",
     "KEY_PREFIX",
     "DEFAULT_KEEP",
