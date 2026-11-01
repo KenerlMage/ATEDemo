@@ -484,6 +484,23 @@ function openMonitor() {
   if (win) win.focus()
 }
 
+/** 常用形态：拉起常驻置顶的监视小窗（Edge 独立窗，产线可一直看） */
+async function openMonitorTop() {
+  const id = (currentTask.value && currentTask.value.id) || ''
+  try {
+    const res = await api.hudStart({ task_id: id })
+    if (res && res.success) {
+      monitorHint.value = res.reused ? '置顶监视窗已在运行，已切回前台' : '已拉起常驻置顶监视窗'
+    } else {
+      monitorHint.value = (res && res.message) || '拉起置顶窗失败，可改用实时监视'
+    }
+  } catch (e) {
+    monitorHint.value = `拉起置顶窗失败：${e.message}`
+  }
+  setTimeout(() => { monitorHint.value = '' }, 5000)
+}
+const monitorHint = ref('')
+
 // ---- 执行 ----
 async function startRun() {
   if (!selectedTpsId.value || running.value) return
@@ -740,6 +757,10 @@ onUnmounted(() => {
           <button class="btn ghost small monitor-btn" title="打开独立窗口查看用例实时数据" @click="openMonitor">
             📈 实时监视
           </button>
+          <button class="btn ghost small monitor-btn" title="拉起常驻置顶的小监视窗（Ctrl+Alt+T 切换置顶）" @click="openMonitorTop">
+            📌 常驻置顶
+          </button>
+          <span v-if="monitorHint" class="monitor-hint">{{ monitorHint }}</span>
         </div>
 
         <div class="uut-row">
@@ -1562,4 +1583,6 @@ onUnmounted(() => {
   .report-frame { height: 320px; }
 }
 .monitor-btn { margin-left: auto; }
+
+.monitor-hint { font-size: 11.5px; color: var(--ok); margin-left: 6px; }
 </style>

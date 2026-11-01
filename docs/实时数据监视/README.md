@@ -88,3 +88,53 @@ python sdk/samples/monitor_demo.py --seconds 60 --rate 10
 ```
 
 脚本会创建一个 `demo-<时间戳>` 任务并持续写入四路数据，打开 Runner 的监视窗口即可看到曲线。
+
+## 六、常驻置顶监视窗（产线形态）
+
+产线需要一块始终浮在最上层的监视窗。网页没有「把自己置顶」的接口，因此给监视页套一个
+独立窗口壳，再由 Win32 置顶，实现位于 `backend/monitor_hud.py`。
+
+### 6.1 形态与取舍
+
+| | 方案 | 说明 |
+| --- | --- | --- |
+| A | 浏览器画中画 | 仅演示用：必须用户手势触发、不能记忆位置，不适合常驻 |
+| B | **Edge 独立窗 + Win32 置顶（已实现）** | 零新增依赖，`msedge --app=` 起无地址栏独立窗，`SetWindowPos` 置顶 |
+| C | pywebview 桌面壳 | 未来形态：`on_top=True` 即可，需多一个打包依赖，WebView2 已具备 |
+
+### 6.2 关键实现
+
+- **独立 profile**：`--user-data-dir=<base>/.ate_rt/hud_profile`。不隔离的话 Edge 会复用已运行实例，
+  既拿不到新窗口、也控制不了位置与生死。
+- **句柄定位**：不能按 `Popen` 的 pid 找窗口（Edge 启动器进程立刻退出，真正的浏览器进程是它的子进程）。
+  采用「启动前后可见窗口差集 + 标题令牌」：前端带 `?hud=<令牌>` 打开时会改写 `document.title`，
+  差集兜住前端未改写的情况。
+- **置顶层用 `HWND_TOPMOST`**，不用最顶层（screen-saver 级），避免压住系统弹窗与急停确认框；
+  一律带 `SWP_NOACTIVATE`，不抢现场焦点。
+- **位置记忆**：`<base>/.ate_rt/monitor_hud.json` 存 `x/y/w/h/topmost`，下次按上次位置打开；
+  默认贴主屏右上角 560×380。
+- **单实例**：命名互斥 `Global\ATE_MONITOR_HUD`；已存在实例时按标题令牌接管窗口，不重复开窗。
+- **热键**：`Ctrl+Alt+T` 切换置顶、`Ctrl+Alt+H` 隐藏/显示。
+- **生命周期**：执行开始 `begin_task` 时自动拉起（`ATE_HUD_AUTO=0` 可关），
+  执行结束 `end_task` 后按 `ATE_HUD_AUTOCLOSE`（默认 8 s）自动收起；`0` 表示不收起。
+
+### 6.3 接口
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/monitor/hud/status` | 运行状态、句柄、置顶/可见、当前矩形、环境自检、热键说明 |
+| `POST /api/monitor/hud/start` | `{task_id, force, topmost, base_url}` → 拉起或复用；返回 `reused` |
+| `POST /api/monitor/hud/stop` | 关闭（先 `WM_CLOSE`，无响应再按进程结束兜底） |
+| `POST /api/monitor/hud/topmost` | `{on}` 切换置顶 |
+| `POST /api/monitor/hud/visible` | `{on}` 隐藏 / 显示 |
+| `POST /api/monitor/hud/rect` | `{x, y, w, h}` 调整位置尺寸（宽高不小于 320×200，并记忆） |
+
+界面入口两处：「测试执行」页步骤面板的「📌 常驻置顶」按钮；监视页头部的「📌 置顶/已置顶」按钮
+（未运行时点它即以置顶窗形态重新打开当前任务）。
+
+### 6.4 现场约定
+
+- 窗口默认位置必须避开急停按钮、安全光栅指示与产线看板等安全区，允许拖动但不得长期停放于安全区内；
+- 常驻不等于勤刷新：取数仍是 1 Hz（上限 2 Hz），`age_s > 5 s` 的通道继续灰显告警；
+- 窗口随执行链路启停，不留在屏上显示上一条 UUT 的旧值；
+- 任何置顶窗异常（找不到 Edge、被组策略拦截、句柄捕获失败）都只返回失败信息，不影响测试执行。

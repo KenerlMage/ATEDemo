@@ -301,6 +301,13 @@ export const api = {
   cameraFrames: (limit = 12) => request(`/api/tools/camera/frames?limit=${limit}`),
   cameraSave: (payload) => request('/api/tools/camera/save', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
+  // ---- 常驻置顶监视窗（Edge 独立窗 + Win32 置顶）----
+  hudStatus: () => request('/api/monitor/hud/status'),
+  hudStart: (payload) => request('/api/monitor/hud/start', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  hudStop: () => request('/api/monitor/hud/stop', { method: 'POST', body: JSON.stringify({}) }),
+  hudTopmost: (on) => request('/api/monitor/hud/topmost', { method: 'POST', body: JSON.stringify({ on }) }),
+  hudVisible: (on) => request('/api/monitor/hud/visible', { method: 'POST', body: JSON.stringify({ on }) }),
+
   // 报告原始地址 (界面内 iframe / 新窗口查看)
   testbenchReportUrl: (file) => `/api/testbench/reports/${encodeURIComponent(file || '')}`
 }

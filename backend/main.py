@@ -1428,6 +1428,7 @@ def _run_tps_task(task_id: str) -> None:
 
     # 登记实时数据任务：监视窗口按任务号展示（不持锁，失败不影响执行）
     realtime_monitor.begin_task(task_id, tps, task)
+    monitor_hud.auto_start(task_id)
 
     total = len(tps["steps"])
     all_ok = True
@@ -1566,6 +1567,7 @@ def _run_tps_task(task_id: str) -> None:
 
     # ---- 收尾 2.5: 结束实时数据任务（监视窗口据此判断本轮已收尾）----
     realtime_monitor.end_task(task_id, "completed" if all_ok else "failed")
+    monitor_hud.auto_stop()
 
     # ---- 收尾 3/3: 生成报告 (报告里带云端上报结果) ----
     with TPS_TASKS_LOCK:
@@ -2249,6 +2251,7 @@ metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
 import instrument_tools  # noqa: E402
 import assistant_shelf  # noqa: E402
 import realtime_monitor  # noqa: E402  实时数据监视（Redis KVS）
+import monitor_hud  # noqa: E402  常驻置顶监视窗（Edge 独立窗 + Win32 置顶）
 import camera_tools  # noqa: E402  工业相机装备助手（Basler pylon 8.0.0）
 
 instrument_tools.register_routes(app, TPS_DIR)
@@ -2261,6 +2264,9 @@ camera_tools.register_routes(app, BASE_DIR)
 
 # 实时数据监视：读取测试用例经 ate_rt 写入的数据（Redis，缺服务时回落 SQLite）
 realtime_monitor.register_routes(app)
+
+# 常驻置顶监视窗：拉起 Edge 独立窗并置顶（/api/monitor/hud/*）
+monitor_hud.register_routes(app, BASE_DIR)
 
 
 # ==================== 测试台装备运维 (独立模块) ====================

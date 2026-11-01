@@ -27,6 +27,7 @@ const loading = ref(true)
 const err = ref('')
 const lastAt = ref('')
 const canvas = ref(null)
+const hud = ref({ running: false, topmost: false, visible: false, rect: {}, available: {} })
 
 const COLORS = ['#6d28d9', '#0f766e', '#b45309', '#b91c1c']
 const MAX_SEL = 4
@@ -161,6 +162,33 @@ function flash(text = '') {
   setTimeout(() => { if (hint.value) hint.value = '' }, 2200)
 }
 
+async function loadHud() {
+  try {
+    const res = await api.hudStatus()
+    hud.value = res
+  } catch (e) {
+    hud.value = { running: false, topmost: false, available: {} }
+  }
+}
+
+/** 一个按钮走完三种意图：未运行→拉起置顶窗；已运行且已置顶→取消置顶；已运行未置顶→重新置顶 */
+async function toggleHudTopmost() {
+  try {
+    if (!hud.value.running) {
+      const res = await api.hudStart({ task_id: taskId.value || String(route.query.task || '') })
+      hud.value = { ...hud.value, ...res }
+      hint.value = res && res.success ? '已拉起常驻置顶监视窗' : ((res && res.message) || '拉起失败')
+    } else {
+      const res = await api.hudTopmost(!hud.value.topmost)
+      hud.value = { ...hud.value, ...res }
+      hint.value = (res && res.message) || '已切换置顶状态'
+    }
+    await loadHud()
+  } catch (e) {
+    hint.value = `置顶操作失败：${e.message}`
+  }
+}
+
 function openTasks() {
   loadTasks()
 }
@@ -278,8 +306,10 @@ function fmtNumber(v) {
 }
 
 let ro = null
+
 onMounted(async () => {
   await loadTasks()
+  await loadHud()
   await loadSnapshot()
   if (numericChannels.value.length && !selected.value.length) {
     selected.value = [numericChannels.value[0].name]
@@ -299,6 +329,12 @@ onUnmounted(() => {
   if (ro) ro.disconnect()
   window.removeEventListener('resize', drawChart)
 })
+
+// 置顶窗会带 hud=<令牌> 打开本页：改写标题，桌面端据此定位窗口句柄
+const hudToken = computed(() => String(route.query.hud || ''))
+watch(hudToken, (t) => {
+  if (t) document.title = t
+}, { immediate: true })
 
 watch(() => route.query.task, (v) => {
   if (v && tasks.value.some((t) => t.task_id === v)) selectTask(String(v))
@@ -322,6 +358,9 @@ watch(() => route.query.task, (v) => {
         <button class="btn ghost small" :class="{ on: rateHz === 2 }" @click="setRate(2)">2 Hz</button>
         <button class="btn small" @click="togglePause">{{ paused ? '继续' : '暂停' }}</button>
         <button class="btn ghost small" @click="openTasks">刷新任务</button>
+        <button class="btn ghost small" :class="{ on: hud.running && hud.topmost }" @click="toggleHudTopmost">
+          {{ hud.running ? (hud.topmost ? '📌 已置顶' : '📌 置顶') : '📌 常驻置顶' }}
+        </button>
       </div>
     </header>
 
