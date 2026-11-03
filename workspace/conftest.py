@@ -13,7 +13,7 @@
 6. **收集结果**：把每个用例的测量值、阈值判定、耗时写到 `run_result.json`，供 ATE Runner
    汇总成测试报告；会话结束统一释放仪器会话（含 OUTP OFF 等安全收尾）。
 
-版本标记：ATECONFTEST_VERSION = 3（后端用它判断是否需要覆盖更新）
+版本标记：ATECONFTEST_VERSION = 4（后端用它判断是否需要覆盖更新）
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-ATECONFTEST_VERSION = 2
+ATECONFTEST_VERSION = 4
 
 ROOT = Path(__file__).resolve().parent
 
@@ -72,6 +72,12 @@ def _load_env() -> dict:
         os.environ.setdefault("ATE_RT_URL", str(env["rt_url"]))
     if env.get("task_id"):
         os.environ.setdefault("ATE_RT_TASK_ID", str(env["task_id"]))
+
+    # 装备管理模块（DM）端点：设置了 ATE_DM_ENABLE=1 时，设备操作改由 DM 下发
+    if backend:
+        dm_ep = Path(backend) / ".ate_rt" / "dm_endpoint.json"
+        os.environ.setdefault("ATE_DM_ENDPOINT", str(dm_ep))
+    os.environ.setdefault("ATE_BACKEND_DIR", str(backend or ""))
     env["ate_backend"] = backend
     env["env_file"] = env_file
     env["run_dir"] = str(ROOT)
@@ -89,6 +95,17 @@ RUN_LOG = RUN_DIR / "run_log.txt"
 
 
 # ------------------------------------------------------------------ 工具
+
+def _dm_enabled() -> bool:
+    """用例是否改由装备管理模块操作设备（ATE_DM_ENABLE=1）"""
+    return str(os.environ.get("ATE_DM_ENABLE") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _dm_proxy(alias: str, row: dict, mode: str):
+    """拿 DM 驱动代理；不可用时抛错，由调用方回退进程内驱动"""
+    from ate_dm.proxy import open_proxy
+    return open_proxy(row, alias=alias, mode=mode)
+
 
 def _now() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
@@ -336,6 +353,15 @@ class AteContext:
             raise drivers.DriverError(f"无法为 {alias} 建立驱动: {why}", device_id=alias)
         spec = self.device_config.get(alias) or {}
         mode = str(spec.get("mode") or self.mode).lower()
+        if _dm_enabled():
+            try:
+                proxy = _dm_proxy(alias, row, mode)
+                self.log(f"设备经装备管理模块接入 {alias}: {proxy.resource or '-'} "
+                         f"[{'仿真' if proxy.simulate else '真机'}] handle={int(proxy)}")
+                self._drivers[alias] = proxy
+                return proxy
+            except Exception as e:      # DM 不可用不影响本轮执行，回退进程内驱动
+                self.log(f"[warn] 装备管理模块不可用，回退进程内驱动 {alias}: {e}")
         driver = drivers.get_driver(row, mode=mode, alias=alias)
         info = driver.open()
         self.log(f"驱动就绪 {alias}: {info['driver']} @ {info['resource']} "

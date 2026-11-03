@@ -2,8 +2,8 @@
   "schema": "tps.v2",
   "id": "spm_rh_dyn",
   "name": "SPM读头动态测试",
-  "version": "2.0.0",
-  "description": "SPM 读头动态测试 TPS：上电 -> 激励加载 -> 转速闭环 -> 回放信号 -> 负载验证 -> 环境终止。测试台装备与阈值分别由 device_config / testconfig 描述，运行环境在 workspace 下按临时副本执行。",
+  "version": "2.1.0",
+  "description": "SPM 读头动态测试 TPS：上电 -> 激励加载 -> 转速闭环 -> 回放信号 -> 负载验证 -> 连续运行稳定性（90 s，过程中逐秒上传数据）-> 环境终止。测试台装备与阈值分别由 device_config / testconfig 描述，运行环境在 workspace 下按临时副本执行。",
   "project": "SPM 项目",
   "dut": "SPM 读头",
   "workspace_dir": "SPM读头动态测试",
@@ -103,6 +103,50 @@
       "min": 3.1,
       "max": 3.5,
       "unit": "V"
+    },
+    "TC_SOAK_VDD": {
+      "label": "稳态供电电压",
+      "min": 3.15,
+      "max": 3.45,
+      "unit": "V",
+      "nominal": 3.3
+    },
+    "TC_SOAK_IDD": {
+      "label": "连续运行最大工作电流",
+      "min": 150,
+      "max": 260,
+      "unit": "mA"
+    },
+    "TC_SOAK_RPM": {
+      "label": "稳态平均转速",
+      "min": 3540,
+      "max": 3660,
+      "unit": "rpm",
+      "nominal": 3600
+    },
+    "TC_SOAK_RAMP": {
+      "label": "斜坡跟踪最大偏差",
+      "min": 0,
+      "max": 40,
+      "unit": "rpm"
+    },
+    "TC_SOAK_VPP": {
+      "label": "稳态回放幅度",
+      "min": 2.25,
+      "max": 2.55,
+      "unit": "V"
+    },
+    "TC_SOAK_LOAD": {
+      "label": "加载后负载端电压",
+      "min": 3.0,
+      "max": 3.6,
+      "unit": "V"
+    },
+    "TC_SOAK_SAMPLES": {
+      "label": "过程数据上传组数",
+      "min": 60,
+      "max": 100000,
+      "unit": "组"
     }
   },
   "setup": [
@@ -216,6 +260,38 @@
       "checks": {
         "VLOAD": "TC_ELOAD_V"
       }
+    },
+    {
+      "no": 8,
+      "id": "TC006",
+      "name": "连续运行稳定性测试",
+      "case": "testcase.soak::continuous_run_soak",
+      "description": "转速 1200 -> 3600 rpm 斜坡 30 s、稳态 45 s、加载 15 s，合计 90 s；过程中逐秒把电压 / 电流 / 转速 / 回放幅度 / 负载电压写入实时数据通道，Runner「实时监视」窗口可在线查看曲线",
+      "params": {
+        "psu_alias": "psu",
+        "dmm_alias": "dmm",
+        "spin_alias": "spin",
+        "scope_alias": "scope",
+        "eload_alias": "eload",
+        "voltage": 3.3,
+        "rpm": 3600,
+        "load_current": 0.5,
+        "phase1_s": 30,
+        "phase2_s": 45,
+        "phase3_s": 15,
+        "sample_s": 1.0
+      },
+      "checks": {
+        "VDD_STEADY": "TC_SOAK_VDD",
+        "IDD_MAX": "TC_SOAK_IDD",
+        "RPM_STEADY": "TC_SOAK_RPM",
+        "RAMP_ERR_MAX": "TC_SOAK_RAMP",
+        "VPP_STEADY": "TC_SOAK_VPP",
+        "LOAD_V": "TC_SOAK_LOAD",
+        "SAMPLES": "TC_SOAK_SAMPLES"
+      },
+      "timeout_s": 180,
+      "step": true
     }
   ],
   "teardown": [
