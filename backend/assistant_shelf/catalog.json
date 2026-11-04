@@ -93,7 +93,7 @@
     {
       "id": "camera-assistant",
       "name": "工业相机助手",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "vendor": "ATE 装备组",
       "summary": "相机参数与曝光控制 + 光斑检测，独立窗口运行",
       "description": "独立桌面程序（非网页内嵌）：相机参数与曝光控制一页、图像处理与光斑数据一页，全工程流式取图；无相机时走内置仿真源。",
@@ -103,10 +103,11 @@
         "光斑检测",
         "独立进程"
       ],
-      "requires": "Windows 10/11 · PySide6 或 PySide2 · numpy · matplotlib · 可选 pypylon 8.0",
+      "requires": "Windows 10/11（64 位）· 自带 Python 运行时与全部依赖，无需安装",
       "release_note": "首个版本：双流程窗口（相机调试 / 图像处理）、仿真源、27 项单元测试通过。",
       "published_at": "2026-11-04 09:49:11",
-      "size_hint": "86 KB"
+      "size_hint": "86 KB",
+      "self_contained": true
     }
   ]
 }

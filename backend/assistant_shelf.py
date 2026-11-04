@@ -317,6 +317,10 @@ def launch(assistant_id: str) -> dict:
     meta = _install_meta(dest)
     manifest = _read_json(dest / "assistant.json", default={}) or {}
     entry = str(meta.get("entry") or manifest.get("entry") or "start.bat")
+    # 自带运行时的发布包直接起 exe：不经过 cmd 中转，也不会多出一个控制台窗口
+    runtime_exe = str(manifest.get("runtime_exe") or "").strip()
+    if runtime_exe and (dest / runtime_exe).is_file():
+        entry = runtime_exe
     script = (dest / entry).resolve()
     try:
         script.relative_to(dest.resolve())
@@ -337,8 +341,9 @@ def launch(assistant_id: str) -> dict:
         cmd = [str(script)]
         shell = False
     flags = 0
-    if os.name == "nt":
-        # 用独立控制台窗口启动：与 DETACHED_PROCESS 互斥，二者不可同时置位
+    if os.name == "nt" and script.suffix.lower() != ".exe":
+        # 脚本类入口用独立控制台窗口：与 DETACHED_PROCESS 互斥，二者不可同时置位；
+        # 自带运行时的 exe 本身就是窗口程序，再给控制台会多一个黑框。
         flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
     try:
         proc = subprocess.Popen(

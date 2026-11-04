@@ -3,6 +3,22 @@
 独立的桌面工程：直接运行、可打包为 exe，面向"相机参数调试 → 像素图处理 → 光斑测量"一条线。
 界面用 PySide2 编写（Python 3.11+ 自动使用 PySide6），业务按 MVP 分层，算法只依赖 numpy。
 
+## 两种分发形态
+
+| 形态 | 内容 | 需要什么 |
+| --- | --- | --- |
+| **自带运行时（推荐）** | `runtime/CameraAssistant.exe` + `runtime/_internal/`，约 150 MB | 只需 Windows 10/11 64 位，**不装 Python、不装任何库** |
+| 源码形态 | `main.py` + `camera_assistant/`，约 90 KB | Python 3.10+ 与 PySide6 / numpy / matplotlib |
+
+`start.bat` 与货架启动都优先使用自带运行时；只有缺少 `runtime/` 的源码检出才回退到本机 Python。
+运行时不入 git（见 `.gitignore`），由 `camera_assistant.spec` 构建后随发布包分发：
+
+```powershell
+.venv\Scripts\pyinstaller.exe camera_assistant.spec --noconfirm --clean
+robocopy dist\CameraAssistant <发布包>\runtime /E
+```
+
+
 ## 一、两个主流程
 
 | 流程 | 界面 | 能做什么 |

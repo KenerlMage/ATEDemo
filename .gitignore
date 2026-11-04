@@ -84,3 +84,7 @@ workspace/**/run_*/
 
 # 驱动实现已统一到 SDK，本地归档目录不入库
 backend/drivers_legacy/
+
+# 相机助手的自带运行时（PyInstaller onedir 产物，约 150 MB，随发布包分发不入库）
+**/assistant_shelf/**/runtime/
+
