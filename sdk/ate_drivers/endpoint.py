@@ -41,6 +41,12 @@ LAN = "LAN"
 SERIAL = "SERIAL"
 SUPPORTED_INTERFACES = (LAN, SERIAL)
 
+#: 各家族允许声明的连接方式：SCPI 仪器走本模块（网口 / 串口），
+#: 相机走厂商 SDK（USB3 / GigE Vision / Camera Link），链路不由本模块解析。
+FAMILY_INTERFACES = {
+    "camera": ("USB", "USB3", "GIGE", "GIGE-V", "CAMERALINK"),
+}
+
 #: 档案里 interface 字段的常见写法 → 规范值
 _INTERFACE_ALIASES = {
     "LAN": LAN, "NET": LAN, "NETWORK": LAN, "ETHERNET": LAN, "ENET": LAN,
@@ -147,6 +153,28 @@ def normalize_interface(value: Any) -> str:
     """把档案/驱动里的连接方式写法归一化为 `LAN` / `SERIAL`；认不出返回空串"""
     text = str(value or "").strip().upper().replace(" ", "")
     return _INTERFACE_ALIASES.get(text, "")
+
+
+def interfaces_for(family: Any) -> tuple:
+    """某家族允许声明的连接方式；未登记的家族回落为 `LAN` / `SERIAL`"""
+    return FAMILY_INTERFACES.get(str(family or "").strip().lower(), SUPPORTED_INTERFACES)
+
+
+def normalize_interface_kind(value: Any, allowed: Optional[tuple] = None) -> str:
+    """归一化连接方式：先按别名表认 `LAN` / `SERIAL`，认不出再在 `allowed` 内去分隔符比对。
+
+    因此 `GIGE-V` / `gige_v` / `GigE-V` 视为同一写法；不在 `allowed` 内的一律返回空串。
+    """
+    kind = normalize_interface(value)
+    if kind:
+        return kind
+    key = re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
+    if not key:
+        return ""
+    for candidate in (allowed if allowed is not None else SUPPORTED_INTERFACES):
+        if re.sub(r"[^A-Z0-9]", "", str(candidate).upper()) == key:
+            return str(candidate)
+    return ""
 
 
 def interfaces_of(cls: Any) -> tuple:
@@ -346,7 +374,8 @@ def endpoint_from(source: Any = None, *, interface: Any = None, host: Any = None
                     device_id=device_id, timeout=float(timeout if timeout is not None else 2.0))
 
 
-__all__ = ["AUTO", "BACKEND_CHOICES", "DEFAULT_BACKEND", "LAN", "NATIVE", "NO_LINK",
-           "SERIAL", "SERIAL_DEFAULTS", "SUPPORTED_BACKENDS", "SUPPORTED_INTERFACES", "VISA",
-           "Endpoint", "backends_of", "endpoint_from", "interfaces_of", "normalize_backend",
-           "normalize_interface", "resolve_backend", "visa_resource_for"]
+__all__ = ["AUTO", "BACKEND_CHOICES", "DEFAULT_BACKEND", "FAMILY_INTERFACES", "LAN", "NATIVE",
+           "NO_LINK", "SERIAL", "SERIAL_DEFAULTS", "SUPPORTED_BACKENDS", "SUPPORTED_INTERFACES",
+           "VISA", "Endpoint", "backends_of", "endpoint_from", "interfaces_for",
+           "interfaces_of", "normalize_backend", "normalize_interface",
+           "normalize_interface_kind", "resolve_backend", "visa_resource_for"]

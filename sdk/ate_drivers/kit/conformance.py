@@ -21,6 +21,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import tempfile
 import re
 import sys
 from typing import Any, Callable, Optional
@@ -29,7 +30,8 @@ from ..capabilities import is_known, validate
 from ..contract import API_VERSION, DEPRECATIONS, RESULT_SCHEMA, check_compatible
 from ..errors import DriverError, UnsupportedCapability
 from ..endpoint import (SUPPORTED_BACKENDS, SUPPORTED_INTERFACES, backends_of,
-                         endpoint_from, interfaces_of, normalize_backend, normalize_interface)
+                         endpoint_from, interfaces_for, normalize_backend,
+                         normalize_interface_kind)
 from ..transport import VisaTransport, transport_class
 from ..models import DeviceConfig
 
@@ -111,13 +113,17 @@ def c05_command_table(ctx) -> tuple[bool, str]:
 def c06_simulate_all_capabilities(ctx) -> tuple[bool, str]:
     dev = _new(ctx["cls"])
     failed = []
-    for cap in sorted(set(ctx["cls"].CAPABILITIES)):
-        try:
-            result = dev.do(cap)
-            if not result.get("ok"):
-                failed.append(f"{cap}: ok=False")
-        except Exception as e:
-            failed.append(f"{cap}: {type(e).__name__} {e}")
+    # 有些能力天生需要外部参数：落盘类必须给路径（家族层有意要求，不能算失败），
+    # 所以检查项负责提供一个临时目录，而不是让驱动偷偷给默认值。
+    with tempfile.TemporaryDirectory(prefix="ate-conf-") as tmp:
+        for cap in sorted(set(ctx["cls"].CAPABILITIES)):
+            params = {"path": os.path.join(tmp, "snap.png")} if cap == "camera.snap" else {}
+            try:
+                result = dev.do(cap, **params)
+                if not result.get("ok"):
+                    failed.append(f"{cap}: ok=False")
+            except Exception as e:
+                failed.append(f"{cap}: {type(e).__name__} {e}")
     dev.close()
     return (not failed), "；".join(failed) or f"仿真下 {len(set(ctx['cls'].CAPABILITIES))} 项能力全部可执行"
 
@@ -335,25 +341,40 @@ def c17_model_dispatch(ctx) -> tuple[bool, str]:
 
 
 def c18_connection_declared(ctx) -> tuple[bool, str]:
-    """连接方式：必须声明 `INTERFACES`（`LAN` / `SERIAL` 组合），每种方式都能解析出真实端点，
-    且与 `driver.json` 的 `interfaces` 一致（兼容旧的单值 `interface`）"""
+    """连接方式：必须在**所属家族允许的范围内**声明，且与 `driver.json` 的 `interfaces` 一致。
+
+    走 `endpoint` 的连接方式（`LAN` / `SERIAL`）还要能解析出真实端点、转成对应链路；
+    相机家族的 `USB` / `GIGE` 由厂商 SDK 建链，不经 `endpoint`，因此只校验声明与清单一致。
+    """
     cls = ctx["cls"]
+    family = str(getattr(cls, "family", "") or "").strip().lower()
+    allowed = interfaces_for(family)
     raw = getattr(cls, "INTERFACES", None)
     if raw is None:
         raw = (getattr(cls, "INTERFACE", "") or "",)
     elif isinstance(raw, str):
         raw = (raw,)
     declared = [str(item).strip() for item in tuple(raw or ()) if str(item).strip()]
-    kinds = interfaces_of(cls)
     problems = []
     if not declared:
-        problems.append("未声明连接方式（INTERFACES 应为 %s 组合）" % (SUPPORTED_INTERFACES,))
-    unknown = [item for item in declared if not normalize_interface(item)]
+        problems.append("未声明连接方式（INTERFACES 应为 %s 的组合）" % (allowed,))
+
+    kinds: list = []
+    unknown: list = []
+    for item in declared:
+        kind = normalize_interface_kind(item, allowed)
+        if not kind:
+            unknown.append(item)
+        elif kind not in kinds:
+            kinds.append(kind)
     if unknown:
-        problems.append(f"连接方式不在支持范围: {unknown}（应为 {SUPPORTED_INTERFACES}）")
+        problems.append("连接方式不在支持范围: %s（family %r 允许 %s）" % (unknown, family, allowed))
+
     samples = {"LAN": {"host": "192.168.10.41", "port": 4000, "protocol": "TCP"},
                "SERIAL": {"serial_port": "COM6", "baudrate": 115200}}
     for kind in kinds:
+        if kind not in SUPPORTED_INTERFACES:
+            continue                 # 厂商 SDK 建链的连接方式，端点层不参与
         try:
             ep = endpoint_from(dict(samples.get(kind) or {}), interface=kind)
         except Exception as e:      # 端点解析必须给出可读错误，不能崩
@@ -369,25 +390,25 @@ def c18_connection_declared(ctx) -> tuple[bool, str]:
             continue
         if cfg.transport_kind() != ("socket" if kind == "LAN" else "serial"):
             problems.append(f"{kind} 端点转档案后链路类型为 {cfg.transport_kind()!r}")
+
     module = sys.modules.get(cls.__module__)
     path = getattr(module, "__file__", "") or ""
     if path:
         manifest_path = os.path.join(os.path.dirname(path), "driver.json")
         if os.path.isfile(manifest_path):
             try:
-                raw = json.load(open(manifest_path, encoding="utf-8"))
+                raw_manifest = json.load(open(manifest_path, encoding="utf-8"))
             except Exception as e:  # pragma: no cover
-                raw = None
+                raw_manifest = None
                 problems.append(f"driver.json 无法解析: {e}")
-            if raw is not None:
-                listed = raw.get("interfaces")
+            if raw_manifest is not None:
+                listed = raw_manifest.get("interfaces")
                 if listed is None:
-                    listed = [raw["interface"]] if raw.get("interface") else []
-                norm = [normalize_interface(m) for m in listed]
+                    listed = [raw_manifest["interface"]] if raw_manifest.get("interface") else []
+                norm = [normalize_interface_kind(m, allowed) for m in listed]
                 if sorted(norm) != sorted(kinds):
                     problems.append(f"driver.json interfaces={listed} 与类 INTERFACES={list(kinds)} 不一致")
     return (not problems), "；".join(problems) or f"连接方式就绪（{' / '.join(kinds)}）"
-
 
 
 def c19_backends_declared(ctx) -> tuple[bool, str]:

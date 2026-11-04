@@ -26,7 +26,8 @@ from typing import Any, Optional
 
 from ..capabilities import validate
 from ..contract import API_VERSION, MANIFEST_SCHEMA, check_compatible
-from ..endpoint import (SUPPORTED_BACKENDS, normalize_backend, normalize_interface)
+from ..endpoint import (SUPPORTED_BACKENDS, interfaces_for, normalize_backend,
+                         normalize_interface_kind)
 from ..errors import ConfigurationError, ContractMismatch, DriverNotFound
 
 MANIFEST_NAME = "driver.json"
@@ -37,7 +38,7 @@ OPTIONAL_DEFAULTS = {"label": "", "models": [], "interfaces": ["LAN"],
                      "simulate": True, "min_platform": "", "depends": [],
                      "vendor": "", "signature": "", "source": "local"}
 
-INTERFACES = ("LAN", "SERIAL")  # 支持的连接方式：网口 + 串口
+INTERFACES = ("LAN", "SERIAL")  # SCPI 仪器的连接方式；各族实际白名单见 endpoint.interfaces_for()
 BACKENDS = SUPPORTED_BACKENDS   # 支持的传输后端：原生栈 + VISA
 
 
@@ -89,12 +90,13 @@ def load_manifest(path: str, platform_api: str = API_VERSION) -> dict:
     if not isinstance(declared, list) or not declared:
         raise ConfigurationError(f"interfaces 必须是数组，实际 {declared!r}",
                                  detail=f"应为 {INTERFACES} 的任意组合，如 [\"LAN\", \"SERIAL\"]")
+    allowed = interfaces_for(raw.get("family"))
     kinds = []
     for item in declared:
-        kind = normalize_interface(item)
+        kind = normalize_interface_kind(item, allowed)
         if not kind:
             raise ConfigurationError(f"interfaces 含非法连接方式: {item!r}",
-                                     detail=f"应为 {INTERFACES} 之一")
+                                     detail=f"family {raw.get('family')!r} 允许 {allowed}")
         if kind not in kinds:
             kinds.append(kind)
     iface = kinds[0]

@@ -21,10 +21,11 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Optional
 
+from .endpoint import interfaces_for
 from .errors import ConfigurationError, DriverNotFound
 
-#: 相机合法连接方式（USB3 / GigE Vision / Camera Link）
-CAMERA_INTERFACES = ("USB", "USB3", "GIGE", "GIGE-V", "CAMERALINK")
+#: 相机合法连接方式（USB3 / GigE Vision / Camera Link），与 endpoint.FAMILY_INTERFACES 同源
+CAMERA_INTERFACES = interfaces_for("camera")
 
 CAMERA_BACKENDS = ("native",)
 

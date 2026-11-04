@@ -207,3 +207,27 @@ def test_simulate_frame_and_stats_are_pure_python_safe():
     assert stats["pixels"] == 96 * 64
     assert stats["min"] < stats["max"]
     assert stats["contrast"] == pytest.approx(stats["max"] - stats["min"], abs=0.01)
+
+
+# ---------------------------------------------------------------- 上架门禁
+
+def test_manifest_is_loadable_by_kit():
+    """相机包必须能被 kit 的清单加载器接受：连接方式按 family 取白名单，不套用 LAN/SERIAL"""
+    from ate_drivers.kit import load_manifest
+
+    package = (Path(__file__).resolve().parents[1]
+               / "ate_drivers" / "vendors" / "basler_pylon")
+    manifest = load_manifest(str(package))
+    assert manifest["family"] == "camera"
+    assert manifest["interfaces"] == ["USB", "GIGE"]
+    assert manifest["interface"] == "USB"
+    assert manifest["models"], "型号派发要求显式列出型号"
+
+
+def test_camera_package_passes_conformance():
+    """相机包必须通过一致性套件：落盘类能力由检查项提供临时目录，相机接口不做端点解析"""
+    from ate_drivers.kit import conformance
+
+    report = conformance.run_conformance(BaslerPylonCamera)
+    failed = [c["id"] for c in report["checks"] if not c["ok"]]
+    assert report["ok"], "未通过检查项: %s" % failed
