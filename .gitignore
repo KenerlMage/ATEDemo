@@ -81,3 +81,6 @@ workspace/**/run_*/
 
 # 实时数据监视的 SQLite 回退目录（运行期生成，不入库）
 **/.ate_rt/
+
+# 驱动实现已统一到 SDK，本地归档目录不入库
+backend/drivers_legacy/

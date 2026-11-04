@@ -75,7 +75,8 @@ def test_registry_report_is_healthy():
     assert report["ok"] is True
     assert report["builtin"] + report["discovered"] == report["total"]
     assert NEW_KEY in report["discovered_keys"]
-    assert report["modules_scanned"] >= 4
+    # 驱动实现已统一到 SDK，backend 侧可扫描模块随之减少；只校验扫描确实发生
+    assert report["modules_scanned"] >= 1
 
 
 def test_self_check_has_no_problems():

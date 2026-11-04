@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""通用 SCPI 家族驱动：万用表 / 可编程电源 / 电子负载 / 波形发生器 / 串口运动控制
+"""通用 SCPI 家族驱动（SDK 侧）：万用表 / 电源 / 电子负载 / 波形发生器 / 运动控制
 
 真实模式下发标准 SCPI 命令；仿真模式由 `simulate_command()` 给出**确定性**测量值
 （用 `stable_ratio` 生成 ±0.3% 级别的稳定偏差），因此 TPS 用例在无硬件时也能跑通，
@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .base import Driver, stable_ratio
-from .errors import DriverError
+from ..base import InstrumentDriver as Driver
+from ..errors import DriverError
+from .util import stable_ratio
 
 
 def _to_float(text: str, what: str) -> float:
@@ -148,7 +149,7 @@ class PsuDriver(GenericScpiDriver):
         super().__init__(*args, **kw)
         self.setpoint = {"voltage": 0.0, "current": 0.0}
         self.output_on_flag = False
-        self.on_close("OUTP OFF")
+        self.protect_on_close("OUTP OFF")
 
     # ---- 设置 ----
     def _channel(self, channel: Optional[str]) -> str:
@@ -253,7 +254,7 @@ class ELoadDriver(GenericScpiDriver):
         self.current = 0.0
         self.mode = "CC"
         self.input_on_flag = False
-        self.on_close("INP OFF")
+        self.protect_on_close("INP OFF")
 
     def set_current(self, current: float = 0.0, **_) -> dict:
         self.current = float(current)
@@ -335,7 +336,7 @@ class AwgDriver(GenericScpiDriver):
         super().__init__(*args, **kw)
         self.waveform = {"kind": "SIN", "frequency": 1000.0, "amplitude": 2.4, "offset": 0.0}
         self.output_on_flag = False
-        self.on_close("OUTP OFF")
+        self.protect_on_close("OUTP OFF")
 
     def set_waveform(self, kind: str = "SIN", frequency: Optional[float] = None,
                      amplitude: Optional[float] = None, offset: Optional[float] = None, **_) -> dict:
@@ -405,7 +406,7 @@ class MotionDriver(GenericScpiDriver):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.speed = 0.0
-        self.on_close("STOP")
+        self.protect_on_close("STOP")
 
     def handshake(self, **_) -> dict:
         if self.simulate:

@@ -18,11 +18,8 @@ from typing import Any, Optional
 from .base import Driver, PassiveDriver
 from .errors import DriverNotFound
 from .models import DeviceConfig
-from .camera import CameraDriver
 from .discovery import scan as _scan_drivers
-from .scope import ScopeDriver
 from .sdk_bridge import sdk_driver_class, sdk_status
-from .scpi import AwgDriver, DmmDriver, ELoadDriver, GenericScpiDriver, MotionDriver, PsuDriver
 
 # 受控设备类型清单。key 同时是注册记录中的 device_type 与 driver_key。
 #: 内置受控类型（随 Runner 安装包发布）
@@ -31,66 +28,69 @@ _BUILTIN_TYPES: list[dict] = [
         "key": "tektronix-mso5",
         "family": "scope",
         "label": "数字示波器 · 泰克 MSO5 系列",
-        "cls": sdk_driver_class("ate_drivers.vendors.tektronix_mso.driver:TekMsoScope", "scope", ScopeDriver),
+        "cls": sdk_driver_class("ate_drivers.vendors.tektronix_mso.driver:TekMsoScope", "scope"),
         "description": "泰克 MSO5/DPO5 系列，LAN 或串口",
     },
     {
         "key": "generic-dmm",
         "family": "dmm",
         "label": "数字万用表",
-        "cls": DmmDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:DmmDriver", "dmm"),
         "description": "支持 SCPI 的台式/系统万用表",
     },
     {
         "key": "generic-psu",
         "family": "psu",
         "label": "可编程直流电源",
-        "cls": PsuDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:PsuDriver", "psu"),
         "description": "单路/多路可编程直流电源",
     },
     {
         "key": "generic-eload",
         "family": "eload",
         "label": "可编程电子负载",
-        "cls": ELoadDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:ELoadDriver", "eload"),
         "description": "支持恒流/恒压/恒阻/恒功率的电子负载",
     },
     {
         "key": "generic-awg",
         "family": "awg",
         "label": "波形发生器 / 信号源",
-        "cls": AwgDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:AwgDriver", "awg"),
         "description": "函数发生器、任意波形发生器或射频信号源",
     },
     {
         "key": "serial-motion",
         "family": "motion",
         "label": "运动控制器（串口）",
-        "cls": MotionDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:MotionDriver", "motion"),
         "description": "通过串口控制转速、位置或扫描运动",
     },
     {
         "key": "basler-pylon",
         "family": "camera",
         "label": "工业相机 · Basler pylon 8.0.0",
-        "cls": sdk_driver_class("ate_drivers.vendors.basler_pylon.driver:BaslerPylonCamera", "camera", CameraDriver),
+        "cls": sdk_driver_class("ate_drivers.vendors.basler_pylon.driver:BaslerPylonCamera", "camera"),
         "description": "Basler GigE / USB3 相机，pylon 8.0.0（pypylon，惰性加载）",
     },
     {
         "key": "passive-device",
         "family": "passive",
         "label": "被动设备（无通讯）",
-        "cls": sdk_driver_class("ate_drivers.base:PassiveDriver", "passive", PassiveDriver),
+        "cls": sdk_driver_class("ate_drivers.base:PassiveDriver", "passive"),
         "description": "夹具、工装、手动设备等无通讯对象",
     },
     {
         "key": "generic-scpi",
         "family": "generic",
         "label": "通用 SCPI 仪器",
-        "cls": GenericScpiDriver,
+        "cls": sdk_driver_class("ate_drivers.generic.scpi:GenericScpiDriver", "generic"),
         "description": "未归入上述家族、但支持 SCPI 的仪器",
     },
 ]
+
+#: SDK 加载失败（cls 为 None）的类型不进入受控清单——驱动实现只认 SDK 一份
+_BUILTIN_TYPES = [item for item in _BUILTIN_TYPES if item.get("cls") is not None]
 
 #: 启动时扫描一次：新增驱动模块自动并入受控清单（与内置同 key 时内置优先）
 _DISCOVERY = _scan_drivers({item["key"] for item in _BUILTIN_TYPES})
