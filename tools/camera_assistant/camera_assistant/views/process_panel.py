@@ -6,18 +6,27 @@ import numpy as np
 
 from ..qt_compat import QtCore, QtWidgets, Signal
 
-import matplotlib
+#: matplotlib 缺失时降级为提示页：流程一（相机调试）与整体窗口启动不受影响
+MPL_ERROR = ""
+try:
+    import matplotlib
 
-matplotlib.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
-matplotlib.rcParams["axes.unicode_minus"] = False
+    matplotlib.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
+    matplotlib.rcParams["axes.unicode_minus"] = False
 
-from matplotlib.figure import Figure                                    # noqa: E402
-from matplotlib.patches import Rectangle                                # noqa: E402
+    from matplotlib.figure import Figure                                # noqa: E402
+    from matplotlib.patches import Rectangle                            # noqa: E402
 
-try:                                                                    # noqa: E402
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-except ImportError:                                                     # PySide2 环境
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    try:                                                                # noqa: E402
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+    except ImportError:                                                 # PySide2 环境
+        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+except Exception as _exc:                                                # pragma: no cover
+    matplotlib = None
+    Figure = None
+    Rectangle = None
+    FigureCanvas = None
+    MPL_ERROR = f"{type(_exc).__name__}: {_exc}"
 
 COLUMNS = ["#", "亮度中心X", "亮度中心Y", "光斑中心X", "光斑中心Y", "等效直径", "面积", "峰值", "饱和"]
 THRESHOLD_MODES = [("otsu", "Otsu 自动"), ("absolute", "绝对阈值"), ("relative", "相对峰值 %")]
@@ -52,10 +61,23 @@ class ProcessPanel(QtWidgets.QWidget):
         head.addWidget(self.summary, 1)
         left.addLayout(head)
 
-        self.figure = Figure(figsize=(6.0, 3.6), dpi=100, facecolor="#FFFFFF")
-        self.canvas = FigureCanvas(self.figure)
-        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        left.addWidget(self.canvas, 1)
+        if Figure is not None and FigureCanvas is not None:
+            self.figure = Figure(figsize=(6.0, 3.6), dpi=100, facecolor="#FFFFFF")
+            self.canvas = FigureCanvas(self.figure)
+            self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            left.addWidget(self.canvas, 1)
+        else:
+            self.figure = None
+            self.canvas = None
+            missing = QtWidgets.QLabel(
+                "缺少绘图依赖，本页暂不可用。\n"
+                f"matplotlib 加载失败：{MPL_ERROR}\n"
+                "安装后重启助手即可：pip install matplotlib"
+            )
+            missing.setWordWrap(True)
+            missing.setAlignment(QtCore.Qt.AlignCenter)
+            missing.setStyleSheet("color:#8B1A1A;font-size:12px;background:#FAFAF8;")
+            left.addWidget(missing, 1)
         root.addLayout(left, 3)
 
         # ---- 右：表格与参数
@@ -225,6 +247,9 @@ class ProcessPanel(QtWidgets.QWidget):
 
     # ---- 绘制
     def render_result(self, result, array: np.ndarray) -> None:
+        if self.figure is None or self.canvas is None:
+            self.summary.setText("未安装 matplotlib，无法绘图")
+            return
         self.figure.clear()
         ax_img = self.figure.add_subplot(1, 2, 1)
         ax_mask = self.figure.add_subplot(1, 2, 2)

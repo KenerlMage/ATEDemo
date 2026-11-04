@@ -2,7 +2,7 @@
   "source": "local",
   "channel": "demo",
   "remote_url": "",
-  "updated_at": "2026-10-31 18:00:00",
+  "updated_at": "2026-11-04 09:49:11",
   "note": "本次为演示：货架清单与安装包均随程序本地持有（assistant_shelf/catalog.json 与 packages/），等价于远端服务下发的结果；接入远端时把 catalog 的来源替换为接口返回即可。",
   "items": [
     {
@@ -89,6 +89,24 @@
       "release_note": "新增常数 XML 一并归集；打包支持分卷；修复中文路径下压缩失败。",
       "published_at": "2026-10-15 10:05:00",
       "size_hint": "6 KB"
+    },
+    {
+      "id": "camera-assistant",
+      "name": "工业相机助手",
+      "version": "1.0.0",
+      "vendor": "ATE 装备组",
+      "summary": "相机参数与曝光控制 + 光斑检测，独立窗口运行",
+      "description": "独立桌面程序（非网页内嵌）：相机参数与曝光控制一页、图像处理与光斑数据一页，全工程流式取图；无相机时走内置仿真源。",
+      "tags": [
+        "机器视觉",
+        "Basler pylon",
+        "光斑检测",
+        "独立进程"
+      ],
+      "requires": "Windows 10/11 · PySide6 或 PySide2 · numpy · matplotlib · 可选 pypylon 8.0",
+      "release_note": "首个版本：双流程窗口（相机调试 / 图像处理）、仿真源、27 项单元测试通过。",
+      "published_at": "2026-11-04 09:49:11",
+      "size_hint": "86 KB"
     }
   ]
 }

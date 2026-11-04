@@ -1,0 +1,18 @@
+{
+  "id": "camera-assistant",
+  "name": "工业相机助手",
+  "version": "1.0.0",
+  "vendor": "ATE 装备组",
+  "summary": "相机参数与曝光控制 + 光斑检测，独立窗口运行",
+  "description": "以 PySide2 API 编写的独立桌面程序（运行期回退 PySide6），不依赖浏览器页面：左栏设定相机分辨率、帧率、曝光、增益与像素格式并流式取图；右栏做阈值分割、光斑标注与面积/峰值/饱和统计，结果以表格呈现并可导出。不进入 TPS 主流程，不改测试基线。",
+  "tags": [
+    "机器视觉",
+    "Basler pylon",
+    "光斑检测",
+    "独立进程"
+  ],
+  "requires": "Windows 10/11 · Python 3.10+ · PySide6 或 PySide2 · numpy · matplotlib · 可选 pypylon 8.0",
+  "entry": "start.bat",
+  "icon": "icon.png",
+  "published_at": "2026-11-04 09:49:11"
+}

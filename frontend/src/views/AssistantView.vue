@@ -9,7 +9,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
-import CameraPanel from '../components/CameraPanel.vue'
 
 const loading = ref(true)
 const error = ref('')
@@ -204,10 +203,26 @@ async function launchAssistant(t) {
   }
 }
 
+/* 内置卡片 -> 货架独立进程助手的映射：相机不再网页内嵌，改为启动独立窗口 */
+const SHELF_BY_TOOL = { 'camera-basler': 'camera-assistant' }
+
+async function launchShelfById(id) {
+  try {
+    const res = await api.launchAssistant(id)
+    if (!res || res.success === false) throw new Error((res && res.message) || '启动失败')
+    flash('已在独立窗口启动助手')
+    await loadShelf()
+  } catch (e) {
+    flash(`启动失败：${e.message}。若尚未下载，请到「货架」下载「工业相机助手」`, 'warn')
+  }
+}
+
 function runSelected() {
   const t = tool.value
   if (!t) { flash('请先点选一张工具卡片', 'warn'); return }
   if (!t.available) { flash(`「${t.name}」尚在规划中，请先使用数字示波器`, 'warn'); return }
+  const shelfId = SHELF_BY_TOOL[t.id]
+  if (shelfId) { launchShelfById(shelfId); return }
   if (t.source === 'shelf') { launchAssistant(t); return }
   running.value = t.id
   if (t.id === 'oscilloscope') {
@@ -519,9 +534,6 @@ const MEAS_LABEL = {
         </article>
       </div>
     </section>
-
-    <!-- 工业相机工作区（Basler pylon 8.0.0） -->
-    <CameraPanel v-if="running === 'camera-basler'" @close="running = ''" />
 
     <!-- 示波器工作区 -->
     <section v-if="running === 'oscilloscope'" class="work">
