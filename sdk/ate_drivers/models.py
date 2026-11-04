@@ -60,6 +60,16 @@ class DeviceConfig:
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "DeviceConfig":
+        # 容错：Runner 的设备档案模型是 dataclass，外部也可能直接传 sqlite3.Row。
+        if isinstance(data, cls):
+            return data
+        if data is not None and not isinstance(data, dict):
+            if hasattr(data, "keys"):
+                data = {k: data[k] for k in data.keys()}
+            elif hasattr(data, "__dict__"):
+                data = dict(vars(data))
+            else:
+                data = {}
         d = dict(data or {})
         return cls(
             bench_id=str(d.get("bench_id") or ""),

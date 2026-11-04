@@ -13,6 +13,7 @@ from .scpi import (  # noqa: F401
     MotionDriver,
     PsuDriver,
 )
+from .power_meter import PowerMeterDriver  # noqa: F401
 from .util import stable_ratio  # noqa: F401
 
 __all__ = [
@@ -22,5 +23,6 @@ __all__ = [
     "ELoadDriver",
     "AwgDriver",
     "MotionDriver",
+    "PowerMeterDriver",
     "stable_ratio",
 ]
