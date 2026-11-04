@@ -42,11 +42,11 @@ def test_configure_is_atomic_on_invalid_input():
     """非法尺寸抛错，但已有参数保持不变（历史缺陷：setup 被写成 4x480）"""
     cam = make_camera()
     cam.open()
-    before = dict(cam.setup)
+    before = dict(cam.setup_map)
     with pytest.raises(DriverError):
         cam.configure(width=4)
-    assert cam.setup["width"] == before["width"]
-    assert cam.setup["height"] == before["height"]
+    assert cam.setup_map["width"] == before["width"]
+    assert cam.setup_map["height"] == before["height"]
     cam.close()
 
 

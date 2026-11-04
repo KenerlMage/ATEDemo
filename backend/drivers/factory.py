@@ -21,6 +21,7 @@ from .models import DeviceConfig
 from .camera import CameraDriver
 from .discovery import scan as _scan_drivers
 from .scope import ScopeDriver
+from .sdk_bridge import sdk_driver_class, sdk_status
 from .scpi import AwgDriver, DmmDriver, ELoadDriver, GenericScpiDriver, MotionDriver, PsuDriver
 
 # 受控设备类型清单。key 同时是注册记录中的 device_type 与 driver_key。
@@ -30,7 +31,7 @@ _BUILTIN_TYPES: list[dict] = [
         "key": "tektronix-mso5",
         "family": "scope",
         "label": "数字示波器 · 泰克 MSO5 系列",
-        "cls": ScopeDriver,
+        "cls": sdk_driver_class("ate_drivers.vendors.tektronix_mso.driver:TekMsoScope", "scope", ScopeDriver),
         "description": "泰克 MSO5/DPO5 系列，LAN 或串口",
     },
     {
@@ -72,14 +73,14 @@ _BUILTIN_TYPES: list[dict] = [
         "key": "basler-pylon",
         "family": "camera",
         "label": "工业相机 · Basler pylon 8.0.0",
-        "cls": CameraDriver,
+        "cls": sdk_driver_class("ate_drivers.vendors.basler_pylon.driver:BaslerPylonCamera", "camera", CameraDriver),
         "description": "Basler GigE / USB3 相机，pylon 8.0.0（pypylon，惰性加载）",
     },
     {
         "key": "passive-device",
         "family": "passive",
         "label": "被动设备（无通讯）",
-        "cls": PassiveDriver,
+        "cls": sdk_driver_class("ate_drivers.base:PassiveDriver", "passive", PassiveDriver),
         "description": "夹具、工装、手动设备等无通讯对象",
     },
     {

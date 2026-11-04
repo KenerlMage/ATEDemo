@@ -221,12 +221,17 @@ class CameraSession:
 
     def configure(self, params: dict) -> dict:
         clean = {k: v for k, v in (params or {}).items() if v is not None and v != ""}
-        res = self.driver.configure(**clean)
-        return res
+        # 亮度与噪声保留 Runner 侧「夹取而非报错」的既有约定：前端滑块可能越界，
+        # 静默夹取比抛错更符合现场操作习惯；其余参数仍由驱动严格校验。
+        if "level" in clean:
+            clean["level"] = max(0, min(255, int(clean["level"])))
+        if "noise" in clean:
+            clean["noise"] = max(0.0, float(clean["noise"]))
+        return self.driver.configure(**clean)
 
     def exposure(self, exposure_us: Optional[float] = None, scale: Optional[float] = None,
                  auto: Optional[str] = None) -> dict:
-        setup = dict(self.driver.setup)
+        setup = dict(self.driver.setup_map)
         if exposure_us is not None:
             setup["exposure_us"] = _clamp_exposure(exposure_us)
         if scale is not None:
@@ -244,14 +249,14 @@ class CameraSession:
             或相机自身处于自动曝光/增益闭环），此时保留原曝光，不做无效拉高。
         """
         target = max(1.0, min(254.0, float(target)))
-        original = float(self.driver.setup["exposure_us"])
+        original = float(self.driver.setup_map["exposure_us"])
         trace = []
         converged = responsive = False
         prev_mean = None
         for i in range(max(1, min(10, int(max_rounds)))):
             stats = self.driver.stats()["value"]
             mean = float(stats.get("mean") or 0.0)
-            cur = float(self.driver.setup["exposure_us"])
+            cur = float(self.driver.setup_map["exposure_us"])
             trace.append({"round": i + 1, "exposure_us": round(cur, 1), "mean": round(mean, 2)})
             if prev_mean is not None and abs(mean - prev_mean) < 0.5:
                 responsive = False
@@ -272,10 +277,10 @@ class CameraSession:
         elif not self.driver.simulate:
             self.exposure(auto="Continuous")         # 真机交给相机内部闭环
         final = self.driver.stats()["value"]
-        trace.append({"round": len(trace) + 1, "exposure_us": round(float(self.driver.setup["exposure_us"]), 1),
+        trace.append({"round": len(trace) + 1, "exposure_us": round(float(self.driver.setup_map["exposure_us"]), 1),
                       "mean": round(float(final.get("mean") or 0.0), 2)})
         return {"target": target, "trace": trace, "converged": converged, "responsive": responsive,
-                "final_exposure_us": round(float(self.driver.setup["exposure_us"]), 1),
+                "final_exposure_us": round(float(self.driver.setup_map["exposure_us"]), 1),
                 "final_mean": round(float(final.get("mean") or 0.0), 2)}
 
     # ---------------- 采集与落盘 ----------------
@@ -297,8 +302,8 @@ class CameraSession:
             "width": int(value.get("width") or 0),
             "height": int(value.get("height") or 0),
             "pixel_format": str(value.get("pixel_format") or ""),
-            "exposure_us": round(float(self.driver.setup["exposure_us"]), 1),
-            "gain_db": self.driver.setup.get("gain_db"),
+            "exposure_us": round(float(self.driver.setup_map["exposure_us"]), 1),
+            "gain_db": self.driver.setup_map.get("gain_db"),
             "sha256": value.get("sha256", ""),
             "stats": value.get("stats") or {},
             "at": _now(),
@@ -543,7 +548,7 @@ def register_routes(app: FastAPI, base_dir: Path) -> None:
             if req.exposure_us is None and req.scale is None and not req.auto:
                 return _err("请给出曝光时间、曝光倍数或自动曝光档位")
             sess.exposure(exposure_us=req.exposure_us, scale=req.scale, auto=req.auto or None)
-            cur = float(sess.driver.setup["exposure_us"])
+            cur = float(sess.driver.setup_map["exposure_us"])
             msg = f"曝光时间已设为 {cur:.0f} µs"
             if req.auto:
                 msg += f"，自动曝光 {req.auto}"

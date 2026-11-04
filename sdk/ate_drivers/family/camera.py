@@ -30,7 +30,7 @@ import random
 import struct
 import time
 import zlib
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace
 from pathlib import Path
 from typing import Any, Optional
 
@@ -539,8 +539,12 @@ class CameraDriver(InstrumentDriver):
     # ------------------------------------------------------------ 动作：配置
 
     def configure(self, **params: Any) -> dict:
-        changed = self.setup.merge(**params)
-        self.setup.validate()
+        # 原子提交：先在副本上合并与校验，通过后才替换当前配置，
+        # 避免非法参数把会话状态改成半新半旧（历史缺陷：width 被写成 4）。
+        candidate = replace(self.setup)
+        changed = candidate.merge(**params)
+        candidate.validate()
+        self.setup = candidate
         warnings = self._apply(self.setup) if not self.simulate else []
         if warnings:
             self.warnings.extend(warnings)

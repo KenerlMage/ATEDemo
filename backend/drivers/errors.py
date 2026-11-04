@@ -1,24 +1,39 @@
 # -*- coding: utf-8 -*-
-"""驱动层异常定义（全部继承 DriverError，方便上层统一兜底）"""
+"""驱动层异常：唯一真源在 ``sdk/ate_drivers/errors.py``。
+
+驱动实现统一走 SDK 之后，异常类型也必须唯一，否则 ``except DriverError``
+在本模块捕获不到 SDK 抛出的 ``ConfigurationError`` / ``TransportError``。
+本文件只做重新导出，并保持历史模块路径 ``drivers.errors`` 可用。
+"""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 
-class DriverError(Exception):
-    """驱动层通用异常（配置错误、协议错误、仪器返回异常等）"""
+_ROOT = Path(__file__).resolve().parents[2]
+_SDK = _ROOT / "sdk"
+if _SDK.is_dir() and str(_SDK) not in sys.path:
+    sys.path.insert(0, str(_SDK))
 
-    def __init__(self, message: str, *, device_id: str = "", detail: str = ""):
-        super().__init__(message)
-        self.device_id = device_id
-        self.detail = detail
+from ate_drivers.errors import (  # noqa: E402,F401
+    ConfigurationError,
+    ContractMismatch,
+    DriverError,
+    DriverNotFound,
+    DriverTimeout,
+    ProtocolError,
+    TransportError,
+    UnsupportedCapability,
+)
 
-    def to_dict(self) -> dict:
-        return {"error": str(self), "device_id": self.device_id, "detail": self.detail}
-
-
-class DriverNotFound(DriverError):
-    """注册库里找不到可用的驱动实现 / 设备未登记"""
-
-
-class TransportError(DriverError):
-    """链路层错误：连不上、超时、写失败、串口打不开"""
+__all__ = [
+    "DriverError",
+    "ConfigurationError",
+    "DriverNotFound",
+    "DriverTimeout",
+    "TransportError",
+    "ProtocolError",
+    "UnsupportedCapability",
+    "ContractMismatch",
+]
