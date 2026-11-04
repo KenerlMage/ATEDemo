@@ -53,7 +53,7 @@
 | 层 | 目录 / 文件 | 职责 | 不许做 |
 | --- | --- | --- | --- |
 | 门面 | `api/instruments.py` · `api/camera.py` | 校验参数、挑模式（真机/仿真）、核对型号、把结果整理成用户友好的结构 | 不许出现任何仪器命令字样 |
-| 装配 | `assembly/registry.py` · `assembly/cameras.py` | 型号归一化、登记、精确派发、别名、注册表自检、`open_scope()` / `open_camera()` | 不许打分、不许模糊匹配、不许兜底驱动 |
+| 装配 | `assembly/scopes.py` · `assembly/cameras.py` · `assembly/devices.py` | 型号归一化、登记、精确派发、注册表自检、`open_scope()` / `open_camera()`；`devices` 负责别名 → 档案 → 句柄 | 不许打分、不许模糊匹配、不许兜底驱动；设备簿不连数据库 |
 | 家族 | `families/<家族>.py` · `families/generic/` | 动作定义、参数单位、测量算法、仿真基线、命令表契约、安全退出 | 不许出现具体品牌的命令拼写；`generic/` 只收「动作 ≤6 且无需特化」的简化家族 |
 | 厂商包 | `vendors/<厂商>/` | 命令表、应答前导解析、量纲缩放、枚举映射、仿真模型；**厂商 SDK 只在这里出现** | 不许改动作名、不许改返回结构、不许 import 其它厂商包 |
 | 驱动基类 | `base.py` | 会话生命周期、动作分发、能力校验、`TRANSPORT_FACTORY` 链路工厂钩子 | 不许依赖家族及以上任何东西 |
@@ -245,7 +245,56 @@ R&S 的实现（`vendors/rohde_schwarz_mxo/rs_link.py`）：
 > `RsInstrument` 已收录进 `kit/conformance.py` 的 `OPTIONAL_RUNTIME`，L3 顶层 import 它
 > 不判"偷偷引入第三方依赖"；实现上仍用函数内惰性 import，缺包时由驱动降级。
 
-## 8. 版本与兼容
+## 8. 设备簿与别名（多台同型号）
+
+一台台架挂两台同型号设备是常态：两块 MSO54、两台同型号相机。**型号派发只能回答
+"用哪个驱动"，回答不了"哪一台"**。所以型号之外还得有一层别名。
+
+三种身份，各管一件事：
+
+| 概念 | 存在哪 | 作用 |
+| --- | --- | --- |
+| 别名 | `device_registry.device_id` | 现场叫法，用例里唯一的凭据 |
+| 型号 | `device_registry.model` | 派发到哪个驱动类 |
+| 连接参数 | `host` / `port` / `serial_port` / `interface` …… | 怎么连上这一台 |
+
+别名与连接参数**一起存在数据库**，由后端 / Runner 读出来灌进 SDK；SDK 自己
+不连库、不读配置文件路径。
+
+```python
+from ate_drivers import connect, load_devices
+
+load_devices(rows)          # rows 来自 device_registry：dict / sqlite3.Row / dataclass 都收
+
+def test_rise_time():
+    scope = connect("scope_main")     # 别名 → 档案 → 句柄
+    aux = connect("scope_aux")        # 同型号的另一台，各连各的端口
+    ...
+```
+
+约定：
+
+* 同一别名重复 `connect` 返回**同一个句柄**；`disconnect(alias)` 之后才重建。
+  换机、掉线重连用 `connect(alias, refresh=True)`。
+* `name` 与 `device_id` 不同时，`name` 也当别名（现场常直接说"主示波器"）。
+* 别名跨台架重名时用 `connect(alias, bench_id="...")` 指定；不指定就报错，不猜。
+* 家族由 `category` / `role` / `extra.device_type` 判定；新增设备类型只需
+  `register_family("psu", opener)`，设备簿不认识具体家族。
+* 未登记别名 → `DriverNotFound`，提示里会列出当前可用别名。
+
+命名一律对称，方便照着抄：
+
+| 家族 | 文件 | 注册 | 派发类 | 打开 |
+| --- | --- | --- | --- | --- |
+| 示波器 | `assembly/scopes.py` | `register_scope_model` / `register_scope_driver` | `scope_class` | `open_scope` |
+| 相机 | `assembly/cameras.py` | `register_camera_model` / `register_camera_driver` | `camera_class` | `open_camera` |
+| 设备簿 | `assembly/devices.py` | `register_device` / `register_family` | — | `connect` |
+
+`scope_models()` / `camera_models()`、`scope_entries()` / `camera_entries()`、
+`scope_self_check()` / `camera_self_check()` 全部同名同义。以后加电源、电子负载、
+运动台，照抄一份 `xxx.py` 就是完整的一套。
+
+## 9. 版本与兼容
 
 | 常量 | 值 | 作用 |
 | --- | --- | --- |
@@ -259,7 +308,7 @@ R&S 的实现（`vendors/rohde_schwarz_mxo/rs_link.py`）：
 
 兼容规则：**动作只增不改**；改语义必须先加新动作并把旧的写进 `DEPRECATIONS`；`min_platform` 声明平台最低版本，`check_compatible()` 在加载阶段就拒绝不兼容的包（报 `E_CONTRACT`）。
 
-## 9. 上架门禁（19 项）
+## 10. 上架门禁（19 项）
 
 `python -m ate_drivers.kit.cli check <驱动包>` 会逐项跑下面 19 条。**门禁不绿，不准上架。**
 
@@ -276,7 +325,7 @@ R&S 的实现（`vendors/rohde_schwarz_mxo/rs_link.py`）：
 | C09 | 错误可分类 | C18 | 连接方式可声明 |
 | C19 | 传输后端可声明（`native` / `visa`） | | |
 
-## 10. 与平台侧的关系
+## 11. 与平台侧的关系
 
 平台侧（`D:\ATE\backend\drivers/`）是**另一套实现**，两者通过「型号 + 清单」对齐：
 
@@ -299,7 +348,7 @@ spec = resolve_spec(device_model, specs)      # 未登记 → 抛错，不猜
 driver_cls = load_entry(spec["entry"], spec["_base_dir"])
 ```
 
-## 11. 设计取舍
+## 12. 设计取舍
 
 | 取舍 | 选择了 | 代价 / 换来什么 |
 | --- | --- | --- |

@@ -31,6 +31,8 @@
     python -m ate_drivers.kit.cli models           # 看已登记型号
 """
 
+#: 设备簿（别名 → 档案 → 句柄）在 ``assembly.devices``：
+#: 同型号多台设备靠别名区分，用例侧用 ``connect("scope_main")`` 取句柄。
 from .core.capabilities import KNOWN_CAPABILITIES, Capability  # noqa: F401
 from .core.contract import (  # noqa: F401
     API_VERSION,
@@ -87,7 +89,33 @@ from .assembly.cameras import (  # noqa: F401
 )
 from .api.camera import Camera  # noqa: F401
 from .api import Scope  # noqa: F401
-from .assembly.registry import driver_class, entries, models, open_scope, self_check  # noqa: F401
+from .assembly.scopes import (  # noqa: F401
+    open_scope,
+    register_scope_driver,
+    register_scope_model,
+    scope_aliases,
+    scope_class,
+    scope_entries,
+    scope_entry,
+    scope_models,
+    scope_self_check,
+    scope_vendors,
+    unregister_scope_driver,
+)
+from .assembly.devices import (  # noqa: F401
+    connect,
+    device_aliases,
+    device_config,
+    disconnect,
+    disconnect_all,
+    handle_of,
+    handles,
+    load_devices,
+    register_device,
+    register_family,
+    registered_families,
+    unload_devices,
+)
 
 __version__ = "1.2.0"
 
@@ -145,10 +173,10 @@ __all__ = [
     "Waveform",
     "check_compatible",
     "deprecated",
-    "driver_class",
+    "scope_class",
     "backends_of",
     "endpoint_from",
-    "entries",
+    "scope_entries",
     "normalize_backend",
     "resolve_backend",
     "set_visa_factory",
@@ -160,7 +188,29 @@ __all__ = [
     "make_transport",
     "normalize_interface",
     "set_serial_factory",
-    "models",
+    "scope_models",
     "open_scope",
-    "self_check",
+    "scope_self_check",
+    "camera_aliases",
+    "camera_self_check",
+    "camera_vendors",
+    "register_camera_model",
+    "register_scope_driver",
+    "register_scope_model",
+    "scope_aliases",
+    "scope_entry",
+    "scope_vendors",
+    "unregister_scope_driver",
+    "connect",
+    "device_aliases",
+    "device_config",
+    "disconnect",
+    "disconnect_all",
+    "handle_of",
+    "handles",
+    "load_devices",
+    "register_device",
+    "register_family",
+    "registered_families",
+    "unload_devices",
 ]

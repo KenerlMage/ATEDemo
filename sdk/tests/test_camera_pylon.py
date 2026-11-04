@@ -44,7 +44,7 @@ def test_capabilities_cover_family_baseline():
 def test_factory_registers_every_declared_model():
     for model in BaslerPylonCamera.MODELS:
         assert camera_factory.camera_class(model) is BaslerPylonCamera
-    assert camera_factory.self_check()["ok"], camera_factory.self_check()["problems"]
+    assert camera_factory.camera_self_check()["ok"], camera_factory.camera_self_check()["problems"]
 
 
 def test_alias_dispatches_to_basler():

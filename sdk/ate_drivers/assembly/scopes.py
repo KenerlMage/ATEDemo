@@ -10,7 +10,7 @@
 **登记新型号**（平台代码不动）
 
 1. 厂商包 `driver.py` 声明 `MODELS = ("MXO44",)`；
-2. 厂商包 `driver.json` 的 `models` 列表写同一组型号（上架门禁 C17 会校验两处一致）；
+2. 厂商包 `driver.json` 的 `scope_models` 列表写同一组型号（上架门禁 C17 会校验两处一致）；
 3. `ate_drivers.vendors.VENDORS` 里挂上驱动类（内置包）或放进 `<ATE>/drivers` 由清单扫描加载。
 
 两家示波器都是**网口（LAN）**型号：连接参数只有 `host` 与 `port`。
@@ -50,7 +50,7 @@ class _Reg:
         self.alias_of = alias_of
         self.source = source
 
-    def describe(self) -> dict:
+    def scope_describe(self) -> dict:
         cls = self.cls
         return {
             "model": self.model,
@@ -78,7 +78,7 @@ def _entry_of(cls: Any) -> str:
     return "%s:%s" % (getattr(cls, "__module__", ""), getattr(cls, "__name__", ""))
 
 
-def register_model(model: str, cls: Any, *, replace: bool = False, alias_of: str = "",
+def register_scope_model(model: str, cls: Any, *, replace: bool = False, alias_of: str = "",
                    source: str = "builtin") -> str:
     """登记一个型号（幂等：同一型号同一驱动重复登记不报错）"""
     key = normalize_model(model)
@@ -94,10 +94,10 @@ def register_model(model: str, cls: Any, *, replace: bool = False, alias_of: str
     return key
 
 
-def register_driver(cls: Any, models: Optional[Iterable[str]] = None,
+def register_scope_driver(cls: Any, models: Optional[Iterable[str]] = None,
                     aliases: Iterable[str] = (), *, replace: bool = False,
                     source: str = "builtin") -> list[str]:
-    """把一个驱动类登记到它声明的全部型号（`models` 缺省取类属性 `MODELS`）
+    """把一个驱动类登记到它声明的全部型号（`scope_models` 缺省取类属性 `MODELS`）
 
     别名取类属性 `MODEL_ALIASES`（**不是** `ALIASES`——那是家族层的动作别名表）。
     """
@@ -107,13 +107,13 @@ def register_driver(cls: Any, models: Optional[Iterable[str]] = None,
         raise ConfigurationError(
             "驱动 %s 没有声明 MODELS" % getattr(cls, "driver_key", cls),
             detail="型号派发要求每个驱动显式列出它支持的型号（上架门禁 C17）")
-    keys = [register_model(m, cls, replace=replace, source=source) for m in listed]
+    keys = [register_scope_model(m, cls, replace=replace, source=source) for m in listed]
     for a in aliases:
-        keys.append(register_model(a, cls, replace=replace, alias_of=str(listed[0]), source=source))
+        keys.append(register_scope_model(a, cls, replace=replace, alias_of=str(listed[0]), source=source))
     return keys
 
 
-def unregister_driver(cls: Any) -> int:
+def unregister_scope_driver(cls: Any) -> int:
     """注销一个驱动类登记的全部型号（测试/热插拔用）"""
     gone = [k for k, r in _registry.items() if r.cls is cls]
     for k in gone:
@@ -121,12 +121,12 @@ def unregister_driver(cls: Any) -> int:
     return len(gone)
 
 
-def driver_class(model: Any) -> Type[Any]:
+def scope_class(model: Any) -> Type[Any]:
     """按型号派发驱动类；未登记则列出已登记型号（**不猜、不兜底**）"""
     key = normalize_model(model)
     reg = _registry.get(key)
     if reg is None:
-        known = ", ".join(models()) or "(空)"
+        known = ", ".join(scope_models()) or "(空)"
         raise DriverNotFound(
             "未登记的示波器型号：%r" % (model,),
             detail="已登记型号：%s —— 型号派发不做模糊匹配，请在设备档案里写确定的型号，"
@@ -134,31 +134,31 @@ def driver_class(model: Any) -> Type[Any]:
     return reg.cls
 
 
-def entry_for(model: Any) -> dict:
+def scope_entry(model: Any) -> dict:
     """型号 → 注册项摘要（含官方型号名与 entry）"""
     key = normalize_model(model)
     reg = _registry.get(key)
     if reg is None:
-        driver_class(model)  # 复用同一套报错
-    return reg.describe()
+        scope_class(model)  # 复用同一套报错
+    return reg.scope_describe()
 
 
-def models() -> tuple:
+def scope_models() -> tuple:
     """已登记的**正式**型号（不含别名），按字母序"""
     return tuple(sorted(r.model for r in _registry.values() if not r.alias_of))
 
 
-def aliases() -> dict:
+def scope_aliases() -> dict:
     """别名 → 正式型号"""
     return {r.model: r.alias_of for r in _registry.values() if r.alias_of}
 
 
-def entries() -> list:
+def scope_entries() -> list:
     """注册表全量摘要（前端「驱动库」页 / 设备档案型号下拉框用）"""
-    return [r.describe() for r in sorted(_registry.values(), key=lambda r: (r.alias_of != "", r.model))]
+    return [r.scope_describe() for r in sorted(_registry.values(), key=lambda r: (r.alias_of != "", r.model))]
 
 
-def vendors() -> tuple:
+def scope_vendors() -> tuple:
     """已登记的厂商名（去重保序）"""
     seen, out = set(), []
     for r in _registry.values():
@@ -169,10 +169,10 @@ def vendors() -> tuple:
     return tuple(out)
 
 
-def describe() -> str:
+def scope_describe() -> str:
     """人读摘要（CLI / 排查用）"""
-    lines = ["型号注册表（共 %d 个型号）:" % len(models())]
-    for e in entries():
+    lines = ["型号注册表（共 %d 个型号）:" % len(scope_models())]
+    for e in scope_entries():
         tag = "（别名 → %s）" % e["alias_of"] if e["alias_of"] else ""
         lines.append("  %-12s %s%s" % (e["model"], e["label"] or e["driver"], tag))
         lines.append("  %-12s 厂商 %s · 驱动 %s v%s · 连接方式 %s · 仿真 %s"
@@ -182,11 +182,11 @@ def describe() -> str:
     return "\n".join(lines)
 
 
-def self_check() -> dict:
+def scope_self_check() -> dict:
     """注册表自检：型号唯一、接口一致、型号与清单一致（CI / 门禁用）"""
     problems = []
     seen: dict = {}
-    for e in entries():
+    for e in scope_entries():
         key = normalize_model(e["model"])
         if key in seen and not e["alias_of"]:
             problems.append("型号重复：%s" % e["model"])
@@ -208,7 +208,7 @@ def self_check() -> dict:
             problems.append("%s 没有声明型号" % e["driver"])
         if e["alias_of"] and normalize_model(e["alias_of"]) not in _registry:
             problems.append("%s 的别名指向不存在的型号 %s" % (e["model"], e["alias_of"]))
-    return {"ok": not problems, "models": len(models()), "aliases": len(aliases()),
+    return {"ok": not problems, "scope_models": len(scope_models()), "scope_aliases": len(scope_aliases()),
             "problems": problems}
 
 
@@ -257,7 +257,7 @@ def _register_builtin() -> tuple:
     """把内置厂商包自动登记进注册表（导入时执行一次）"""
     from ..vendors import DRIVERS
     for cls in DRIVERS:
-        register_driver(cls, source="builtin")
+        register_scope_driver(cls, source="builtin")
     return DRIVERS
 
 
@@ -269,17 +269,17 @@ __all__ = [
     "INTERFACE_SERIAL",
     "SUPPORTED_BACKENDS",
     "SUPPORTED_INTERFACES",
-    "aliases",
-    "describe",
-    "driver_class",
-    "entries",
-    "entry_for",
-    "models",
+    "scope_aliases",
+    "scope_describe",
+    "scope_class",
+    "scope_entries",
+    "scope_entry",
+    "scope_models",
     "normalize_model",
     "open_scope",
-    "register_driver",
-    "register_model",
-    "self_check",
-    "unregister_driver",
-    "vendors",
+    "register_scope_driver",
+    "register_scope_model",
+    "scope_self_check",
+    "unregister_scope_driver",
+    "scope_vendors",
 ]

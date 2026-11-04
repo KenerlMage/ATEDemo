@@ -14,4 +14,4 @@
 from .camera import Camera  # noqa: F401
 from .instruments import Scope  # noqa: F401
 from ..assembly.cameras import open_camera  # noqa: F401  装配层实现，门面统一出口
-from ..assembly.registry import open_scope  # noqa: F401  同上
+from ..assembly.scopes import open_scope  # noqa: F401  同上

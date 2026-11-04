@@ -72,10 +72,10 @@ class Scope:
         if not model:
             raise ConfigurationError("必须指定示波器型号",
                                     detail="型号来自设备档案的 model 字段（数据库设备表）")
-        from ..assembly import registry as factory
+        from ..assembly import scopes as factory
 
-        self._entry = factory.entry_for(model)          # 未登记会在这一步直接报错
-        self._cls = factory.driver_class(model)
+        self._entry = factory.scope_entry(model)          # 未登记会在这一步直接报错
+        self._cls = factory.scope_class(model)
         self._model = self._entry["model"]
         self._supported = tuple(self._entry.get("interfaces") or ())
         self._endpoint = endpoint if endpoint is not None else endpoint_from(
@@ -370,7 +370,7 @@ class Scope:
 
     def _check_model(self) -> None:
         """核对设备回读型号与登记型号（防"档案型号写错、连上了别的机器"）"""
-        from ..assembly import registry as factory
+        from ..assembly import scopes as factory
 
         info = self.identity()
         actual = info.get("model") or ""

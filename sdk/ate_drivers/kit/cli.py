@@ -244,8 +244,8 @@ def cmd_models(args) -> int:
     """打印平台已登记型号（型号派发依据），可选按目录合并已装驱动包"""
     from ..assembly import registry as factory
 
-    print(factory.describe())
-    check = factory.self_check()
+    print(factory.scope_describe())
+    check = factory.scope_self_check()
     print("注册表自检：%s（型号 %d · 别名 %d）"
           % ("通过" if check["ok"] else "不通过", check["models"], check["aliases"]))
     for p in check["problems"]:

@@ -4,7 +4,7 @@
 与示波器注册表（`factory.py`）**分开维护**，原因有二：
 
 1. 相机的连接方式不是 `LAN` / `SERIAL`，而是 `USB3` / `GigE`；混进示波器的门禁
-   会互相误判（`self_check` 会报「连接方式不在支持范围」）；
+   会互相误判（`camera_self_check` 会报「连接方式不在支持范围」）；
 2. 相机没有「端口」概念，选机靠**序列号 / 用户自定义名 / 序号**，端点模型不同。
 
 两者的共同原则完全一致：**不做打分、不做模糊匹配**。型号查不到就报错并列出
@@ -43,7 +43,7 @@ class _Entry:
         self.alias_of = alias_of
         self.source = source
 
-    def describe(self) -> dict:
+    def camera_describe(self) -> dict:
         cls = self.cls
         return {
             "model": self.model,
@@ -124,7 +124,7 @@ def camera_entry(model: Any) -> dict:
     entry = _registry.get(key)
     if entry is None:
         camera_class(model)  # 复用同一套报错
-    return entry.describe()
+    return entry.camera_describe()
 
 
 def camera_models() -> tuple:
@@ -136,7 +136,7 @@ def camera_aliases() -> dict:
 
 
 def camera_entries() -> list:
-    return [e.describe() for e in sorted(_registry.values(), key=lambda x: (x.alias_of != "", x.model))]
+    return [e.camera_describe() for e in sorted(_registry.values(), key=lambda x: (x.alias_of != "", x.model))]
 
 
 def camera_vendors() -> tuple:
@@ -149,7 +149,7 @@ def camera_vendors() -> tuple:
     return tuple(out)
 
 
-def self_check() -> dict:
+def camera_self_check() -> dict:
     """注册表自检：型号唯一、连接方式合法、清单与类声明一致（CI / 门禁用）"""
     problems = []
     seen: dict = {}
@@ -176,7 +176,7 @@ def self_check() -> dict:
             "aliases": len(camera_aliases()), "problems": problems}
 
 
-def describe() -> str:
+def camera_describe() -> str:
     lines = ["相机型号注册表（共 %d 个型号）:" % len(camera_models())]
     for e in camera_entries():
         tag = "（别名 → %s）" % e["alias_of"] if e["alias_of"] else ""
@@ -224,11 +224,11 @@ __all__ = [
     "camera_entry",
     "camera_models",
     "camera_vendors",
-    "describe",
+    "camera_describe",
     "normalize_model",
     "open_camera",
     "register_camera_driver",
     "register_camera_model",
-    "self_check",
+    "camera_self_check",
     "unregister_camera_driver",
 ]

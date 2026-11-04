@@ -13,7 +13,7 @@ import re
 import pytest
 
 from ate_drivers import Scope, open_scope
-from ate_drivers.assembly import registry as factory
+from ate_drivers.assembly import scopes as factory
 from ate_drivers.core.errors import ConfigurationError, DriverError
 from ate_drivers.kit import run_conformance
 from ate_drivers.core.transport import VisaTransport, make_transport
@@ -98,23 +98,23 @@ def run_use_case(scope: Scope) -> dict:
 # ---------------------------------------------------------------- ① 型号派发（无打分）
 
 def test_registry_dispatches_by_exact_model():
-    assert "MSO54" in factory.models() and "MXO44" in factory.models()
-    assert factory.driver_class("MSO54") is TekMsoScope
-    assert factory.driver_class(" mso-54 ") is TekMsoScope        # 大小写/分隔符归一化
-    assert factory.driver_class("MXO4") is RsMxoScope             # 系列俗称作为别名登记
-    assert factory.driver_class("mxo44") is RsMxoScope
-    assert factory.entry_for("MXO44")["model"] == "MXO44"         # 拿回官方型号名
-    for e in factory.entries():
+    assert "MSO54" in factory.scope_models() and "MXO44" in factory.scope_models()
+    assert factory.scope_class("MSO54") is TekMsoScope
+    assert factory.scope_class(" mso-54 ") is TekMsoScope        # 大小写/分隔符归一化
+    assert factory.scope_class("MXO4") is RsMxoScope             # 系列俗称作为别名登记
+    assert factory.scope_class("mxo44") is RsMxoScope
+    assert factory.scope_entry("MXO44")["model"] == "MXO44"         # 拿回官方型号名
+    for e in factory.scope_entries():
         assert e["model"] and e["interface"] == "LAN"
         assert e["driver"] in ("tektronix-mso5", "rohde-schwarz-mxo4")
-    assert factory.self_check()["ok"], factory.self_check()["problems"]
+    assert factory.scope_self_check()["ok"], factory.scope_self_check()["problems"]
 
 
 def test_scoring_mechanism_is_gone():
     """打分选择机制已整体删除：没有权重、没有模糊匹配、没有兜底驱动"""
     for name in ("score_spec", "WEIGHTS", "SCOPE_SPECS", "GenericScope", "resolve_spec"):
         assert not hasattr(factory, name), name
-    assert "generic-scope" not in factory.models()
+    assert "generic-scope" not in factory.scope_models()
 
 
 def test_unknown_model_errors_with_available_list():
@@ -480,7 +480,7 @@ def test_driver_without_serial_rejects_serial_endpoint():
         INTERFACES = ("LAN",)
         MODELS = ("LAN-ONLY-1",)
 
-    factory.register_driver(LanOnly, models=("LAN-ONLY-1",), replace=True)
+    factory.register_scope_driver(LanOnly, models=("LAN-ONLY-1",), replace=True)
     try:
         with pytest.raises(ConfigurationError) as e:
             Scope("LAN-ONLY-1", serial_port=SERIAL_NAME, baudrate=115200)
@@ -489,7 +489,7 @@ def test_driver_without_serial_rejects_serial_endpoint():
                    verify_model=False) as sc:
             assert sc.interface == "LAN"
     finally:
-        factory.unregister_driver(LanOnly)
+        factory.unregister_scope_driver(LanOnly)
 
 
 def test_gate_c18_flags_missing_connection_declaration():
@@ -692,7 +692,7 @@ def test_driver_backends_declaration_is_enforced():
         BACKENDS = ("native",)
         MODELS = ("NATIVE-ONLY-1",)
 
-    factory.register_driver(NativeOnlyScope, source="test")
+    factory.register_scope_driver(NativeOnlyScope, source="test")
     try:
         ok = open_scope("NATIVE-ONLY-1", host=TEK_HOST, port=TEK_PORT,
                         transport=_recorder("MSO54"))
@@ -701,7 +701,7 @@ def test_driver_backends_declaration_is_enforced():
             open_scope("NATIVE-ONLY-1", host=TEK_HOST, port=TEK_PORT, backend="visa")
         assert "不支持 visa 后端" in str(e.value)
     finally:
-        factory.unregister_driver(NativeOnlyScope)
+        factory.unregister_scope_driver(NativeOnlyScope)
 
 
 def test_gate_c19_flags_missing_and_unknown_backend(tmp_path):
