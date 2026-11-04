@@ -187,7 +187,7 @@ pip install pyvisa               # 已有 NI-VISA / Keysight VISA 时只装 pyvi
 
 ```python
 from ate_drivers import open_scope
-from ate_drivers.errors import ConfigurationError, DriverTimeout, ProtocolError
+from ate_drivers.core.errors import ConfigurationError, DriverTimeout, ProtocolError
 
 try:
     with open_scope(device=row) as scope:

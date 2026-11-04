@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""驱动层异常：唯一真源在 ``sdk/ate_drivers/errors.py``。
+"""驱动层异常：唯一真源在 ``sdk/ate_drivers/core/errors.py``。
 
 驱动实现统一走 SDK 之后，异常类型也必须唯一，否则 ``except DriverError``
 在本模块捕获不到 SDK 抛出的 ``ConfigurationError`` / ``TransportError``。
@@ -16,7 +16,7 @@ _SDK = _ROOT / "sdk"
 if _SDK.is_dir() and str(_SDK) not in sys.path:
     sys.path.insert(0, str(_SDK))
 
-from ate_drivers.errors import (  # noqa: E402,F401
+from ate_drivers.core.errors import (  # noqa: E402,F401
     ConfigurationError,
     ContractMismatch,
     DriverError,

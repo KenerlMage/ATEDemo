@@ -21,10 +21,10 @@ from pathlib import Path
 import pytest
 
 from ate_drivers import Camera, open_camera
-from ate_drivers.capabilities import Capability, validate
-from ate_drivers.errors import ConfigurationError, DriverError, DriverNotFound
-from ate_drivers import camera_factory
-from ate_drivers.family.camera import CameraSetup, frame_stats, simulate_frame
+from ate_drivers.core.capabilities import Capability, validate
+from ate_drivers.core.errors import ConfigurationError, DriverError, DriverNotFound
+from ate_drivers.assembly import cameras as camera_factory
+from ate_drivers.families.camera import CameraSetup, frame_stats, simulate_frame
 from ate_drivers.vendors.basler_pylon.driver import BaslerPylonCamera
 
 MODEL = "acA1920-40gm"
@@ -190,7 +190,7 @@ def test_real_mode_without_pypylon_gives_actionable_error():
 
 def test_hook_contract_requires_vendor_implementation():
     """家族基类不实现真机钩子：漏实现时必须显式报错而不是静默通过"""
-    from ate_drivers.family.camera import CameraDriver
+    from ate_drivers.families.camera import CameraDriver
 
     cam = CameraDriver({"device_id": "X", "model": "generic"}, mode="real")
     with pytest.raises(NotImplementedError):

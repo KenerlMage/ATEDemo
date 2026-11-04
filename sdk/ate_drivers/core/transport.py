@@ -360,7 +360,7 @@ class SerialTransport(Transport):
         if factory is None:
             raise ConfigurationError("串口链路需要 pyserial（当前环境未安装）",
                                      detail="pip install pyserial，或调用 "
-                                            "ate_drivers.transport.set_serial_factory() 注入串口实现")
+                                            "ate_drivers.core.transport.set_serial_factory() 注入串口实现")
         try:
             self.port = factory(**p)
         except Exception as e:   # pyserial 的 SerialException 不是标准库异常，统一收口
@@ -492,7 +492,7 @@ class VisaTransport(Transport):
         if factory is None:
             raise ConfigurationError("VISA 后端需要 pyvisa（当前环境未安装）",
                                      detail="pip install pyvisa pyvisa-py；或调用 "
-                                            "ate_drivers.transport.set_visa_factory() 注入 VISA 会话实现")
+                                            "ate_drivers.core.transport.set_visa_factory() 注入 VISA 会话实现")
         try:
             self.session = factory(resource, self.timeout, self.attributes())
         except DriverError:
@@ -583,7 +583,7 @@ def make_transport(cfg=None, mode: str = "simulate", timeout: float = DEFAULT_TI
         if session_factory is None and visa_factory() is None:
             raise ConfigurationError("VISA 后端需要 pyvisa（当前环境未安装）",
                                      detail="pip install pyvisa pyvisa-py；或调用 "
-                                            "ate_drivers.transport.set_visa_factory() 注入 VISA 会话实现")
+                                            "ate_drivers.core.transport.set_visa_factory() 注入 VISA 会话实现")
         return VisaTransport(cfg, timeout=timeout, handler=handler,
                              session_factory=session_factory, resource=visa_resource)
     if used != NATIVE:

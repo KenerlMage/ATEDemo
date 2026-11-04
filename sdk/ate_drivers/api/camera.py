@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from .errors import ConfigurationError, DriverError
-from .models import DeviceConfig
+from ..core.errors import ConfigurationError, DriverError
+from ..core.models import DeviceConfig
 
 __all__ = ["Camera"]
 
@@ -42,7 +42,7 @@ class Camera:
             raise ConfigurationError(
                 "必须指定相机型号",
                 detail="型号来自设备档案的 model 字段；未登记型号会直接报错并列出现有型号")
-        from . import camera_factory
+        from ..assembly import cameras as camera_factory
 
         self._entry = camera_factory.camera_entry(model)      # 未登记在此报错
         self._cls = camera_factory.camera_class(model)

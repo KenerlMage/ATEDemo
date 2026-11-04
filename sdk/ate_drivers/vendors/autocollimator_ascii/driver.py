@@ -11,7 +11,7 @@ ASCII 命令按常见自准直仪（Möller-Wedel ELCOMAT / Trioptics 系列）�
 from __future__ import annotations
 
 from ...base import InstrumentDriver
-from ...errors import ConfigurationError, ProtocolError
+from ...core.errors import ConfigurationError, ProtocolError
 
 __all__ = ["AsciiAutocollimator"]
 

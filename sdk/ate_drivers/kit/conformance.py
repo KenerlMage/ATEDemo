@@ -26,14 +26,14 @@ import re
 import sys
 from typing import Any, Callable, Optional
 
-from ..capabilities import is_known, validate
-from ..contract import API_VERSION, DEPRECATIONS, RESULT_SCHEMA, check_compatible
-from ..errors import DriverError, UnsupportedCapability
-from ..endpoint import (SUPPORTED_BACKENDS, SUPPORTED_INTERFACES, backends_of,
+from ..core.capabilities import is_known, validate
+from ..core.contract import API_VERSION, DEPRECATIONS, RESULT_SCHEMA, check_compatible
+from ..core.errors import DriverError, UnsupportedCapability
+from ..core.endpoint import (SUPPORTED_BACKENDS, SUPPORTED_INTERFACES, backends_of,
                          endpoint_from, interfaces_for, normalize_backend,
                          normalize_interface_kind)
-from ..transport import VisaTransport, transport_class
-from ..models import DeviceConfig
+from ..core.transport import VisaTransport, transport_class
+from ..core.models import DeviceConfig
 
 SAMPLE_DEVICE = {
     "device_id": "chk-scope-1",
@@ -250,7 +250,7 @@ def c14_aliases_valid(ctx) -> tuple[bool, str]:
 
 
 #: 可选运行时依赖：只允许**惰性导入**（函数体内），缺它时给出可读错误并降级，不算硬依赖
-OPTIONAL_RUNTIME = ("serial", "pyvisa", "pypylon", "numpy")
+OPTIONAL_RUNTIME = ("serial", "pyvisa", "pypylon", "numpy", "RsInstrument")
 
 
 def _import_names(node) -> list:

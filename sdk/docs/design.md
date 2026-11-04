@@ -25,37 +25,39 @@
 
 ## 2. 六层结构与依赖方向
 
-依赖**单向向下**：门面 → 注册表 → 家族 → 链路 → 传输。谁都不许反向 import，厂商包只许依赖家族层与契约层。
+依赖**单向向下**：`api/` → `assembly/` → `families/` → (`base.py`) → `core/`。谁都不许反向 import；厂商包只许依赖家族层、基类与内核，以及它自己的厂商 SDK。
 
 ```
-                     ┌─────────────────────────────┐
-   用户/TPS 用例  →  │ api.py        Scope 门面     │  只暴露业务方法
-                     ├─────────────────────────────┤
-   平台侧接入     →  │ factory.py    型号注册表      │  按型号精确派发
-                     ├─────────────────────────────┤
-   每类设备一份   →  │ family/<家族>.py  家族契约    │  动作/单位/算法/仿真基线
-                     ├─────────────────────────────┤
-   每个品牌一份   →  │ vendors/<厂商>/   厂商驱动包  │  只填差异面
-                     ├─────────────────────────────┤
-   链路解析       →  │ endpoint.py   连接方式层     │  档案 → 端点 + 校验
-                     ├─────────────────────────────┤
-   真实收发       →  │ transport.py  链路层         │  socket / 串口 / VISA / 仿真
-                     ├─────────────────────────────┤
-   底座           →  │ base.py · contract.py · capabilities.py · errors.py · models.py │
-                     └─────────────────────────────┘
+                     ┌──────────────────────────────────────────┐
+   用户/TPS 用例  →  │ api/            Scope · Camera 门面        │  只暴露业务方法
+                     │   instruments.py · camera.py              │
+                     ├──────────────────────────────────────────┤
+   平台侧接入     →  │ assembly/       型号注册表 · 相机派发       │  按型号精确派发
+                     │   registry.py · cameras.py                │
+                     ├──────────────────────────────────────────┤
+   每类设备一份   →  │ families/       家族契约                   │  动作/单位/算法/仿真基线
+                     │   scope.py · camera.py · generic/         │
+                     ├──────────────────────────────────────────┤
+   每个品牌一份   →  │ vendors/        厂商驱动包（含厂商 SDK 适配）│  只填差异面
+                     ├──────────────────────────────────────────┤
+   驱动基类       →  │ base.py         会话 · 分发 · 能力         │  厂商链路工厂钩子
+                     ├──────────────────────────────────────────┤
+   契约内核       →  │ core/           errors · contract ·       │  不认识任何品牌
+                     │   capabilities · endpoint · models ·      │  不依赖上层
+                     │   transport                               │
+                     └──────────────────────────────────────────┘
 ```
 
 各层职责与「不许做的事」：
 
-| 层 | 文件 | 职责 | 不许做 |
+| 层 | 目录 / 文件 | 职责 | 不许做 |
 | --- | --- | --- | --- |
-| 门面 | `api.py` | 校验参数、挑模式（真机/仿真）、核对型号、把结果整理成用户友好的结构 | 不许出现任何仪器命令字样 |
-| 注册表 | `factory.py` | 型号归一化、登记、精确派发、别名、注册表自检、`open_scope()` | 不许打分、不许模糊匹配、不许兜底驱动 |
-| 家族 | `family/<家族>.py` | 动作定义、参数单位、测量算法、仿真基线、命令表契约、安全退出 | 不许出现具体品牌的命令拼写 |
-| 厂商包 | `vendors/<厂商>/` | 命令表、应答前导解析、量纲缩放、枚举映射、仿真模型 | 不许改动作名、不许改返回结构、不许 import 其它厂商包 |
-| 连接方式 | `endpoint.py` | 档案 → `Endpoint`（LAN / SERIAL）、传输后端解析（`native` / `visa`）、参数校验、转 `DeviceConfig`、规范 VISA 资源名 | 不许猜链路、不许猜后端、不许静默降级 |
-| 链路 | `transport.py` | `SocketTransport` / `SerialTransport` / `VisaTransport` / `SimulateTransport`，同一套 open/close/write/read/query；`backend` 决定用原生栈还是 PyVISA | 不许把第三方库变成硬依赖（pyserial / pyvisa 一律惰性导入 + 可注入） |
-| 底座 | `base.py` 等 | 会话生命周期、动作分发、能力校验、统一返回结构、错误码、数据模型 | 不许依赖家族以上任何东西 |
+| 门面 | `api/instruments.py` · `api/camera.py` | 校验参数、挑模式（真机/仿真）、核对型号、把结果整理成用户友好的结构 | 不许出现任何仪器命令字样 |
+| 装配 | `assembly/registry.py` · `assembly/cameras.py` | 型号归一化、登记、精确派发、别名、注册表自检、`open_scope()` / `open_camera()` | 不许打分、不许模糊匹配、不许兜底驱动 |
+| 家族 | `families/<家族>.py` · `families/generic/` | 动作定义、参数单位、测量算法、仿真基线、命令表契约、安全退出 | 不许出现具体品牌的命令拼写；`generic/` 只收「动作 ≤6 且无需特化」的简化家族 |
+| 厂商包 | `vendors/<厂商>/` | 命令表、应答前导解析、量纲缩放、枚举映射、仿真模型；**厂商 SDK 只在这里出现** | 不许改动作名、不许改返回结构、不许 import 其它厂商包 |
+| 驱动基类 | `base.py` | 会话生命周期、动作分发、能力校验、`TRANSPORT_FACTORY` 链路工厂钩子 | 不许依赖家族及以上任何东西 |
+| 契约内核 | `core/` | 错误体系、能力与版本契约、连接方式与端点、数据模型、传输链路（socket / 串口 / VISA / 仿真） | 不许出现品牌名、型号名、仪器命令字 |
 | 工具链 | `kit/` | 脚手架、清单校验、19 项门禁、CLI | 不进运行时依赖（生产环境可以不装） |
 
 ## 3. 数据模型
@@ -176,7 +178,6 @@
 
 链路实现（`kind` × `backend` 的组合，全在 `transport.py` 一处收口）：
 
-| 链路 | 实现类 | 依赖 | 资源名 / 说明 |
 | --- | --- | --- | --- |
 | 仿真 | `SimulateTransport` | 无 | 与后端无关；没有硬件也能跑全流程 |
 | 网口 LAN · `native` | `SocketTransport` | 标准库 socket | `192.168.10.41:4000`（raw socket） |
@@ -208,6 +209,41 @@
 串口帧参数（`baud_rate` / `data_bits` / `parity` / `stop_bits`）**不写进资源名**——
 `ASRL::COM6::115200::INSTR` 那种拼法不是 VISA 规范资源名；规范写法是 `ASRL6::INSTR`，
 波特率等作为会话属性下发（`_apply_visa_attributes()` 逐项 setattr，会话不认的属性跳过：网口没有 `baud_rate`）。
+
+### 7.1 厂商 SDK 落在 L3，不做第三类传输后端
+
+`native` / `visa` 是**平台提供的传输后端**，对所有驱动生效；而厂商官方库
+（R&S 的 `RsInstrument`、Basler 的 `pypylon`）是**某一家的事情**，不能登记成后端——
+否则 `transport.py` 就得认识品牌，所有驱动都被某一家的包绑架。
+
+做法是 `base.py` 留一个链路工厂钩子：
+
+```python
+class InstrumentDriver:
+    TRANSPORT_FACTORY: Any = None      # 留空 → make_transport（原生 / VISA / 仿真）
+```
+
+厂商包在自己的 `driver.py` 里挂上去：
+
+```python
+# vendors/rohde_schwarz_mxo/driver.py —— L3
+TRANSPORT_FACTORY = staticmethod(rs_transport)
+```
+
+R&S 的实现（`vendors/rohde_schwarz_mxo/rs_link.py`）：
+
+* 真机 + 装了 `RsInstrument` → `RsInstrumentLink`（`kind="rsinstrument"`）；
+* 仿真 → 仍是 `SimulateTransport`（仿真不是链路，不该被厂商库替代）；
+* 档案 `extra.rsinstrument = off` → 回落 `SocketTransport` / `SerialTransport`。
+
+三条必须守住：
+
+1. `core/transport.py` **不 import** `RsInstrument`，缺它时整库照常可用；
+2. 声明要走官方库却打不开时**直接报错**（`E_CONFIG` / `TransportError`），不静默换链路；
+3. 官方库缺 VISA 运行时的失败信息要带运维指引（R&S VISA 未装 → 设 `extra.rsinstrument=off`）。
+
+> `RsInstrument` 已收录进 `kit/conformance.py` 的 `OPTIONAL_RUNTIME`，L3 顶层 import 它
+> 不判"偷偷引入第三方依赖"；实现上仍用函数内惰性 import，缺包时由驱动降级。
 
 ## 8. 版本与兼容
 

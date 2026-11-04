@@ -15,8 +15,8 @@ from __future__ import annotations
 import math
 from typing import Optional
 
-from ..base import InstrumentDriver as Driver
-from ..errors import DriverError
+from ...base import InstrumentDriver as Driver
+from ...core.errors import DriverError
 from .util import stable_ratio
 
 #: 光功率计的波长测量范围（nm）

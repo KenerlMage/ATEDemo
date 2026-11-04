@@ -21,12 +21,12 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Iterable, Optional, Type
 
-from .errors import ConfigurationError, DriverNotFound
-from .endpoint import (SUPPORTED_INTERFACES, endpoint_from, interfaces_of,
+from ..core.errors import ConfigurationError, DriverNotFound
+from ..core.endpoint import (SUPPORTED_INTERFACES, endpoint_from, interfaces_of,
                        LAN as INTERFACE_LAN, SERIAL as INTERFACE_SERIAL,
     SUPPORTED_BACKENDS, backends_of,
 )
-from .family.scope import ScopeDriver
+from ..families.scope import ScopeDriver
 
 #: 支持的连接方式（LAN = 网口，SERIAL = 串口）——由 endpoint 层统一定义
 LAN_ALIAS = INTERFACE_LAN
@@ -229,7 +229,7 @@ def open_scope(model: Any = None, host: Optional[str] = None, port: Optional[int
       也可以写进档案的 `backend` 字段；型号没声明的后端 → `ConfigurationError`；
     * 型号未登记 → `DriverNotFound`；型号不支持该连接方式 → `ConfigurationError`。
     """
-    from .api import Scope  # 局部导入避免与 api 的循环依赖
+    from ..api import Scope  # 局部导入避免与 api 的循环依赖
 
     model = model if model is not None else _pick(device, "model")
     backend = backend if backend not in ("", None) else _pick(device, "backend")
@@ -255,7 +255,7 @@ def _pick(device: Any, field: str) -> Any:
 
 def _register_builtin() -> tuple:
     """把内置厂商包自动登记进注册表（导入时执行一次）"""
-    from .vendors import DRIVERS
+    from ..vendors import DRIVERS
     for cls in DRIVERS:
         register_driver(cls, source="builtin")
     return DRIVERS

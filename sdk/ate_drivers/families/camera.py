@@ -35,9 +35,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..base import InstrumentDriver
-from ..capabilities import Capability
-from ..errors import ConfigurationError, DriverError
-from ..transport import Transport
+from ..core.capabilities import Capability
+from ..core.errors import ConfigurationError, DriverError
+from ..core.transport import Transport
 
 __all__ = [
     "CameraChannel",
@@ -449,7 +449,7 @@ class CameraDriver(InstrumentDriver):
     def __init__(self, cfg: Any = None, mode: str = "simulate", timeout: Optional[float] = None,
                  transport: Optional[Transport] = None, alias: str = "",
                  setup: Optional[dict] = None, **kw: Any):
-        from ..models import DeviceConfig
+        from ..core.models import DeviceConfig
 
         _cfg = cfg if isinstance(cfg, DeviceConfig) else DeviceConfig.from_dict(cfg or {})
         super().__init__(_cfg, mode=mode, timeout=timeout,

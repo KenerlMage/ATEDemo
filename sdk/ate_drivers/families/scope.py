@@ -21,9 +21,9 @@ from dataclasses import asdict, dataclass
 from typing import Optional
 
 from ..base import InstrumentDriver
-from ..capabilities import Capability
-from ..contract import WAVEFORM_SCHEMA
-from ..errors import DriverError, ProtocolError
+from ..core.capabilities import Capability
+from ..core.contract import WAVEFORM_SCHEMA
+from ..core.errors import DriverError, ProtocolError
 
 WAVEFORM_KINDS = ("sine", "square", "triangle", "sawtooth", "dc", "noise")
 MEASURE_ITEMS = ("PK2PK", "AMPLITUDE", "FREQUENCY", "PERIOD", "MEAN", "RMS", "RISE", "FALL")

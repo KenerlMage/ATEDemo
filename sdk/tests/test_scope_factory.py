@@ -12,10 +12,11 @@ import re
 
 import pytest
 
-from ate_drivers import Scope, factory, open_scope
-from ate_drivers.errors import ConfigurationError, DriverError
+from ate_drivers import Scope, open_scope
+from ate_drivers.assembly import registry as factory
+from ate_drivers.core.errors import ConfigurationError, DriverError
 from ate_drivers.kit import run_conformance
-from ate_drivers.transport import VisaTransport, make_transport
+from ate_drivers.core.transport import VisaTransport, make_transport
 from ate_drivers.vendors.rohde_schwarz_mxo.driver import RsMxoScope
 from ate_drivers.vendors.tektronix_mso.driver import TekMsoScope
 
@@ -348,7 +349,7 @@ def _serial_device(**over):
 
 
 def test_endpoint_resolves_lan_serial_and_none():
-    from ate_drivers.endpoint import endpoint_from
+    from ate_drivers.core.endpoint import endpoint_from
 
     lan = endpoint_from({"host": TEK_HOST, "port": TEK_PORT, "protocol": "VXI-11"})
     assert lan.kind == "LAN" and lan.label == "%s:%d" % (TEK_HOST, TEK_PORT)
@@ -364,7 +365,7 @@ def test_endpoint_resolves_lan_serial_and_none():
 
 
 def test_endpoint_rejects_half_lan_and_ambiguous_archive():
-    from ate_drivers.endpoint import endpoint_from
+    from ate_drivers.core.endpoint import endpoint_from
 
     with pytest.raises(ConfigurationError) as e1:
         endpoint_from({"host": TEK_HOST})                              # 只给 host
@@ -385,8 +386,8 @@ def test_endpoint_rejects_half_lan_and_ambiguous_archive():
 
 
 def test_serial_transport_via_injected_factory():
-    from ate_drivers.endpoint import endpoint_from
-    from ate_drivers.transport import SerialTransport, set_serial_factory
+    from ate_drivers.core.endpoint import endpoint_from
+    from ate_drivers.core.transport import SerialTransport, set_serial_factory
 
     cfg = endpoint_from(_serial_device()).to_device_config(model=TEK_MODEL)
     port = FakeSerialPort()
@@ -419,8 +420,8 @@ def test_serial_transport_via_injected_factory():
 
 
 def test_serial_without_pyserial_gives_readable_error(monkeypatch):
-    from ate_drivers import transport as tp
-    from ate_drivers.endpoint import endpoint_from
+    from ate_drivers.core import transport as tp
+    from ate_drivers.core.endpoint import endpoint_from
 
     cfg = endpoint_from(_serial_device()).to_device_config(model=TEK_MODEL)
     monkeypatch.setattr(tp, "_pyserial", lambda: None)
@@ -432,8 +433,8 @@ def test_serial_without_pyserial_gives_readable_error(monkeypatch):
 
 def test_same_business_code_runs_over_serial():
     """同一段业务代码换到串口链路：身份 / 档位 / 跑停 / 状态照常，命令确实从串口出去"""
-    from ate_drivers.endpoint import endpoint_from
-    from ate_drivers.transport import SerialTransport
+    from ate_drivers.core.endpoint import endpoint_from
+    from ate_drivers.core.transport import SerialTransport
 
     ep = endpoint_from(_serial_device())
     cfg = ep.to_device_config(model=TEK_MODEL)
@@ -567,7 +568,7 @@ class FakeVisaSession:
 @pytest.fixture()
 def visa_sessions(monkeypatch):
     """注入假 VISA 会话工厂（应答来自同型号仿真命令表），用例结束后自动复位"""
-    import ate_drivers.transport as tp
+    import ate_drivers.core.transport as tp
 
     sim = open_scope(TEK_MODEL)
     handler = sim._driver.simulate_command
@@ -584,7 +585,7 @@ def visa_sessions(monkeypatch):
 
 def test_visa_resource_names_are_canonical():
     """VISA 资源名用规范写法：网口 TCPIP0::…::SOCKET、串口 ASRL6::INSTR"""
-    from ate_drivers.endpoint import visa_resource_for
+    from ate_drivers.core.endpoint import visa_resource_for
 
     assert visa_resource_for("LAN", "192.168.10.41", 4000) == "TCPIP0::192.168.10.41::4000::SOCKET"
     assert visa_resource_for("SERIAL", port_name="COM6") == "ASRL6::INSTR"
@@ -636,7 +637,7 @@ def test_visa_serial_backend_sets_frame_attributes(visa_sessions):
 
 def test_backend_auto_follows_availability(visa_sessions, monkeypatch):
     """auto：装了 pyvisa（或注入过工厂）走 VISA，否则走原生；实际值永远可查"""
-    import ate_drivers.transport as tp
+    import ate_drivers.core.transport as tp
 
     auto_visa = open_scope(TEK_MODEL, host=TEK_HOST, port=TEK_PORT, backend="auto")
     assert auto_visa.backend == "visa"
@@ -664,7 +665,7 @@ def test_unknown_backend_is_rejected():
 
 def test_explicit_visa_without_pyvisa_gives_readable_error(monkeypatch):
     """显式要 VISA 但环境没有 pyvisa → 可读 E_CONFIG（真机模式才拦，仿真不需要后端）"""
-    import ate_drivers.transport as tp
+    import ate_drivers.core.transport as tp
 
     monkeypatch.setattr(tp, "DEFAULT_VISA_FACTORY", None)
     monkeypatch.setattr(tp, "_pyvisa", lambda: None)

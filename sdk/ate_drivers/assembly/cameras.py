@@ -21,8 +21,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Optional
 
-from .endpoint import interfaces_for
-from .errors import ConfigurationError, DriverNotFound
+from ..core.endpoint import interfaces_for
+from ..core.errors import ConfigurationError, DriverNotFound
 
 #: 相机合法连接方式（USB3 / GigE Vision / Camera Link），与 endpoint.FAMILY_INTERFACES 同源
 CAMERA_INTERFACES = interfaces_for("camera")
@@ -197,7 +197,7 @@ def open_camera(model: Any = None, *, serial_number: str = "", user_name: str = 
     * `mode="real"`：需要 pylon 8.0.0 运行时 + pypylon，且至少要有一台在线相机；
     * 选机：`serial_number` > `user_name` > `index`（默认 0，即第一台）。
     """
-    from .api_camera import Camera
+    from ..api.camera import Camera
 
     return Camera(model, serial_number=serial_number, user_name=user_name, index=index,
                   mode=mode, timeout=timeout, setup=setup, transport=transport, alias=alias,
@@ -205,7 +205,7 @@ def open_camera(model: Any = None, *, serial_number: str = "", user_name: str = 
 
 
 def _register_builtin() -> tuple:
-    from .vendors import CAMERA_DRIVERS
+    from ..vendors import CAMERA_DRIVERS
 
     for cls in CAMERA_DRIVERS:
         register_camera_driver(cls, source="builtin")

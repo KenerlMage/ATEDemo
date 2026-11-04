@@ -33,10 +33,31 @@ from __future__ import annotations
 
 import re
 
-from ...errors import DriverError
-from ...family.scope import ScopeDriver, Waveform
+from ...core.errors import DriverError
+from ...core.transport import make_transport
+from ...families.scope import ScopeDriver, Waveform
+from .rs_link import RsInstrumentLink, rsinstrument_available
 
 __all__ = ["RsMxoScope"]
+
+
+def _prefers_rsinstrument(cfg) -> bool:
+    """档案 ``extra.rsinstrument``：auto / on（默认）用官方库，off 强制走标准库链路"""
+    extra = getattr(cfg, "extra", None)
+    if not isinstance(extra, dict):
+        return True
+    flag = str(extra.get("rsinstrument", "auto")).strip().lower()
+    return flag not in ("off", "0", "false", "no", "native")
+
+
+def rs_transport(cfg, mode, *, timeout, handler, backend):
+    """R&S 的链路选择：真机优先用官方 RsInstrument，其余情况走平台统一链路。
+
+    仿真仍然由 ``SimulateTransport`` 承接——仿真不是"链路"，不该被厂商库替代。
+    """
+    if str(mode).lower() == "real" and _prefers_rsinstrument(cfg) and rsinstrument_available():
+        return RsInstrumentLink(cfg, timeout=timeout)
+    return make_transport(cfg, mode, timeout=timeout, handler=handler, backend=backend)
 
 
 class RsMxoScope(ScopeDriver):
@@ -46,6 +67,7 @@ class RsMxoScope(ScopeDriver):
     label = "数字示波器 · 罗德与施瓦茨 MXO44（MXO 4 系列）"
     driver_version = "1.6.0"
     INTERFACES = ("LAN", "SERIAL")   # 连接方式：网口 + 串口
+    TRANSPORT_FACTORY = staticmethod(rs_transport)  # 真机走 RsInstrument（装了才用）
     BACKENDS = ("native", "visa")    # 传输后端：标准库收发 / PyVISA
    # 连接方式：网口 + 串口（命令集相同，只换链路）
     INTERFACE = "LAN"                # 兼容旧写法：首选连接方式

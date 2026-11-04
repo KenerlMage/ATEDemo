@@ -31,15 +31,15 @@
     python -m ate_drivers.kit.cli models           # 看已登记型号
 """
 
-from .capabilities import KNOWN_CAPABILITIES, Capability  # noqa: F401
-from .contract import (  # noqa: F401
+from .core.capabilities import KNOWN_CAPABILITIES, Capability  # noqa: F401
+from .core.contract import (  # noqa: F401
     API_VERSION,
     CONTRACT_NAME,
     RESULT_SCHEMA,
     check_compatible,
     deprecated,
 )
-from .errors import (  # noqa: F401
+from .core.errors import (  # noqa: F401
     ConfigurationError,
     ContractMismatch,
     DriverError,
@@ -49,26 +49,26 @@ from .errors import (  # noqa: F401
     TransportError,
     UnsupportedCapability,
 )
-from .models import DeviceConfig  # noqa: F401
+from .core.models import DeviceConfig  # noqa: F401
 from .base import InstrumentDriver, PassiveDriver  # noqa: F401
-from .family.scope import (  # noqa: F401
+from .families.scope import (  # noqa: F401
     ChannelSetup,
     Measurement,
     ScopeDriver,
     TimebaseSetup,
     Waveform,
 )
-from .transport import (  # noqa: F401
+from .core.transport import (  # noqa: F401
     SerialTransport, SimulateTransport, SocketTransport, Transport, VisaTransport,
     make_transport, set_serial_factory, set_visa_factory, transport_class, visa_available,
     visa_factory,
 )
-from .endpoint import (  # noqa: F401
+from .core.endpoint import (  # noqa: F401
     AUTO, BACKEND_CHOICES, DEFAULT_BACKEND, NATIVE, SERIAL_DEFAULTS, SUPPORTED_BACKENDS,
     SUPPORTED_INTERFACES, VISA, Endpoint, backends_of, endpoint_from, interfaces_of,
     normalize_backend, normalize_interface, resolve_backend, visa_resource_for,
 )
-from .family.camera import (  # noqa: F401
+from .families.camera import (  # noqa: F401
     CameraChannel,
     CameraDriver,
     CameraSetup,
@@ -77,7 +77,7 @@ from .family.camera import (  # noqa: F401
     simulate_frame,
     write_png,
 )
-from .camera_factory import (  # noqa: F401
+from .assembly.cameras import (  # noqa: F401
     camera_class,
     camera_entries,
     camera_entry,
@@ -85,9 +85,9 @@ from .camera_factory import (  # noqa: F401
     open_camera,
     register_camera_driver,
 )
-from .api_camera import Camera  # noqa: F401
+from .api.camera import Camera  # noqa: F401
 from .api import Scope  # noqa: F401
-from .factory import driver_class, entries, models, open_scope, self_check  # noqa: F401
+from .assembly.registry import driver_class, entries, models, open_scope, self_check  # noqa: F401
 
 __version__ = "1.2.0"
 

@@ -7,8 +7,14 @@
   "label": "数字示波器 · 罗德与施瓦茨 MXO44（MXO 4 系列）",
   "vendor": "Rohde & Schwarz",
   "entry": "ate_drivers.vendors.rohde_schwarz_mxo.driver:RsMxoScope",
-  "interfaces": ["LAN", "SERIAL"],
-  "backends": ["native", "visa"],
+  "interfaces": [
+    "LAN",
+    "SERIAL"
+  ],
+  "backends": [
+    "native",
+    "visa"
+  ],
   "models": [
     "MXO44"
   ],
@@ -30,6 +36,8 @@
   ],
   "simulate": true,
   "min_platform": "1.0.0",
-  "depends": [],
+  "depends": [
+    "RsInstrument>=1.100"
+  ],
   "signature": ""
 }

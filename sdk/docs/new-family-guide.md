@@ -57,7 +57,7 @@
 三个地方都要改，漏一个门禁 C03 就会挂：
 
 ```python
-# ate_drivers/capabilities.py
+# ate_drivers/core/capabilities.py
 
 CORE_CAPABILITIES = ("identify", "reset", "state")        # 所有家族共享，不动
 
@@ -81,7 +81,7 @@ KNOWN_CAPABILITIES = frozenset(
 
 > 现状：`dmm` / `psu` / `awg` / `motion` / `passive` / `generic` 六个家族名**已在能力表里占位**（例如 `dmm: ["dmm.measure"]`、`psu: ["psu.set_output", "psu.measure"]`、`awg: ["awg.set_waveform", "awg.output"]`、`motion: ["motion.move", "motion.read_position"]`），但**家族实现尚未落地**。所以接万用表的现实路径是：能力位已存在 → 直接按第 3~9 步写 `family/dmm.py`，不需要改能力表（要加新动作才改）。
 
-产出物：`capabilities.py` 的 diff。验证：`python -c "from ate_drivers import capabilities as c; print(c.KNOWN_CAPABILITIES)"` 能看到新动作。
+产出物：`capabilities.py` 的 diff。验证：`python -c "from ate_drivers.core import capabilities as c; print(c.KNOWN_CAPABILITIES)"` 能看到新动作。
 
 ### 第 3 步：定义数据模型
 
@@ -307,15 +307,15 @@ class Fluke8808AScope(DmmDriver):
 
 | # | 文件 | 改什么 |
 | --- | --- | --- |
-| 1 | `ate_drivers/capabilities.py` | `FAMILY_CAPABILITIES` / `REQUIRED_BY_FAMILY` / `KNOWN_CAPABILITIES` |
-| 2 | `ate_drivers/family/<家族>.py` | 新增家族契约（动作、模型、校验、仿真基线、命令插槽） |
-| 3 | `ate_drivers/family/__init__.py` | 导出家族类 |
-| 4 | `ate_drivers/api.py` | 家族门面（可选，若走统一门面则不新增） |
+| 1 | `ate_drivers/core/capabilities.py` | `FAMILY_CAPABILITIES` / `REQUIRED_BY_FAMILY` / `KNOWN_CAPABILITIES` |
+| 2 | `ate_drivers/families/<家族>.py` | 新增家族契约（动作、模型、校验、仿真基线、命令插槽） |
+| 3 | `ate_drivers/families/__init__.py` | 导出家族类 |
+| 4 | `ate_drivers/api/instruments.py` | 家族门面（可选，若走统一门面则不新增） |
 | 5 | `ate_drivers/__init__.py` | 导出新家族类与门面函数 |
 | 6 | `ate_drivers/vendors/<厂商>_<型号>/` | 型号驱动包 + `driver.json` |
 | 7 | `ate_drivers/vendors/__init__.py` | 追加 `DRIVERS` 元组（内置登记） |
 | 8 | `ate_drivers/kit/conformance.py` | 家族特有门禁项（可选） |
-| 9 | `ate_drivers/transport.py` | 一般**不用改**：链路与后端已收口（`native` / `visa`）；新后端才在此登记 |
+| 9 | `ate_drivers/core/transport.py` | 一般**不用改**：链路与后端已收口（`native` / `visa`）；新后端才在此登记 |
 | 9 | `tests/test_<家族>_family.py` | 家族级测试 |
 | 10 | `sdk/docs/` + `sdk/README.md` | 文档与型号清单 |
 

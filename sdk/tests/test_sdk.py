@@ -26,9 +26,9 @@ from ate_drivers import (  # noqa: E402
     UnsupportedCapability,
     check_compatible,
 )
-from ate_drivers.capabilities import Capability, validate  # noqa: E402
-from ate_drivers.contract import describe_contract  # noqa: E402
-from ate_drivers.family.scope import ScopeDriver, measure_samples, sim_samples  # noqa: E402
+from ate_drivers.core.capabilities import Capability, validate  # noqa: E402
+from ate_drivers.core.contract import describe_contract  # noqa: E402
+from ate_drivers.families.scope import ScopeDriver, measure_samples, sim_samples  # noqa: E402
 from ate_drivers.kit import (  # noqa: E402
     FakeTransport,
     load_manifest,

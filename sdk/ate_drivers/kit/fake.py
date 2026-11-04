@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Optional
 
-from ..transport import Transport
+from ..core.transport import Transport
 
 
 class FakeTransport(Transport):
@@ -54,11 +54,11 @@ class FakeTransport(Transport):
         self.log.append(cmd)
         kind = self.fail_on.get(cmd)
         if kind == "timeout":
-            from ..errors import DriverTimeout
+            from ..core.errors import DriverTimeout
 
             raise DriverTimeout(f"（测试注入）{cmd} 超时")
         if kind == "transport":
-            from ..errors import TransportError
+            from ..core.errors import TransportError
 
             raise TransportError(f"（测试注入）{cmd} 写失败")
         answer = ""

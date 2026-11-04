@@ -24,11 +24,11 @@ import os
 import re
 from typing import Any, Optional
 
-from ..capabilities import validate
-from ..contract import API_VERSION, MANIFEST_SCHEMA, check_compatible
-from ..endpoint import (SUPPORTED_BACKENDS, interfaces_for, normalize_backend,
+from ..core.capabilities import validate
+from ..core.contract import API_VERSION, MANIFEST_SCHEMA, check_compatible
+from ..core.endpoint import (SUPPORTED_BACKENDS, interfaces_for, normalize_backend,
                          normalize_interface_kind)
-from ..errors import ConfigurationError, ContractMismatch, DriverNotFound
+from ..core.errors import ConfigurationError, ContractMismatch, DriverNotFound
 
 MANIFEST_NAME = "driver.json"
 REQUIRED_FIELDS = ("schema", "key", "version", "family", "api", "entry", "models")

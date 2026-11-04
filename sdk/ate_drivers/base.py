@@ -16,12 +16,12 @@ from __future__ import annotations
 import time
 from typing import Any, Optional
 
-from .capabilities import KNOWN_CAPABILITIES, matches, validate
-from .contract import API_VERSION, RESULT_SCHEMA, check_compatible, deprecated  # noqa: F401
-from .errors import DriverError, UnsupportedCapability
-from .models import DeviceConfig
-from .endpoint import backends_of, resolve_backend  # noqa: E402
-from .transport import SimulateTransport, Transport, make_transport, visa_available
+from .core.capabilities import KNOWN_CAPABILITIES, matches, validate
+from .core.contract import API_VERSION, RESULT_SCHEMA, check_compatible, deprecated  # noqa: F401
+from .core.errors import DriverError, UnsupportedCapability
+from .core.models import DeviceConfig
+from .core.endpoint import backends_of, resolve_backend  # noqa: E402
+from .core.transport import SimulateTransport, Transport, make_transport, visa_available
 
 CORE_ACTIONS = {"identify": "identify", "reset": "reset", "state": "state"}
 
@@ -44,6 +44,11 @@ class InstrumentDriver:
     # 旧动作名 -> 新能力名（保住历史 TPS 的调用；新代码不允许再使用左边这些名字）
     ALIASES: dict[str, str] = {}
     SIMULATE_SUPPORTED = True
+    #: 厂商层可覆盖的链路工厂，签名与 :func:`make_transport` 一致。
+    #: 用于接入「厂商自己的通信库」（如 R&S 的 RsInstrument、Basler 的 Pylon）：
+    #: 这类库只属于某一家的 L3，不能下沉到 L0 传输层，否则所有驱动都会被它绑住。
+    #: 留空即走平台统一链路，仿真 / 超时 / 日志行为完全不变。
+    TRANSPORT_FACTORY: Any = None
 
     def __init__(
         self,
@@ -70,7 +75,8 @@ class InstrumentDriver:
                 device_id=self.cfg.device_id,
                 detail="该驱动声明的后端：" + " / ".join(self.declared_backends),
             )
-        self.transport = transport or make_transport(
+        factory = self.TRANSPORT_FACTORY or make_transport
+        self.transport = transport or factory(
             self.cfg, self.mode, timeout=self.timeout, handler=self.simulate_command,
             backend=self.backend
         )
@@ -83,7 +89,7 @@ class InstrumentDriver:
         self._teardown: list[str] = []
         compatible, reason = check_compatible(self.api_version)
         if not compatible:
-            from .errors import ContractMismatch
+            from .core.errors import ContractMismatch
 
             raise ContractMismatch(reason, device_id=self.device_id, detail=f"驱动契约 {self.api_version}")
 

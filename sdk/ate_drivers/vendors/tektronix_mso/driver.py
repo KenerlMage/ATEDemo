@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from ...family.scope import ScopeDriver
+from ...families.scope import ScopeDriver
 
 __all__ = ["TekMsoScope"]
 

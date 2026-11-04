@@ -43,11 +43,11 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Optional, Sequence
 
-from .errors import ConfigurationError, DriverError
-from .endpoint import DEFAULT_BACKEND, VISA, backends_of, endpoint_from, resolve_backend
-from .family.scope import MEASURE_ITEMS, ScopeDriver
-from .models import DeviceConfig
-from .transport import visa_available
+from ..core.errors import ConfigurationError, DriverError
+from ..core.endpoint import DEFAULT_BACKEND, VISA, backends_of, endpoint_from, resolve_backend
+from ..families.scope import MEASURE_ITEMS, ScopeDriver
+from ..core.models import DeviceConfig
+from ..core.transport import visa_available
 
 KIND = "oscilloscope"
 MEASURE_ALIASES = {
@@ -72,7 +72,7 @@ class Scope:
         if not model:
             raise ConfigurationError("必须指定示波器型号",
                                     detail="型号来自设备档案的 model 字段（数据库设备表）")
-        from . import factory
+        from ..assembly import registry as factory
 
         self._entry = factory.entry_for(model)          # 未登记会在这一步直接报错
         self._cls = factory.driver_class(model)
@@ -176,7 +176,7 @@ class Scope:
 
     def backend_detail(self) -> dict:
         """后端详情：请求值 / 实际值 / 环境可用性（排障用，解释"为什么用了原生栈"）"""
-        from .transport import visa_available
+        from ..core.transport import visa_available
 
         return {"requested": self._backend_requested, "used": self._backend,
                 "declared": list(self._backends),
@@ -370,7 +370,7 @@ class Scope:
 
     def _check_model(self) -> None:
         """核对设备回读型号与登记型号（防"档案型号写错、连上了别的机器"）"""
-        from . import factory
+        from ..assembly import registry as factory
 
         info = self.identity()
         actual = info.get("model") or ""

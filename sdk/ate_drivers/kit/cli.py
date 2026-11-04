@@ -18,7 +18,7 @@ import os
 import re
 import sys
 
-from ..contract import API_VERSION, MANIFEST_SCHEMA, describe_contract
+from ..core.contract import API_VERSION, MANIFEST_SCHEMA, describe_contract
 from .conformance import format_report, run_conformance
 from .registry import load_manifest, resolve_entry, scan_dir
 
@@ -242,7 +242,7 @@ def cmd_list(args) -> int:
 
 def cmd_models(args) -> int:
     """打印平台已登记型号（型号派发依据），可选按目录合并已装驱动包"""
-    from .. import factory
+    from ..assembly import registry as factory
 
     print(factory.describe())
     check = factory.self_check()
