@@ -168,6 +168,8 @@ D:\ATE
 
 ### 3.9 TPS 运行环境（tps_runtime/ + drivers/ + ate_db.py）
 
+> 驱动的分层代码结构、类图与扩展点见 [driver-dev-view.md](driver-dev-view.md)。
+
 - **workspace 与临时副本**：`tps_runtime/workspace.py` 的 `workspace_root()` 取 `<ATE 安装运行目录>/workspace`（可用环境变量 `ATE_WORKSPACE` 覆盖），`ensure_workspace()` 在不存在时自动创建；`stage()` 在真正跑用例前把整个 TPS 目录 `copytree` 一份临时副本到 `workspace/<TPS 名称>/run_<task_id>/`，源 TPS 永不被写脏；`cleanup_runs()` 按保留策略（默认 5）清理旧副本，**当前运行目录始终受保护**。
 - **公共 conftest**：正本放在 `tps_runtime/conftest_template.py`，部署时**按文件复制**到 `workspace/conftest.py` 并写入每个运行目录（升级带 `ATECONFTEST_VERSION` 版本标记，版本一致则 kept，不一致则备份 + 覆盖）。conftest 读同目录 `ate_env.json`（或 `ATE_ENV_FILE`），据此把后端目录加入 `sys.path`、设置 `ATE_DB_PATH`，然后 `import ate_db` / `import drivers`。
 - **注入内容**：夹具 `ate_ctx`（聚合上下文）/ `ate_bench` / `ate_devices`（来自 SQLite 的测试台与设备）/ `ate_thresholds`（本次 `testconfig`）/ `driver(别名)` / `ate_runner`（结果记录）。`ctx.check(别名, 值)` 自动按上下限判定并抛 `LimitError`（带 `checks` 明细），否则失败用例的阈值信息无法落盘。
