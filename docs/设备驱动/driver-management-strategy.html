@@ -101,6 +101,21 @@
   footer{border-top:1px solid var(--ink);margin-top:20px;padding-top:14px;
     font-size:11.4px;letter-spacing:.04em;color:var(--muted);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
+
+  table.tree{margin-top:6px}
+  table.tree td{padding:5px 10px 5px 0;font-size:12.3px;border-bottom:1px solid #edebe4;line-height:1.45}
+  table.tree td:first-child{font-family:"Consolas","SFMono-Regular",Menlo,monospace;color:var(--accent);white-space:nowrap}
+  table.tree td.p2{padding-left:16px}
+  table.tree td.p3{padding-left:32px}
+  table.tree td.b{font-weight:700}
+  table.tree td:last-child{color:var(--muted);font-size:11.7px;white-space:normal}
+  table.tree tbody tr:last-child td{border-bottom:1px solid var(--rule-2)}
+  pre.mini{font-size:11.1px;line-height:1.52;padding:12px 14px;margin:8px 0 0}
+  .road .del,.road .gate{font-size:11.5px;line-height:1.45}
+  .road .del{color:var(--muted);margin-top:8px}
+  .road .del b,.road .gate b{font-weight:600;letter-spacing:.02em}
+  .road .gate{color:var(--accent);margin-top:6px}
+
   @media (max-width:860px){
     .page{padding:40px 22px 60px}
     .problems{grid-template-columns:1fr 1fr}
@@ -118,11 +133,10 @@
   <header class="top">
     <p class="kicker">ATE Runner · 驱动软件管理方案</p>
     <h1>把驱动从子系统的附属品，变成可独立发布的单元</h1>
-    <p class="lede">当前每个子系统各自维护驱动与用例，问题不随台型收敛而消失。本方案用三类发布物划出变更边界，用注册解析与锁定决定版本，用仿真模式把回归从硬件上解耦。</p>
+    <p class="lede">当前每个子系统各自维护驱动与用例，问题不随台型收敛而消失。本方案用三类发布物划出变更边界，用注册解析与锁定决定版本，用能力层仿真把回归从硬件上解耦。</p>
     <p class="meta-row">
-      <span>范围 · <b>全部标准化主控柜</b></span>
+      <span>版本 · <b>v4（转正）</b></span><span>范围 · <b>全部标准化主控柜</b></span>
       <span>对象 · <b>驱动软件与发布单元</b></span>
-      <span>版本 · <b>方案稿 v2</b></span>
       <span>日期 · <b>2026-11-08</b></span>
     </p>
   </header>
@@ -131,10 +145,10 @@
     <a href="#s1"><span>01</span>问题背景</a>
     <a href="#s2"><span>02</span>驱动软件分类</a>
     <a href="#s3"><span>03</span>代码方案</a>
-    <a href="#s4"><span>04</span>分层与解析</a>
+    <a href="#s4"><span>04</span>逻辑视图</a>
     <a href="#s5"><span>05</span>开发视图</a>
     <a href="#s6"><span>06</span>仿真模式</a>
-    <a href="#s7"><span>07</span>落地顺序</a>
+    <a href="#s7"><span>07</span>推进策略</a>
   </nav>
 
   <section id="s1">
@@ -235,7 +249,7 @@
         <tr><th style="width:15%">维度</th><th style="width:29%">基础包</th><th style="width:29%">共享包</th><th style="width:27%">独立包</th></tr>
       </thead>
       <tbody>
-        <tr><td class="row-h">代码产出物</td><td>契约实现 + 厂商适配，随平台仓维护</td><td class="em">契约实现 + 命令表 + 仿真 IO + 随包契约测试</td><td>契约实现的最小集合，允许站点本地扩展</td></tr>
+        <tr><td class="row-h">代码产出物</td><td>契约实现 + 厂商适配，随平台仓维护</td><td class="em">契约实现 + 命令表 + 能力层仿真 + 随包契约测试</td><td>契约实现的最小集合，允许站点本地扩展</td></tr>
         <tr><td class="row-h">归档位置</td><td><code>app/backend/drivers/&lt;设备族&gt;/</code></td><td class="em"><code>packages/&lt;名称&gt;/&lt;版本&gt;/</code>，出 zip 进私有索引</td><td>台架本地目录 + 台架清单登记</td></tr>
         <tr><td class="row-h">交付形态</td><td>随安装包分发，装完即用</td><td class="em">离线 zip 导入，安装不编译、不联网</td><td>现场目录挂载，登记后生效</td></tr>
         <tr><td class="row-h">版本与标签</td><td>跟随平台版本号</td><td class="em">语义化版本 + git tag，多版可共存</td><td>随建台记录，不入主干分支</td></tr>
@@ -250,7 +264,7 @@
   <section id="s4">
     <div class="sec-head">
       <span class="folio">04</span>
-      <h2>分层与解析<small>用例依赖契约，平台负责解析，包提供契约实现</small></h2>
+      <h2>逻辑视图<small>用例依赖契约，平台负责解析，包提供契约实现；分层只覆盖基础包与共享包</small></h2>
     </div>
 
     <div class="twocol">
@@ -261,11 +275,11 @@
           <tbody>
             <tr><td class="em">L4 用例层</td><td>只依赖别名与能力，不出现包名、版本、型号</td></tr>
             <tr><td class="em">L3 契约层</td><td>定义动作集合与返回结构，唯一对用例暴露的接口</td></tr>
-            <tr><td class="em">L2 解析层</td><td>把台型声明与 lock 合成为加载计划，唯一决定版本</td></tr>
-            <tr><td class="em">L1 包层</td><td>唯一允许出现厂商库的地方，实现契约并内置仿真</td></tr>
-            <tr><td class="em">L0 运行时</td><td>持有硬件会话，负责资源仲裁、超时与诊断</td></tr>
+            <tr><td class="em">L2 解析层</td><td>依据台架装备属性与 lock 生成加载计划，唯一决定版本</td></tr>
+            <tr><td class="em">L1 包层</td><td>唯一允许出现厂商库的地方，实现契约并提供能力层仿真</td></tr>
           </tbody>
         </table>
+        <p class="note" style="margin-top:14px">运行时不在软件构建范围内，因此不作为独立层出现。分层只覆盖基础包与共享包；独立包随 TPS 打包交付、在 TPS 内自洽，不按此分层开发。</p>
       </div>
       <div>
         <h3>为什么这样切</h3>
@@ -273,20 +287,20 @@
           <li>契约层承担最贵的变更成本，因此只收跨型号稳定的动作，八项测量语义固定量纲。</li>
           <li>解析层是版本决策的唯一位置，结果写入 lock；运行期不再判断版本，回滚只改 lock。</li>
           <li>包层是厂商依赖的隔离带，CI 可静态检查只有该目录引用厂商库。</li>
-          <li>运行时不认包名，只认能力与资源，一柜多站争用仪器时在运行时排队。</li>
+          <li>会话与资源仲裁留在既有链路里：分层到契约层为止，驱动包不接管连接与寻址。</li>
         </ul>
       </div>
     </div>
 
     <h3>L2 解析的方法</h3>
-    <p>解析做六件事，任一步失败即拒绝启动并给出可执行提示，不做兜底降级。</p>
+    <p>解析做六件事，任一步失败即拒绝启动并给出可执行提示，不做兜底降级。设备与型号的匹配由平台在台架注册时完成 —— 连接清单与型号 BOM 属于装备属性配置，用例作者和驱动开发者都不需要手工传入型号或地址。</p>
     <table>
       <caption>表 3 · L2 解析的六个步骤与失败处理（方案细节）</caption>
       <thead>
         <tr><th style="width:14%">步骤</th><th style="width:24%">输入</th><th style="width:30%">判定</th><th style="width:32%">失败处理</th></tr>
       </thead>
       <tbody>
-        <tr><td class="em">1 读声明</td><td><code>station-types/*.json</code></td><td>能力名与版本范围存在且语法合法</td><td>缺字段或未知能力，拒绝启动</td></tr>
+        <tr><td class="em">1 装备属性</td><td>台架注册时录入的连接清单与型号 BOM</td><td>按 BOM 型号匹配能力与候选包</td><td>型号未登记，拒绝启动并列出缺失项</td></tr>
         <tr><td class="em">2 读 lock</td><td><code>benches/*/bench.lock.json</code></td><td>lock 的台型与当前台型一致</td><td>不一致，要求重新锁定</td></tr>
         <tr><td class="em">3 求解版本</td><td>注册表中的包清单</td><td>版本满足 ^ ~ &gt;= 约束且不冲突</td><td>无解或多解，列出候选并拒绝</td></tr>
         <tr><td class="em">4 校验完整性</td><td>包目录内容</td><td>tree_sha256 与 lock 记录一致</td><td>不一致，拒绝加载并重新导入</td></tr>
@@ -300,90 +314,98 @@
   <section id="s5">
     <div class="sec-head">
       <span class="folio">05</span>
-      <h2>开发视图<small>新增一个驱动只动三处：新增包目录、在台型声明里加一行能力约束、重新生成本台 lock；平台仓代码不改</small></h2>
+      <h2>开发视图<small>新增驱动只动三处：新增包目录、在台架装备属性里登记设备与型号、重新生成本台 lock；平台仓代码不改</small></h2>
     </div>
 
     <div class="twocol">
       <div>
-        <h3>manifest.json 示例</h3>
-        <pre><code>{
-  "<span class="s">name</span>": "vendor-model",            <span style="color:#5f5e57">// 包唯一名</span>
-  "<span class="s">version</span>": "1.0.0",
-  "<span class="s">capability</span>": "oscilloscope",     <span style="color:#5f5e57">// 能力，不是型号</span>
-  "<span class="s">contract</span>": "1.0",               <span style="color:#5f5e57">// 契约版本</span>
-  "<span class="s">entry</span>": "vendor_model.driver:VendorScope",
-  "<span class="s">vendor_deps</span>": ["VendorLib==2.3.1"],  <span style="color:#5f5e57">// 精确版本</span>
-  "<span class="s">runtime</span>": { "runner": "&gt;=1.6 &lt;2.0",
-             "python": "&gt;=3.11" },
-  "<span class="s">simulate</span>": true,                   <span style="color:#5f5e57">// 支持仿真</span>
-  "<span class="s">verified_on_hardware</span>": false,      <span style="color:#5f5e57">// 真机核对状态</span>
-  "<span class="s">owner</span>": "仪器驱动组",            <span style="color:#5f5e57">// 无主不入库</span>
-  "<span class="s">targets</span>": ["MXO44", "MXO54", "MXO58"]
-}</code></pre>
-      </div>
-      <div>
-        <h3>代码仓影响范围</h3>
-        <table>
-          <caption>表 4 · 影响范围（方案细节）</caption>
-          <thead><tr><th style="width:44%">路径</th><th style="width:16%">变更</th><th>说明</th></tr></thead>
+        <h3>代码结构：一个包 = 一个目录，四层各管一件事</h3>
+        <table class="tree">
           <tbody>
-            <tr><td><code>packages/&lt;名称&gt;/</code></td><td class="em">新增</td><td>manifest + pkg + vendor + conformance</td></tr>
-            <tr><td><code>station-types/&lt;台型&gt;.json</code></td><td class="em">改一行</td><td>加能力名与版本约束</td></tr>
-            <tr><td><code>benches/&lt;台架&gt;/bench.lock.json</code></td><td class="em">重新生成</td><td>记录版本与目录哈希</td></tr>
-            <tr><td><code>app/backend/drivers</code></td><td>不改</td><td>稳定集仍随平台发布</td></tr>
-            <tr><td><code>kit/</code> · <code>runtime/</code></td><td>不改</td><td>契约不变则无需改动</td></tr>
+            <tr><td class="b">drivers/</td><td>仓根：契约、工具、包与台架绑定</td></tr>
+            <tr><td class="p2">contracts/scope.py</td><td>能力、方法、量纲的唯一来源</td></tr>
+            <tr><td class="p2">kit/registry · resolve · conformance</td><td>注册、解析、一致性套件</td></tr>
+            <tr><td class="p2">runtime/session.py</td><td>会话、资源仲裁、超时与诊断</td></tr>
+            <tr><td class="p2 b">packages/rohde-schwarz-mxo/</td><td>一个共享包的全部内容</td></tr>
+            <tr><td class="p3">manifest.json</td><td>能力、契约、依赖、入口、owner</td></tr>
+            <tr><td class="p3">pkg/rs_mxo/driver.py</td><td>契约实现，厂商库只出现在这里</td></tr>
+            <tr><td class="p3">pkg/rs_mxo/scpi.py</td><td>命令表与返回解析</td></tr>
+            <tr><td class="p3">pkg/rs_mxo/simulate.py</td><td>能力层仿真实现</td></tr>
+            <tr><td class="p3">vendor/</td><td>厂商库离线副本，随包分发</td></tr>
+            <tr><td class="p3">conformance/test_contract.py</td><td>随包契约测试</td></tr>
+            <tr><td class="p2">station-types/scope-bench.json</td><td>台型 → 能力与版本约束</td></tr>
+            <tr><td class="p2">benches/BENCH-DEMO/bench.lock.json</td><td>锁定版本与目录哈希</td></tr>
+            <tr><td class="p2">ci/pack.py</td><td>出包、哈希、索引条目</td></tr>
+            <tr><td class="p2">tests/ · tools/</td><td>流程测试与命令行入口</td></tr>
           </tbody>
         </table>
       </div>
+      <div>
+        <h3>新增驱动需要开发的范围</h3>
+        <table>
+          <thead><tr><th style="width:34%">工作</th><th>产出</th><th style="width:18%">规模</th></tr></thead>
+          <tbody>
+            <tr><td>实现契约子集</td><td>driver.py 覆盖本设备用到的能力方法</td><td class="em">1–2 天</td></tr>
+            <tr><td>写命令与解析</td><td>scpi.py 命令表 + 返回字段解析</td><td class="em">1–3 天</td></tr>
+            <tr><td>写能力层仿真</td><td>simulate.py 返回合法结构与量纲</td><td class="em">0.5 天</td></tr>
+            <tr><td>随包契约测试</td><td>conformance/test_contract.py</td><td class="em">0.5 天</td></tr>
+            <tr><td>出包与登记</td><td>zip + 索引条目 + 台架装备属性</td><td class="em">0.5 天</td></tr>
+          </tbody>
+        </table>
+
+        <h3>manifest.json 示例（必填字段）</h3>
+        <pre class="mini"><code>{
+  "<span class="s">name</span>": "vendor-model",  "<span class="s">version</span>": "1.0.0",
+  "<span class="s">capability</span>": "oscilloscope",  "<span class="s">contract</span>": "1.0",
+  "<span class="s">entry</span>": "vendor_model.driver:VendorScope",
+  "<span class="s">vendor_deps</span>": ["VendorLib==2.3.1"],
+  "<span class="s">runtime</span>": { "runner": "&gt;=1.6", "python": "&gt;=3.11" },
+  "<span class="s">simulate</span>": true,  "<span class="s">owner</span>": "仪器驱动组"
+}</code></pre>
+      </div>
     </div>
 
-    <h3>开发步骤</h3>
-    <ol class="steps">
-      <li>建包目录并写 manifest：只声明能力、契约、依赖与入口。</li>
-      <li>实现契约子集，跑 conformance 直到 13 项全过。</li>
-      <li>仿真回归通过后，接一个真实台型跑通采集与测量。</li>
-      <li>出包 → 导入私有索引 → 写 lock → 台架重启生效。</li>
-    </ol>
-    <p class="note">不再需要的动作：改平台仓、发主程序、逐台升级。这也是「非标设备变更不再触发主程序发版」这条判据的落点。</p>
+    <p class="note">不再需要的动作：改平台仓、发主程序、逐台升级。这也是「新增设备不再触发主程序发版」这条判据的落点。</p>
   </section>
 
   <section id="s6">
     <div class="sec-head">
       <span class="folio">06</span>
-      <h2>仿真模式：只实现接口，不实现功能<small>在与真机相同的驱动代码路径上替换 IO 层，返回结构合法、量纲一致的数据</small></h2>
+      <h2>仿真模式：只在能力层实现<small>在能力层提供一个满足契约的替身实现，不接管连接与链路，也不模拟仪器物理行为</small></h2>
     </div>
 
-    <p>仿真不是模拟仪器的物理行为，而是满足契约形状：方法可调用、返回结构完整、单位与量纲一致。驱动逻辑与真机共用一套代码，只有 IO 被替换 —— 因此仿真通过能说明契约实现与解析链路正确，不能说明仪器可用。</p>
+    <p>仿真发生在 L1 包层内部：同一个契约实现里，按模式选择真机分支或仿真分支。分层到契约层为止 —— 连接、寻址、会话仍由既有链路负责，仿真不介入，因此逻辑视图里也没有单独的链路层。</p>
 
     <div class="twocol">
       <div>
-        <h3>实现什么</h3>
+        <h3>仿真什么</h3>
         <ul class="plain">
-          <li>承接全部契约方法，参数校验与真机一致</li>
-          <li>返回合法结构：波形采样、时间轴、身份信息、测量值</li>
-          <li>数值由固定模型生成，服从量程与垂直档位关系</li>
+          <li>契约方法的全部返回值：波形采样、时间轴、身份信息、测量值</li>
+          <li>数值由固定模型按量程与垂直档位生成，量纲与单位正确</li>
+          <li>参数校验、异常类型与真机实现保持一致</li>
         </ul>
       </div>
       <div>
-        <h3>不实现什么</h3>
+        <h3>不仿真什么</h3>
         <ul class="plain neg">
           <li>不模拟噪声、带宽、探头衰减等物理特性</li>
-          <li>不保证数值精度：仿真通过不等于真机通过</li>
-          <li>不替代现场验收，只替代无硬件环境下的契约回归</li>
+          <li>不接管连接、寻址与链路，不产生真实报文</li>
+          <li>不替代现场验收：仿真通过不等于真机通过</li>
         </ul>
       </div>
     </div>
 
     <table>
-      <caption>表 5 · 仿真模式的实现方案（方案细节）</caption>
+      <caption>表 5 · 能力层仿真的实现方案（方案细节）</caption>
       <thead><tr><th style="width:18%">要素</th><th>做法</th></tr></thead>
       <tbody>
-        <tr><td class="em">入口切换</td><td>设备档案写 <code>mode=simulate</code> 才启用；未写默认硬件模式，缺库即报错</td></tr>
-        <tr><td class="em">IO 替身</td><td>SimIo 实现 write_str / query_str / query_bin_block 三个方法</td></tr>
-        <tr><td class="em">波形生成</td><td>按幅值与垂直档位生成整屏两个周期，采样数与采样间隔固定</td></tr>
-        <tr><td class="em">测量取值</td><td>由最近一次波形推算，量纲与契约一致，不调用仪器测量功能</td></tr>
-        <tr><td class="em">身份信息</td><td>返回固定厂商、型号、序列号与固件串，字段齐全</td></tr>
-        <tr><td class="em">门禁定位</td><td>进入 CI 与双台型回归，替代无硬件环境的契约检查</td></tr>
+        <tr><td class="em">仿真位置</td><td>L1 包层内部，与真机实现同目录、同契约、同调用路径</td></tr>
+        <tr><td class="em">选择方式</td><td>设备档案写 <code>mode=simulate</code> 时选仿真分支；未写默认真机分支</td></tr>
+        <tr><td class="em">能力覆盖</td><td>只覆盖该包声明实现的能力方法，未实现的能力保持不支持</td></tr>
+        <tr><td class="em">返回值</td><td>结构完整、字段齐全、单位与量纲和契约一致</td></tr>
+        <tr><td class="em">数值来源</td><td>固定模型生成，随量程与垂直档位变化，不读任何真实数据</td></tr>
+        <tr><td class="em">链路状态</td><td>不介入连接、寻址与会话；地址仍由装备属性提供</td></tr>
+        <tr><td class="em">门禁定位</td><td>进 CI 与双台型回归，替代无硬件环境的契约检查</td></tr>
         <tr><td class="em">禁止事项</td><td>不参与现场验收；真机核对通过前 verified_on_hardware 保持 false</td></tr>
       </tbody>
     </table>
@@ -400,39 +422,63 @@
   <section id="s7">
     <div class="sec-head">
       <span class="folio">07</span>
-      <h2>落地顺序<small>先冻结契约，再建仓与门禁，试点闭环后批量迁移</small></h2>
+      <h2>推进策略<small>每阶段有交付物、有判据，才进入下一阶段；顺序不可调换</small></h2>
     </div>
 
     <div class="road">
       <div>
         <div class="p">P0</div><div class="w">第 1–4 周</div>
         <h4>盘点与冻结</h4>
-        <ul><li>设备清单按能力聚类，收敛至 20 个能力族</li><li>输出三类包归属表</li><li>冻结契约 1.0 与设备档案字段</li></ul>
-        <div class="gate">判据：契约与归属表通过评审</div>
+        <ul>
+          <li>设备台账按能力聚类，收敛为 20 个能力族清单</li>
+          <li>逐族确定方法、参数、返回字段与量纲</li>
+          <li>出三类包归属表，逐台设备标注归属与责任人</li>
+          <li>冻结契约 1.0、装备属性字段、lock 格式</li>
+        </ul>
+        <div class="del"><b>交付</b> 能力族清单 / 归属表 / 契约 1.0</div>
+        <div class="gate"><b>判据</b> 契约与归属表通过评审，无未归属设备</div>
       </div>
       <div>
         <div class="p">P1</div><div class="w">第 5–10 周</div>
         <h4>仓库与门禁</h4>
-        <ul><li>建立 contracts / packages / kit / runtime</li><li>出包流程与私有索引</li><li>CI：契约 → 仿真 → 双台型回归</li></ul>
-        <div class="gate">判据：空白包可走完流程并产出签名 zip</div>
+        <ul>
+          <li>建 contracts / packages / kit / runtime 四层目录</li>
+          <li>实现注册表、解析器、一致性与仿真套件</li>
+          <li>出包流程：打包、哈希、索引条目、离线导入</li>
+          <li>CI 三段：契约 → 仿真 → 双台型回归</li>
+        </ul>
+        <div class="del"><b>交付</b> 可运行骨架 + 模板包 + 私有索引</div>
+        <div class="gate"><b>判据</b> 模板包可出包并被两台架离线加载</div>
       </div>
       <div>
         <div class="p">P2</div><div class="w">第 11–16 周</div>
         <h4>首个共享包试点</h4>
-        <ul><li>首个共享包完成真机核对</li><li>两个台型离线导入并灰度</li><li>回滚演练并计时</li></ul>
-        <div class="gate">判据：回滚 ≤ 5 分钟，双台型回归通过</div>
+        <ul>
+          <li>首个共享包完成真机核对，清空待核实命令</li>
+          <li>两个台型离线导入，灰度一周并记录差异</li>
+          <li>回滚演练：改 lock 回退，计时取证</li>
+          <li>平台注册表改为「基线 + 包清单」合并</li>
+        </ul>
+        <div class="del"><b>交付</b> 首个共享包正式版 + 试点报告</div>
+        <div class="gate"><b>判据</b> 回滚 ≤ 5 分钟，双台型回归全部通过</div>
       </div>
       <div>
         <div class="p">P3</div><div class="w">第 17 周起</div>
         <h4>批量迁移与治理</h4>
-        <ul><li>按台型分批迁移，批次间留观察窗</li><li>维护包目录：owner、版本、EOL</li><li>基线冻结在十来个设备族</li></ul>
-        <div class="gate">判据：新增设备不再触发主程序发版</div>
+        <ul>
+          <li>按台型分批迁移，每批 5–8 台，留两周观察窗</li>
+          <li>独立包登记进台架清单，不进入主干分支</li>
+          <li>维护包目录：owner、版本、EOL、兼容矩阵</li>
+          <li>季度复盘：新增设备是否仍触发主程序发版</li>
+        </ul>
+        <div class="del"><b>交付</b> 迁移台账 + 包目录 + 兼容矩阵</div>
+        <div class="gate"><b>判据</b> 新增设备不再触发主程序发版</div>
       </div>
     </div>
   </section>
 
   <footer>
-    <span>ATE Runner · 驱动软件管理方案 · v2</span>
+    <span>ATE Runner · 驱动软件管理方案 · v4</span>
     <span>问题 → 分类 → 代码方案 → 分层 → 开发 → 仿真 → 落地</span>
   </footer>
 
