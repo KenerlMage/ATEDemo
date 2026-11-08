@@ -1,0 +1,23 @@
+{
+  "bench": "BENCH-CAB",
+  "station_type": "standard-bench",
+  "devices": {
+    "oscilloscope": {
+      "resource": "TCPIP::192.168.10.21::INSTR",
+      "mode": "simulate",
+      "timeout_ms": 15000
+    },
+    "camera": {
+      "resource": "serial:SIM0001",
+      "mode": "simulate",
+      "timeout_ms": 5000,
+      "max_width": 320,
+      "max_height": 240
+    },
+    "hexapod": {
+      "resource": "tcpip://192.168.10.31:50000",
+      "mode": "simulate",
+      "timeout_ms": 30000
+    }
+  }
+}

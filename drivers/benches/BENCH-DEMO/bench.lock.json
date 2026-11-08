@@ -10,7 +10,7 @@
       "tree_sha256": "5744b992f2e336b5ff10df70ab4320cf1855f14dab4e355200684831a3aa289a"
     }
   ],
-  "locked_at": "2026-11-08T23:01:21+08:00",
+  "locked_at": "2026-11-08T23:14:50+08:00",
   "distribution": {
     "mode": "platform-repo",
     "repo": "dist/repo",

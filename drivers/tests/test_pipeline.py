@@ -14,8 +14,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+for _pkg in ("rohde-schwarz-mxo", "basler-pypylon", "pi-hexapod"):
+    _p = str(ROOT / "packages" / _pkg / "pkg")
+    if _p not in sys.path:
+        sys.path.append(_p)
 
-from kit.conformance import run_suite  # noqa: E402
+from kit.conformance import run_camera_suite, run_motion_suite, run_suite  # noqa: E402
 from kit.registry import Registry  # noqa: E402
 from kit.resolve import ResolveError, load_station_type, resolve  # noqa: E402
 from runtime.session import DeviceRecord, DriverSession  # noqa: E402
@@ -34,14 +38,22 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(len(m.tree_sha256), 64)
 
     def test_tier_declared_and_valid(self) -> None:
-        # 示波器是标准柜内固定配置：tier=baseline，不是共享包
-        self.assertEqual(self.reg.by_tier("baseline")[0].name, "rohde-schwarz-mxo")
-        self.assertEqual(self.reg.by_tier("shared"), [])
+        # 示波器与工业相机是柜内固定配置（baseline）；六足平台多台型复用但非标配（shared）
+        baseline = sorted(m.name for m in self.reg.by_tier("baseline"))
+        self.assertEqual(baseline, ["basler-pypylon", "rohde-schwarz-mxo"])
+        self.assertEqual([m.name for m in self.reg.by_tier("shared")], ["pi-hexapod"])
+        self.assertEqual(self.reg.by_tier("station"), [])
 
     def test_channel_and_distribution(self) -> None:
-        m = self.reg.by_tier("baseline")[0]
-        self.assertIn(m.channel, ("stable", "canary"))
-        self.assertEqual(m.distribution, "platform-repo")
+        for m in self.reg.all():
+            self.assertIn(m.channel, ("stable", "canary"))
+            self.assertEqual(m.distribution, "platform-repo")
+
+    def test_three_capabilities_registered(self) -> None:
+        caps = sorted(m.capability for m in self.reg.all())
+        self.assertEqual(caps, ["camera", "hexapod", "oscilloscope"])
+        for m in self.reg.all():
+            self.assertTrue(m.vendor_deps, f"{m.name} 未声明 vendor_deps")
 
     def test_find_by_spec(self) -> None:
         self.assertTrue(self.reg.find("oscilloscope", "rohde-schwarz-mxo", "^1.2"))
@@ -187,6 +199,148 @@ class RepoTest(unittest.TestCase):
         lock["resolved"][0]["version"] = "9.9.9"
         lock_path.write_text(json.dumps(lock), encoding="utf-8")
         self.assertFalse(repo.plan(lock_path, site)[0]["in_repo"])
+
+
+class CameraPackageTest(unittest.TestCase):
+    """相机包：能力层仿真 + 契约套件 + 实模式缺库时的错误语义。"""
+
+    def setUp(self) -> None:
+        from basler_pypylon import BaslerCamera  # noqa: WPS433
+
+        self.cls = BaslerCamera
+
+    def test_conformance(self) -> None:
+        checks = run_camera_suite(lambda: self.cls("serial:SIM1", mode="simulate"), expect_mode="simulate")
+        failed = [c for c in checks if not c.ok]
+        self.assertFalse(failed, "; ".join(f"{c.name}: {c.detail}" for c in failed))
+
+    def test_simulation_is_capability_layer(self) -> None:
+        drv = self.cls("serial:SIM1", mode="simulate")
+        drv.connect()
+        try:
+            self.assertIsNone(drv._cam)
+            snap = drv.describe()
+            self.assertEqual(snap["simulation"]["layer"], "capability")
+            self.assertTrue(snap["simulation"]["active"])
+        finally:
+            drv.close()
+
+    def test_hardware_without_sdk_raises(self) -> None:
+        from contracts.camera import CameraError
+
+        drv = self.cls("serial:0000", mode="hardware")
+        with self.assertRaises(CameraError):
+            drv.connect()
+
+    def test_statistics_shared_definition(self) -> None:
+        from contracts.camera import ExposureSpec, compute_statistics
+
+        drv = self.cls("serial:SIM1", mode="simulate")
+        drv.connect()
+        try:
+            drv.configure_exposure(ExposureSpec(exposure_us=8000))
+            frame = drv.grab(1)[0]
+            expect = compute_statistics(frame.samples(), width=frame.width)
+            for item, value in expect.items():
+                self.assertAlmostEqual(drv.statistics(frame, item), value, places=6)
+            # 曝光翻倍，亮度必须上升
+            drv.configure_exposure(ExposureSpec(exposure_us=16000))
+            brighter = drv.statistics(drv.grab(1)[0], "mean_gray")
+            self.assertGreater(brighter, expect["mean_gray"])
+        finally:
+            drv.close()
+
+
+class HexapodPackageTest(unittest.TestCase):
+    """六足包：能力层仿真 + 契约套件 + 未回零拒绝运动。"""
+
+    def setUp(self) -> None:
+        from pi_hexapod import PiHexapod  # noqa: WPS433
+
+        self.cls = PiHexapod
+
+    def test_conformance(self) -> None:
+        checks = run_motion_suite(lambda: self.cls("tcpip://127.0.0.1:50000", mode="simulate"))
+        failed = [c for c in checks if not c.ok]
+        self.assertFalse(failed, "; ".join(f"{c.name}: {c.detail}" for c in failed))
+
+    def test_reference_required(self) -> None:
+        from contracts.motion import MotionUnsupported
+
+        drv = self.cls("tcpip://127.0.0.1:50000", mode="simulate")
+        drv.connect()
+        try:
+            with self.assertRaises(MotionUnsupported):
+                drv.move_to({"X": 100.0})
+            drv.reference()
+            pos = drv.move_to({"X": 1500.0, "Z": -800.0})
+            self.assertAlmostEqual(pos.get("X"), 1500.0, places=3)
+            self.assertAlmostEqual(pos.get("Z"), -800.0, places=3)
+        finally:
+            drv.close()
+
+    def test_limit_and_axis_errors(self) -> None:
+        from contracts.motion import MotionLimitError, MotionUnsupported
+
+        drv = self.cls("tcpip://127.0.0.1:50000", mode="simulate")
+        drv.connect()
+        try:
+            drv.reference()
+            with self.assertRaises(MotionLimitError):
+                drv.move_to({"X": 1e6})
+            with self.assertRaises(MotionUnsupported):
+                drv.move_to({"Q": 1.0})
+        finally:
+            drv.close()
+
+    def test_hardware_without_sdk_raises(self) -> None:
+        from contracts.motion import MotionError
+
+        drv = self.cls("tcpip://127.0.0.1:50000", mode="hardware")
+        with self.assertRaises(MotionError):
+            drv.connect()
+
+
+class MultiCapabilityStationTest(unittest.TestCase):
+    """一台柜内三台设备：解析 → 会话 → 各自仿真跑通。"""
+
+    def setUp(self) -> None:
+        self.reg = Registry(ROOT)
+        self.reg.load()
+        self.station = load_station_type(ROOT / "station-types" / "standard-bench.json")
+
+    def test_resolve_three_packages(self) -> None:
+        rs = resolve(self.station, self.reg, contract_version="1.0")
+        labels = {r.capability: r.label for r in rs}
+        self.assertEqual(sorted(labels), ["camera", "hexapod", "oscilloscope"])
+        self.assertEqual(labels["camera"], "basler-pypylon@1.0.0")
+        self.assertEqual(labels["hexapod"], "pi-hexapod@1.0.0")
+
+    def test_session_runs_all_capabilities(self) -> None:
+        from contracts.camera import ExposureSpec, RoiSpec
+
+        rs = resolve(self.station, self.reg, contract_version="1.0")
+        devices = {
+            "oscilloscope": DeviceRecord("oscilloscope", "SIM::MXO", mode="simulate"),
+            "camera": DeviceRecord("camera", "serial:SIM1", mode="simulate"),
+            "hexapod": DeviceRecord("hexapod", "tcpip://127.0.0.1:50000", mode="simulate"),
+        }
+        with DriverSession(rs, devices, bench="BENCH-CAB") as s:
+            with s.operation("oscilloscope") as scope:
+                scope.configure_timebase(time_span_s=1e-3)
+                scope.configure_channel(1, scale_v=0.5)
+                self.assertEqual(scope.acquire([1], points=500)[1].n, 500)
+            with s.operation("camera") as cam:
+                cam.configure_exposure(ExposureSpec(exposure_us=9000))
+                cam.configure_roi(RoiSpec(width=160, height=120))
+                frame = cam.grab(1)[0]
+                self.assertGreater(cam.statistics(frame, "mean_gray"), 0)
+            with s.operation("hexapod") as stage:
+                stage.reference()
+                self.assertAlmostEqual(stage.move_to({"X": 200.0}).get("X"), 200.0, places=3)
+            snap = s.describe()
+            self.assertEqual(len(snap["devices"]), 3)
+            self.assertTrue(all(d["connected"] for d in snap["devices"]))
 
 
 if __name__ == "__main__":

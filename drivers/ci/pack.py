@@ -25,7 +25,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kit.registry import Registry, RegistryError, tree_sha256  # noqa: E402
 
-VENDOR_HINTS = ("RsInstrument", "pyvisa", "pypylon", "pylibfranka", "import visa")
+VENDOR_HINTS = (
+    "RsInstrument",
+    "pyvisa",
+    "pypylon",
+    "pipython",
+    "pylibfranka",
+    "import visa",
+)
 
 
 def build(root: Path, out_dir: Path, channel: str = "stable") -> dict:

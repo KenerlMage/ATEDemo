@@ -1,0 +1,22 @@
+{
+  "name": "pi-hexapod",
+  "version": "1.0.0",
+  "tier": "shared",
+  "capability": "hexapod",
+  "contract": "1.0",
+  "entry": "pi_hexapod.driver:PiHexapod",
+  "channel": "stable",
+  "distribution": "platform-repo",
+  "owner": "运动控制组",
+  "runtime": {
+    "runner": ">=1.6",
+    "python": ">=3.9"
+  },
+  "simulate": true,
+  "simulate_layer": "capability",
+  "verified_on_hardware": false,
+  "vendor_deps": [
+    "pipython==2.13.0.2"
+  ],
+  "notes": "多台型复用但非柜内标配，按共享包独立发版。真机未核对：qIDN 字段顺序、qTMN/qTMX 对空间轴的返回、MOV 的 dict 形式、FRF/GOH 回零命令（见 gcs.py 的 VERIFY 列表）。"
+}

@@ -1,0 +1,27 @@
+{
+  "station_type": "standard-bench",
+  "description": "标准化主控柜综合台：柜内示波器 + 工业相机 + 六足平台；光功率计为选配",
+  "requires": [
+    {
+      "capability": "oscilloscope",
+      "package": "rohde-schwarz-mxo",
+      "version": "^1.3"
+    },
+    {
+      "capability": "camera",
+      "package": "basler-pypylon",
+      "version": "^1.0"
+    },
+    {
+      "capability": "hexapod",
+      "package": "pi-hexapod",
+      "version": "^1.0"
+    },
+    {
+      "capability": "optical-power-meter",
+      "package": "exfo-pm-100",
+      "version": "^1.4",
+      "optional": true
+    }
+  ]
+}

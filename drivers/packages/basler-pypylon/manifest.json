@@ -1,0 +1,22 @@
+{
+  "name": "basler-pypylon",
+  "version": "1.0.0",
+  "tier": "baseline",
+  "capability": "camera",
+  "contract": "1.0",
+  "entry": "basler_pypylon.driver:BaslerCamera",
+  "channel": "stable",
+  "distribution": "platform-repo",
+  "owner": "机器视觉组",
+  "runtime": {
+    "runner": ">=1.6",
+    "python": ">=3.9"
+  },
+  "simulate": true,
+  "simulate_layer": "capability",
+  "verified_on_hardware": false,
+  "vendor_deps": [
+    "pypylon==26.10"
+  ],
+  "notes": "标准柜内固定配置的工业相机，随平台版本发布。真机未核对：ExposureTime 单位、ROI 步长、GetArray dtype（见 api.py 的 VERIFY 列表）。"
+}
