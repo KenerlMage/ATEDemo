@@ -1,0 +1,11 @@
+{
+  "bench": "BENCH-DEMO",
+  "station_type": "scope-bench",
+  "devices": {
+    "oscilloscope": {
+      "resource": "TCPIP::192.168.10.21::INSTR",
+      "mode": "simulate",
+      "timeout_ms": 15000
+    }
+  }
+}

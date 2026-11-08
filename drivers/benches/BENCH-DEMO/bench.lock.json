@@ -1,0 +1,14 @@
+{
+  "bench": "BENCH-DEMO",
+  "station_type": "scope-bench",
+  "runner": "1.7.3",
+  "resolved": [
+    {
+      "capability": "oscilloscope",
+      "package": "rohde-schwarz-mxo",
+      "version": "1.2.0",
+      "tree_sha256": "d67a6b6a57f1ba7c90bab1207247a07f044772cb40b11d7852ca2228f47cbd23"
+    }
+  ],
+  "locked_at": "2026-11-08T21:40:52+08:00"
+}

@@ -1,0 +1,17 @@
+{
+  "station_type": "scope-bench",
+  "description": "示波器测量台：柜内 R&S MXO 示波器，预留光功率计与直流电源能力",
+  "requires": [
+    {
+      "capability": "oscilloscope",
+      "package": "rohde-schwarz-mxo",
+      "version": "^1.2"
+    },
+    {
+      "capability": "optical-power-meter",
+      "package": "exfo-pm-100",
+      "version": "^1.4",
+      "optional": true
+    }
+  ]
+}

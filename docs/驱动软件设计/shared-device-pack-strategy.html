@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>非标配但多台型复用设备的管理策略</title>
+<style>
+  :root{
+    --paper:#fafaf9;
+    --ink:#141414;
+    --ink-soft:#3c3b36;
+    --muted:#6f6e66;
+    --rule:#dbd7cf;
+    --rule-strong:#b9b4a9;
+    --accent:#8b0f1a;
+    --wash:#f1efe9;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.62;
+  }
+  .page{max-width:1080px;margin:0 auto;padding:72px 56px 96px}
+  .kicker{
+    font-family:"Consolas",monospace;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 22px
+  }
+  h1{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC","SimSun",serif;
+    font-weight:600;font-size:clamp(29px,4.1vw,44px);line-height:1.14;
+    letter-spacing:-.02em;margin:0 0 20px;max-width:26ch;
+  }
+  .lede{font-size:17.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch;margin:0 0 30px}
+  .meta{
+    display:flex;flex-wrap:wrap;gap:10px 34px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+    padding:12px 0;margin:0 0 52px
+  }
+  .meta b{color:var(--ink);font-weight:600}
+
+  .verdict{
+    border:1px solid var(--ink);padding:26px 28px;margin:0 0 56px;
+    display:grid;grid-template-columns:88px 1fr;gap:24px;align-items:start
+  }
+  .verdict .tag{
+    font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);border-top:2px solid var(--accent);padding-top:8px
+  }
+  .verdict p{margin:0;font-size:18.5px;line-height:1.5}
+  .verdict p + p{margin-top:12px;font-size:15px;color:var(--ink-soft)}
+
+  section{margin:0 0 58px}
+  h2{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    font-size:25px;font-weight:600;line-height:1.25;margin:0 0 6px;
+    display:flex;gap:16px;align-items:baseline
+  }
+  h2 .num{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent);font-weight:400;flex:none}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px;max-width:74ch}
+  p{margin:0 0 16px;max-width:74ch}
+
+  /* 四象限 */
+  .quad{
+    display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule-strong);
+    border:1px solid var(--rule-strong);margin:16px 0 14px
+  }
+  .cell{background:var(--paper);padding:22px 24px}
+  .cell .ax{
+    font-family:"Consolas",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);display:block;margin-bottom:8px
+  }
+  .cell h3{
+    font-family:"Iowan Old Style",Georgia,"Songti SC",serif;font-size:19px;font-weight:600;
+    margin:0 0 8px;letter-spacing:-.01em
+  }
+  .cell p{font-size:13.6px;line-height:1.6;margin:0;color:var(--ink-soft);max-width:none}
+  .cell p + p{margin-top:8px}
+  .cell.hero{background:var(--wash)}
+  .cell.hero h3{color:var(--accent)}
+  .axis-note{
+    font-family:"Consolas",monospace;font-size:11px;color:var(--muted);letter-spacing:.04em;
+    display:flex;justify-content:space-between;margin:0 0 6px
+  }
+
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:14px;table-layout:fixed}
+  caption{
+    text-align:left;font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);padding-bottom:10px
+  }
+  th{
+    text-align:left;font-family:"Consolas",monospace;font-weight:400;font-size:10.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1px solid var(--rule-strong);padding:0 14px 9px 0;vertical-align:bottom
+  }
+  td{border-bottom:1px solid var(--rule);padding:13px 14px 13px 0;vertical-align:top;line-height:1.55}
+  th:last-child,td:last-child{padding-right:0}
+  td:first-child{font-weight:600}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+  .yes{color:var(--accent);font-family:"Consolas",monospace;font-size:12px}
+  .no{color:var(--muted);font-family:"Consolas",monospace;font-size:12px}
+
+  pre{
+    background:var(--wash);border:1px solid var(--rule-strong);border-left:3px solid var(--ink);
+    padding:16px 18px;overflow-x:auto;margin:14px 0 12px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:12.4px;line-height:1.62;
+    color:#26251f
+  }
+  pre .c{color:var(--muted)}
+  pre .k{color:var(--accent)}
+
+  .note{
+    font-size:13.5px;color:var(--muted);max-width:76ch;margin:0 0 10px;
+    padding-left:16px;border-left:2px solid var(--rule)
+  }
+
+  ul.rules{list-style:none;padding:0;margin:12px 0 0}
+  ul.rules li{padding:15px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:start}
+  ul.rules li:first-child{border-top:1px solid var(--rule-strong)}
+  ul.rules .rid{font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding-top:3px}
+  ul.rules .rbody{font-size:14px;line-height:1.6}
+  ul.rules .rbody b{font-weight:600}
+
+  .anti{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--rule-strong);margin:14px 0 0}
+  .anti > div{padding:22px 24px}
+  .anti > div + div{border-left:1px solid var(--rule-strong)}
+  .anti h3{font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400;margin:0 0 12px}
+  .anti ul{margin:0;padding-left:16px}
+  .anti li{font-size:13.5px;line-height:1.6;margin-bottom:9px;color:var(--ink-soft)}
+  .anti li:last-child{margin-bottom:0}
+
+  ol.road{list-style:none;counter-reset:r;padding:0;margin:12px 0 0}
+  ol.road li{counter-increment:r;display:grid;grid-template-columns:86px 1fr;gap:18px;padding:15px 0;border-bottom:1px solid var(--rule);align-items:start}
+  ol.road li:first-child{border-top:1px solid var(--rule-strong)}
+  ol.road li::before{content:counter(r,decimal-leading-zero);font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  ol.road b{font-weight:600}
+  ol.road span.d{display:block;color:var(--ink-soft);font-size:13.8px;margin-top:3px}
+
+  .closing{
+    border-top:1px solid var(--rule-strong);margin-top:60px;padding-top:22px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap
+  }
+  @media (max-width:780px){
+    .page{padding:44px 22px 64px}
+    .verdict{grid-template-columns:1fr;gap:14px}
+    .quad{grid-template-columns:1fr}
+    .anti{grid-template-columns:1fr}
+    .anti > div + div{border-left:0;border-top:1px solid var(--rule-strong)}
+    ul.rules li{grid-template-columns:1fr;gap:6px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="kicker">ATE Runner · 驱动战略 · 决策备忘 03</p>
+  <h1>多台型复用、但不在标准柜配置里的设备，归谁管</h1>
+  <p class="lede">不要放进平台基线，也不要让它们散在各自测试台里。<b>正确位置是「共享包」层</b>：由平台治理、但按台型声明依赖、独立版本发布。判断归属不看「是不是标配」，看<b>复用台型数</b>与<b>变更风险</b>两个轴。</p>
+  <div class="meta">
+    <span>对象 · <b>非标配 × 多台型复用的夹心设备</b></span>
+    <span>版本 · <b>v1</b></span>
+    <span>日期 · <b>2026-11-08</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">Verdict</div>
+    <div>
+      <p>不进平台基线，进<b>平台治理的共享包目录</b>。平台负责契约、注册表、版本解析与兼容矩阵；设备实现本身是独立版本、独立发布的包。</p>
+      <p>关键动作是把「复用关系」变成机器可读的<b>台型清单</b>（哪个台型依赖哪个包、锁哪个版本），而不是靠人记、靠文档约定。没有这份清单，共享包三个月就会退化成没人敢动的公共垃圾场。</p>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>归位的判断轴：两个维度，不是一个是非题</h2>
+    <p class="sub">「在不在标准柜里」只是一维，它回答不了这类设备的归属。加上「被几个台型复用」这一维，四象限一画，夹心设备自然落到左上角。</p>
+    <p class="axis-note"><span>纵轴 · 复用台型数</span><span>横轴 · 是否标准柜配置</span></p>
+    <div class="quad">
+      <div class="cell hero">
+        <span class="ax">多台型 × 非标配</span>
+        <h3>共享包（本文对象）</h3>
+        <p>多个台型复用，但柜内不标配。既不能进基线（会把基线拖成杂货铺），也不能下放到单台（会重复维护 N 份）。</p>
+        <p><b>处置：独立驱动包 + 台型清单声明依赖 + 平台统一解析。</b></p>
+      </div>
+      <div class="cell">
+        <span class="ax">多台型 × 标配</span>
+        <h3>平台基线</h3>
+        <p>每个柜子都有，随平台版本发布。数量应稳定在十来个设备族，越多说明基线在漂移。</p>
+        <p><b>处置：并入基线，同时设升格门槛防止无限扩张。</b></p>
+      </div>
+      <div class="cell">
+        <span class="ax">单台型 × 非标配</span>
+        <h3>站点包</h3>
+        <p>只有一个台型用，通常是专用夹具配套设备或供应商私有协议设备。</p>
+        <p><b>处置：现场挂载，不走平台发布流程，但仍须实现同一契约并签名。</b></p>
+      </div>
+      <div class="cell">
+        <span class="ax">单台型 × 标配</span>
+        <h3>随基线走</h3>
+        <p>柜里有、但当前只有一个台型用到（例如备用接口卡）。</p>
+        <p><b>处置：留在基线，等第二个台型出现再判断是否独立成包。</b></p>
+      </div>
+    </div>
+    <p class="note">第二维不够时再加风险维：<b>停产风险高</b>或<b>固件版本敏感</b>的设备，即使只用在一个台型，也建议独立成包 —— 因为它迟早需要「新旧两版共存」。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>三层发布物，各有各的发布通道</h2>
+    <p class="sub">三个层级不是行政划分，是三种不同的发布节奏与回滚粒度。混在一起，任何一种节奏都会绑架其他两种。</p>
+    <table>
+      <caption>归属与发布节奏</caption>
+      <thead>
+        <tr><th style="width:16%">层</th><th style="width:24%">典型对象</th><th style="width:22%">发布节奏</th><th style="width:19%">回滚粒度</th><th style="width:19%">谁批准</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>基线包</td>
+          <td>电源、DMM、矩阵、相机、程控负载</td>
+          <td>随平台大版本，季度级</td>
+          <td>整平台</td>
+          <td>平台团队</td>
+        </tr>
+        <tr>
+          <td><b>共享包</b></td>
+          <td>光功率计、频谱仪、电子负载、专用采集卡、厂商私有协议设备</td>
+          <td>独立版本，月度级，可灰度</td>
+          <td>单包单版本</td>
+          <td>包 owner + 平台契约校验</td>
+        </tr>
+        <tr>
+          <td>站点包</td>
+          <td>单台专用夹具控制器、临时替代设备</td>
+          <td>随建台 / 换夹具</td>
+          <td>单台</td>
+          <td>站点负责人</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">「共享包」这一层的存在价值，就是把「多台型复用」的维护成本摊薄，同时不让它污染基线。<b>它是本题唯一正确的落点</b> —— 放进基线会拖垮发布节奏，放进站点包会变成 N 份复制。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>机制：台型清单 + 平台解析</h2>
+    <p class="sub">共享包要能被管住，靠的不是流程文档，是机器可读的依赖声明。每个台型一份清单，平台启动时解析，缺包或冲突立即报错。</p>
+    <pre><span class="c"># station-type.yaml —— 台型声明（随台型版本走，进版本库）</span>
+<span class="k">station_type</span>: optical-coupling-01
+
+<span class="k">requires</span>:
+  - <span class="k">capability</span>: dmm            <span class="c"># 用能力名，不用型号</span>
+    <span class="k">package</span>: keysight-34461a
+    <span class="k">version</span>: "^2.3"
+
+  - <span class="k">capability</span>: optical-power-meter
+    <span class="k">package</span>: exfo-pm-100
+    <span class="k">version</span>: "1.4.*"
+    <span class="k">channel_map</span>: fixtures/coupling-01.yaml   <span class="c"># 站点绑定的通道映射</span>
+
+  - <span class="k">capability</span>: camera
+    <span class="k">package</span>: basler-pylon
+    <span class="k">version</span>: "&gt;=8.1 &lt;9"
+    <span class="k">optional</span>: true          <span class="c"># 该台型可无相机运行</span></pre>
+    <p>三个设计要点，决定了这套能不能在几百台上活下来：</p>
+    <ul class="rules">
+      <li><span class="rid">按能力声明</span><span class="rbody">写 <code>optical-power-meter</code> 而不是型号。这样某个型号停产时，只需在目录里给能力挂一个替代实现，台型清单<b>一行都不用改</b>。</span></li>
+      <li><span class="rid">版本可共存</span><span class="rbody">不同台型锁不同主版本，平台解析器支持同一设备并行安装两版。共享包最容易出的事故，就是被强制统一升级。</span></li>
+      <li><span class="rid">装机只装所需</span><span class="rbody">几百台不装全量包，按清单解析出实际需要的十几个包。装机时间与故障面同时下降。</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>治理四条：共享包最容易死在这</h2>
+    <p class="sub">共享包失败基本不是技术原因，是「没主」和「没回归」。这四条要写进规范，不是建议。</p>
+    <ul class="rules">
+      <li><span class="rid">01 · 有主</span><span class="rbody">每个共享包必须有一个 owner 团队，目录里写明联系人与 SLA。<b>无主包当场拒绝入库</b> —— 否则半年后没人敢动它。</span></li>
+      <li><span class="rid">02 · 有回归</span><span class="rbody">发布前必须跑通<b>至少两个使用它的台型</b>的用例集。只在一个台型验证过的包，不算通过。</span></li>
+      <li><span class="rid">03 · 有门槛</span><span class="rbody">升入基线要满足「≥ 八成台型使用且变更极低频」。达不到就一直留在共享包 —— 这是防止基线漂移的唯一闸门。</span></li>
+      <li><span class="rid">04 · 有终点</span><span class="rbody">设备停产要在目录里标 EOL，并登记能力等价替代。台型清单按能力解析，替代对现场透明。</span></li>
+    </ul>
+    <p class="note">四条里最容易被跳过的是第二条。共享包的特殊风险在于：改一次影响多个台型，而验证往往只做了自己那一个 —— 这是几百台规模下最典型的「修好一台，坏掉三台」。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>三个具体反模式</h2>
+    <div class="anti">
+      <div>
+        <h3>归属判断错的</h3>
+        <ul>
+          <li><b>因为「多台型用」就塞进平台</b>：基线逐年膨胀，最后每加一个台型都要发一次主程序。</li>
+          <li><b>因为「不是标配」就下放到台</b>：同一设备在五个台型里各存一份副本，修一个 bug 要改五处。</li>
+        </ul>
+      </div>
+      <div>
+        <h3>机制缺失的</h3>
+        <ul>
+          <li><b>依赖靠文档约定</b>：谁用了哪个版本没人说得清，出问题只能全量重装试一遍。</li>
+          <li><b>强制统一版本</b>：一个台型升级把其他台型拖下水，回滚粒度变成整平台。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>落地三步</h2>
+    <ol class="road">
+      <li><b>把夹心设备列出来</b><span class="d">拿设备清单，标两列：被几个台型用、是否柜内标配。落在「多台型 × 非标配」的全部挑出来，通常十几到几十个，不会太多。</span></li>
+      <li><b>建共享包目录与台型清单</b><span class="d">目录记录包名、能力、版本、owner、EOL 状态；台型清单记录依赖与版本锁。先手写二十份，跑通解析再考虑工具化。</span></li>
+      <li><b>先在一个设备族上试点</b><span class="d">选复用台型最多、且最近改过的那一个（有痛点才有说服力）。跑通「独立发版 → 两个台型回归 → 灰度到第三个台型」这条链路，再复制到其余。</span></li>
+    </ol>
+    <p class="note">不要一上来建平台级包管理服务。共享包治理的核心产物是<b>十七份清单和一条解析规则</b>，工具可以后补，清单不能没有。</p>
+  </section>
+
+  <div class="closing">
+    <span>结论：多台型非标配设备 → 共享包 + 台型清单 + 平台解析</span>
+    <span>ATE Runner · 驱动战略</span>
+  </div>
+
+</div>
+</body>
+</html>

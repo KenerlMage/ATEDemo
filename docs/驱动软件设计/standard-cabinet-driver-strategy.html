@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标准柜时代的驱动分层与分发策略</title>
+<style>
+  :root{
+    --paper:#fafaf9;
+    --ink:#141414;
+    --ink-soft:#3c3b36;
+    --muted:#6f6e66;
+    --rule:#dbd7cf;
+    --rule-strong:#b9b4a9;
+    --accent:#8b0f1a;
+    --wash:#f1efe9;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.62;
+  }
+  .page{max-width:1080px;margin:0 auto;padding:72px 56px 96px}
+  .mono{font-family:"Consolas","SFMono-Regular","Menlo",monospace}
+
+  .kicker{
+    font-family:"Consolas",monospace;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 22px
+  }
+  h1{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC","SimSun",serif;
+    font-weight:600;font-size:clamp(30px,4.2vw,45px);line-height:1.14;
+    letter-spacing:-.02em;margin:0 0 20px;max-width:26ch;
+  }
+  .lede{font-size:17.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch;margin:0 0 30px}
+  .meta{
+    display:flex;flex-wrap:wrap;gap:10px 34px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+    padding:12px 0;margin:0 0 52px
+  }
+  .meta b{color:var(--ink);font-weight:600}
+
+  .verdict{
+    border:1px solid var(--ink);padding:26px 28px;margin:0 0 56px;
+    display:grid;grid-template-columns:88px 1fr;gap:24px;align-items:start
+  }
+  .verdict .tag{
+    font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);border-top:2px solid var(--accent);padding-top:8px
+  }
+  .verdict p{margin:0;font-size:18.5px;line-height:1.5}
+  .verdict p + p{margin-top:12px;font-size:15px;color:var(--ink-soft)}
+
+  section{margin:0 0 58px}
+  h2{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    font-size:25px;font-weight:600;line-height:1.25;margin:0 0 6px;
+    display:flex;gap:16px;align-items:baseline
+  }
+  h2 .num{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent);font-weight:400;flex:none}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px;max-width:72ch}
+  p{margin:0 0 16px;max-width:74ch}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0 20px;font-size:14px;table-layout:fixed}
+  caption{
+    text-align:left;font-family:"Consolas",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:10px
+  }
+  th{
+    text-align:left;font-family:"Consolas",monospace;font-weight:400;font-size:10.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1px solid var(--rule-strong);padding:0 14px 9px 0;vertical-align:bottom
+  }
+  td{border-bottom:1px solid var(--rule);padding:13px 14px 13px 0;vertical-align:top;line-height:1.55}
+  th:last-child,td:last-child{padding-right:0}
+  td:first-child{font-weight:600}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+  code{font-family:"Consolas","SFMono-Regular",monospace;font-size:12.5px;background:var(--wash);padding:1px 5px;word-break:break-word}
+  .yes{color:var(--accent);font-family:"Consolas",monospace;font-size:12px}
+  .no{color:var(--muted);font-family:"Consolas",monospace;font-size:12px}
+
+  /* 分层 */
+  .stack{border-top:1px solid var(--rule-strong);margin:12px 0 16px}
+  .layer{
+    display:grid;grid-template-columns:96px 1fr 200px;gap:20px;
+    border-bottom:1px solid var(--rule);padding:16px 0;align-items:start
+  }
+  .layer .lv{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.08em;color:var(--accent);line-height:1.5}
+  .layer .what{font-size:14.5px;line-height:1.55}
+  .layer .what b{font-weight:600}
+  .layer .who{font-family:"Consolas",monospace;font-size:11.5px;color:var(--muted);line-height:1.5}
+  .note{
+    font-size:13.5px;color:var(--muted);max-width:76ch;margin:0 0 10px;
+    padding-left:16px;border-left:2px solid var(--rule)
+  }
+
+  /* 指标 */
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);margin:12px 0 18px}
+  .metric{padding:20px 22px 20px 0;border-right:1px solid var(--rule)}
+  .metric:last-child{border-right:0;padding-right:0}
+  .metric .v{font-family:"Iowan Old Style",Georgia,serif;font-size:32px;line-height:1.1;letter-spacing:-.02em}
+  .metric .v small{font-size:14px;color:var(--muted);letter-spacing:0;margin-left:6px;font-family:"Consolas",monospace}
+  .metric .k{font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+
+  /* 反模式两栏 */
+  .anti{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--rule-strong);margin:14px 0 0}
+  .anti > div{padding:22px 24px}
+  .anti > div + div{border-left:1px solid var(--rule-strong)}
+  .anti h3{font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400;margin:0 0 12px}
+  .anti ul{margin:0;padding-left:16px}
+  .anti li{font-size:13.5px;line-height:1.6;margin-bottom:9px;color:var(--ink-soft)}
+  .anti li:last-child{margin-bottom:0}
+  .anti li b{color:var(--ink);font-weight:600}
+
+  /* 路线 */
+  ol.road{list-style:none;counter-reset:r;padding:0;margin:12px 0 0}
+  ol.road li{counter-increment:r;display:grid;grid-template-columns:96px 1fr;gap:18px;padding:16px 0;border-bottom:1px solid var(--rule);align-items:start}
+  ol.road li:first-child{border-top:1px solid var(--rule-strong)}
+  ol.road li::before{
+    content:counter(r,decimal-leading-zero);font-family:"Consolas",monospace;
+    font-size:11px;letter-spacing:.1em;color:var(--accent);padding-top:3px
+  }
+  ol.road b{font-weight:600}
+  ol.road span.d{display:block;color:var(--ink-soft);font-size:13.8px;margin-top:3px}
+
+  .closing{
+    border-top:1px solid var(--rule-strong);margin-top:60px;padding-top:22px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap
+  }
+  @media (max-width:780px){
+    .page{padding:44px 22px 64px}
+    .verdict{grid-template-columns:1fr;gap:14px}
+    .layer{grid-template-columns:1fr;gap:6px}
+    .metrics{grid-template-columns:1fr}
+    .metric{border-right:0;border-bottom:1px solid var(--rule);padding-right:0}
+    .metric:last-child{border-bottom:0}
+    .anti{grid-template-columns:1fr}
+    .anti > div + div{border-left:0;border-top:1px solid var(--rule-strong)}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="kicker">ATE Runner · 驱动战略 · 决策备忘 02</p>
+  <h1>几百个测试台收敛到标准柜之后，驱动还该怎么分层、怎么装</h1>
+  <p class="lede">两个问题分开答：<b>分层要，但分层的切法要换</b> —— 按「变化频率」切，不按「协议栈」切；<b>驱动不该全部塞进平台</b> —— 平台只装契约、注册表和稳定集，长尾设备以独立包分发。这两条合起来，才能让几百台设备的维护成本跟台数脱钩。</p>
+  <div class="meta">
+    <span>问题域 · <b>标准化主控柜 × 数百测试台</b></span>
+    <span>版本 · <b>v2（推翻按传输层分层的旧结论）</b></span>
+    <span>日期 · <b>2026-11-08</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">Verdict</div>
+    <div>
+      <p>驱动必须分层，但分层的轴换成<b>「谁在变、多久变一次」</b>：能力契约（极少变）、厂商实现（半年变）、站点绑定（每台都变）、运行时（随运行时变）。</p>
+      <p>驱动<b>不应全部集成进平台</b>。平台内置的是契约、注册表、仿真与柜内固定设备的稳定集；其余按设备族做成独立版本、独立发布的包。否则每加一款仪器就要发一次主程序，几百台现场没法只回滚一个驱动。</p>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>先算规模：几百台不等于几百个驱动</h2>
+    <p class="sub">「几百个功能不同的测试台」听起来是几百倍的驱动工作量，实际不是。复杂度分布极不均匀，认清这一点，后面的设计才有依据。</p>
+    <div class="metrics">
+      <div class="metric">
+        <div class="v">6–12 <small>台/柜</small></div>
+        <div class="k">标准柜内的仪器与板卡</div>
+      </div>
+      <div class="metric">
+        <div class="v">20–40 <small>个</small></div>
+        <div class="k">覆盖多数测试台的设备家族</div>
+      </div>
+      <div class="metric">
+        <div class="v">N × M <small>→ N + M</small></div>
+        <div class="k">按台定制 vs 按能力组合</div>
+      </div>
+    </div>
+    <p class="note">量级为按行业经验的估算区间，具体数字要靠设备清单盘点后替换。结论方向不依赖精确值：<b>设备种类增长慢，测试台数量增长快</b>，所以复杂度必须压在「台」这一侧（配置），不能压在「驱动」那一侧（代码）。</p>
+    <table>
+      <caption>复杂度到底长在哪</caption>
+      <thead>
+        <tr><th style="width:20%">变化源</th><th style="width:26%">几百台下的量级</th><th style="width:26%">变化频率</th><th style="width:28%">应该装进哪一层</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>设备种类</td>
+          <td>几十个家族，几年内缓慢增加</td>
+          <td class="no">低频</td>
+          <td>驱动包（可版本化、可灰度）</td>
+        </tr>
+        <tr>
+          <td>测试台配置</td>
+          <td>几百套，且持续新增与改版</td>
+          <td class="yes">高频</td>
+          <td><b>设备档案 / 站点绑定</b>（数据，不是代码）</td>
+        </tr>
+        <tr>
+          <td>测试程序（TPS）</td>
+          <td>上千个用例，随产品迭代</td>
+          <td class="yes">最高频</td>
+          <td>用例层，只认能力契约</td>
+        </tr>
+        <tr>
+          <td>连接与协议</td>
+          <td>基本由厂商 SDK 提供</td>
+          <td class="no">极低频</td>
+          <td>适配器，SDK 只准出现在这里</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">推论很直接：如果把「测试台差异」写进驱动，等于让最低频的层去承载最高频的变化 —— 这是几百台规模下最常见的死法，也是「每台测试台都在改驱动」的根源。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>分层的正确切法：按变化频率切四层</h2>
+    <p class="sub">不是传输层 / 家族层 / 厂商层那种按「技术栈」切。技术栈切法只回答「代码放哪」，回答不了「谁改它、多久改一次、改坏了影响几台」。</p>
+    <div class="stack">
+      <div class="layer">
+        <div class="lv">L1 · 能力契约</div>
+        <div class="what"><b>上层只认能力，不认型号</b>：<code>DcPower</code>、<code>Dmm</code>、<code>Scope</code>、<code>SignalSource</code>、<code>Camera</code>、<code>RelayMatrix</code>、<code>Load</code>。契约里写的是「设电压/读电流/触发采集/取帧」，不是「某型号的第几条命令」。</div>
+        <div class="who">变更：年级 · 全公司统一<br>影响面：全部测试台</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L2 · 厂商实现</div>
+        <div class="what"><b>一个型号一个适配器</b>，把厂商 SDK（RsInstrument / pypylon / VISA / 厂商 DLL）翻成 L1 的语义。型号特性、命令方言、错误码映射全部封在这里。</div>
+        <div class="who">变更：半年级 · 按设备族<br>影响面：用该型号的测试台</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L3 · 站点绑定</div>
+        <div class="what"><b>每台测试台的差异都在这里，而且是数据不是代码</b>：设备档案（型号、地址、超时）、通道映射（继电器矩阵到 UUT 引脚）、量程与校准系数、夹具补偿。</div>
+        <div class="who">变更：每次建台 / 换夹具<br>影响面：单台测试台</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L4 · 运行时</div>
+        <div class="what"><b>标准柜特有的那一层</b>：会话生命周期、资源独占与仲裁（一柜多站争用同一台仪器）、超时与重试、连接拓扑可视化、故障隔离。</div>
+        <div class="who">变更：随平台版本<br>影响面：全柜所有站</div>
+      </div>
+    </div>
+    <p class="note">检验切法对不对，问一句：<b>某个测试台临时换了一台同能力不同型号的仪器，需要改代码吗？</b>改 L3 的档案就行 —— 说明分层成立；要动 L2 甚至 L1 —— 说明契约没抽对。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>标准柜带来的三个新约束</h2>
+    <p class="sub">这三件事在单台设备、单台测试台的场景里不存在，但一到「几百台 + 统一柜」就变成硬约束，也是分层必须回答的问题。</p>
+    <table>
+      <caption>规模带来的是什么问题</caption>
+      <thead>
+        <tr><th style="width:24%">约束</th><th style="width:38%">具体表现</th><th style="width:38%">对分层的要求</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>柜内仪器共享</td>
+          <td>一个柜挂多个测试站，共用电源、DMM、矩阵；两个站同时下发命令会互相打断量程与触发状态</td>
+          <td>资源仲裁必须在 L4，不能每个驱动自己 <code>open()</code> 一条连接</td>
+        </tr>
+        <tr>
+          <td>备件与替代</td>
+          <td>某型号停产或现场只有替代型号，功能等价但命令方言不同</td>
+          <td>L1 契约必须按能力定义，替代型号只需新增 L2 适配器 + 改 L3 档案</td>
+        </tr>
+        <tr>
+          <td>现场无开发环境</td>
+          <td>产线不能装 IDE、不能编译，故障要在十分钟内定位到「线 / 驱动 / 档案 / 用例」</td>
+          <td>驱动要自带自检与连接拓扑（<code>describe()</code> 类），诊断信息必须能被现场读懂</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">第三条最容易被忽略：几百台的运维成本，八成不在写驱动，而在「现场定位一个问题要多久」。分层如果没让排障变快，它在规模下就是负资产。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>驱动要不要全部集成进平台</h2>
+    <p class="sub">这是分发问题，不是架构问题。三个选项的差别不在「优雅」，在「加一款设备要发多少次版本、现场能回滚到什么粒度」。</p>
+    <table>
+      <caption>分发模型对比</caption>
+      <thead>
+        <tr><th style="width:20%">模型</th><th style="width:32%">加一款新仪器的动作</th><th style="width:30%">代价</th><th style="width:18%">结论</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>全部集成进平台</td>
+          <td>改主程序 → 全平台回归 → 发一个大版本 → 几百台逐台升级</td>
+          <td>发布节奏被最不稳定的设备绑架；单个驱动 bug 要停整条线；装机包越来越大</td>
+          <td class="no">不可取</td>
+        </tr>
+        <tr>
+          <td>全部外挂，平台只留契约</td>
+          <td>只发一个驱动包</td>
+          <td>版本矩阵复杂（平台 × 驱动 × 固件），现场可能出现「驱动不匹配」，需要签名与兼容清单兜底</td>
+          <td class="no">过于激进</td>
+        </tr>
+        <tr>
+          <td><b>稳定集内置 + 长尾外挂</b></td>
+          <td>柜内固定设备（电源、DMM、矩阵、相机、程控负载）随平台发；新品与专用设备走独立包</td>
+          <td>需要一套包规范：版本、签名、兼容矩阵、按测试台类型锁定</td>
+          <td class="yes">推荐</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">切分依据不是技术，是<b>「这台设备会不会出现在每一个柜子里」</b>。每个柜都有的，内置，省一次部署；只有少数台用的，外挂，避免污染基线。经验上内置集稳定在十来个设备族，其余全部外挂。</p>
+    <p>三个模型共用一套硬前提，缺一个就退化成「各自为政」：<b>统一契约</b>（外挂包也实现同一组接口）、<b>统一注册表</b>（平台启动时按档案解析到具体实现）、<b>兼容矩阵</b>（平台版本 × 驱动包版本 × 设备固件，装错要在启动时报错而不是运行中炸）。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>几百台规模下会致命的五个反模式</h2>
+    <div class="anti">
+      <div>
+        <h3>结构上的</h3>
+        <ul>
+          <li><b>按测试台定制驱动</b>：<code>driver_for_station_37.py</code>。台数一涨就爆炸，等价于放弃标准化。</li>
+          <li><b>契约里写型号</b>：<code>set_voltage_34461a()</code>。换型号即改用例，TPS 与硬件再次耦合。</li>
+          <li><b>校准与通道映射写进代码</b>：换夹具要改驱动、要发版，现场只能等研发。</li>
+        </ul>
+      </div>
+      <div>
+        <h3>运行上的</h3>
+        <ul>
+          <li><b>驱动自己管连接</b>：柜内多站抢同一台仪器，量程与触发状态互相踩，故障表现为「偶发读数异常」。</li>
+          <li><b>平台里堆型号分支</b>：<code>if model == ...</code>，每来一款仪器改一次平台核心，回归范围永远说不清。</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">这五条的共同点：都把「高频变化」放进了「低频层」。判断任何设计提案，先看它把变化放在了哪一层。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>落地顺序</h2>
+    <p class="sub">不要先做框架。先做盘点与契约，因为契约抽错了，后面每一行代码都是负债。</p>
+    <ol class="road">
+      <li><b>设备盘点，出一张能力地图</b><span class="d">把几百台用到的仪器按「能力」聚类，而不是按型号列清单。目标是压到二十来个能力族，并标出每个族里的主力型号与替代型号。</span></li>
+      <li><b>定 L1 契约与 L3 档案格式</b><span class="d">契约只写用例真正会用的操作；档案要能表达型号、地址、通道映射、量程与校准系数。这两个定完，剩下的都是填充。</span></li>
+      <li><b>选两个差异最大的测试台做标杆柜</b><span class="d">一个偏电测、一个偏光测或视觉。两台都能用同一套契约跑通，说明抽象站得住；跑不通就趁早改契约，别等铺开。</span></li>
+      <li><b>建包规范与兼容矩阵</b><span class="d">驱动包独立版本、独立签名、声明支持的平台版本与固件范围。现场装错在启动时就报错，而不是跑到一半出怪值。</span></li>
+      <li><b>按测试台类型分批迁移</b><span class="d">每批做等价性回归（老台与新台跑同一组用例，读数与判据一致），而不是「装上去能跑就算过」。批与批之间留回滚点。</span></li>
+      <li><b>收敛长尾</b><span class="d">迁移后期把只有少数台用的设备移出内置集，主平台只保留稳定集。这一步决定三年后升级是「发一次包」还是「排三个月窗口」。</span></li>
+    </ol>
+  </section>
+
+  <div class="closing">
+    <span>结论：分层按变化频率切；驱动以「稳定集内置 + 长尾外挂」分发</span>
+    <span>ATE Runner · 驱动战略</span>
+  </div>
+
+</div>
+</body>
+</html>

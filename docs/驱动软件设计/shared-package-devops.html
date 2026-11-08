@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>共享包：开发与部署方案</title>
+<style>
+  :root{
+    --paper:#fafaf9;--ink:#141414;--ink-soft:#3c3b36;--muted:#6f6e66;
+    --rule:#dbd7cf;--rule-strong:#b9b4a9;--accent:#8b0f1a;--wash:#f1efe9;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.62;
+  }
+  .page{max-width:1080px;margin:0 auto;padding:72px 56px 96px}
+  .kicker{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 22px}
+  h1{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC","SimSun",serif;
+    font-weight:600;font-size:clamp(29px,4.1vw,44px);line-height:1.14;letter-spacing:-.02em;
+    margin:0 0 20px;max-width:26ch;
+  }
+  .lede{font-size:17.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch;margin:0 0 30px}
+  .meta{
+    display:flex;flex-wrap:wrap;gap:10px 34px;font-family:"Consolas",monospace;font-size:11.5px;
+    letter-spacing:.04em;color:var(--muted);border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);padding:12px 0;margin:0 0 52px
+  }
+  .meta b{color:var(--ink);font-weight:600}
+  .verdict{
+    border:1px solid var(--ink);padding:26px 28px;margin:0 0 56px;
+    display:grid;grid-template-columns:88px 1fr;gap:24px;align-items:start
+  }
+  .verdict .tag{
+    font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);border-top:2px solid var(--accent);padding-top:8px
+  }
+  .verdict p{margin:0;font-size:18.5px;line-height:1.5}
+  .verdict p + p{margin-top:12px;font-size:15px;color:var(--ink-soft)}
+
+  section{margin:0 0 58px}
+  h2{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    font-size:25px;font-weight:600;line-height:1.25;margin:0 0 6px;
+    display:flex;gap:16px;align-items:baseline
+  }
+  h2 .num{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent);font-weight:400;flex:none}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px;max-width:74ch}
+  p{margin:0 0 16px;max-width:74ch}
+
+  pre{
+    background:var(--wash);border:1px solid var(--rule-strong);border-left:3px solid var(--ink);
+    padding:16px 18px;overflow-x:auto;margin:14px 0 12px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:12.3px;line-height:1.62;color:#26251f
+  }
+  pre .c{color:var(--muted)}
+  pre .k{color:var(--accent)}
+  pre .s{color:#4a5b2c}
+
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:14px;table-layout:fixed}
+  caption{text-align:left;font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:10px}
+  th{
+    text-align:left;font-family:"Consolas",monospace;font-weight:400;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule-strong);
+    padding:0 14px 9px 0;vertical-align:bottom
+  }
+  td{border-bottom:1px solid var(--rule);padding:13px 14px 13px 0;vertical-align:top;line-height:1.55}
+  th:last-child,td:last-child{padding-right:0}
+  td:first-child{font-weight:600}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+  .gate{font-family:"Consolas",monospace;font-size:12px;color:var(--accent)}
+  .muted{color:var(--muted)}
+  code{font-family:"Consolas","SFMono-Regular",monospace;font-size:12.5px;background:var(--wash);padding:1px 5px;word-break:break-word}
+
+  .note{font-size:13.5px;color:var(--muted);max-width:76ch;margin:0 0 10px;padding-left:16px;border-left:2px solid var(--rule)}
+
+  ul.rules{list-style:none;padding:0;margin:12px 0 0}
+  ul.rules li{padding:15px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:132px 1fr;gap:20px;align-items:start}
+  ul.rules li:first-child{border-top:1px solid var(--rule-strong)}
+  ul.rules .rid{font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding-top:3px}
+  ul.rules .rbody{font-size:14px;line-height:1.6}
+
+  ol.road{list-style:none;counter-reset:r;padding:0;margin:12px 0 0}
+  ol.road li{counter-increment:r;display:grid;grid-template-columns:86px 1fr;gap:18px;padding:15px 0;border-bottom:1px solid var(--rule);align-items:start}
+  ol.road li:first-child{border-top:1px solid var(--rule-strong)}
+  ol.road li::before{content:counter(r,decimal-leading-zero);font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  ol.road b{font-weight:600}
+  ol.road span.d{display:block;color:var(--ink-soft);font-size:13.8px;margin-top:3px}
+
+  .closing{
+    border-top:1px solid var(--rule-strong);margin-top:60px;padding-top:22px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap
+  }
+  @media (max-width:780px){
+    .page{padding:44px 22px 64px}
+    .verdict{grid-template-columns:1fr;gap:14px}
+    ul.rules li{grid-template-columns:1fr;gap:6px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="kicker">ATE Runner · 驱动战略 · 决策备忘 04</p>
+  <h1>共享包怎么开发、怎么部署</h1>
+  <p class="lede">一句话：<b>包是带清单的 zip，开发走「一个代码库、路径触发、契约门禁」，部署走「离线介质 + 每台一份 lock 文件」。</b>不引入 pip、不在现场构建、不做运行时热插拔 —— 因为产线离线，任何需要联网的环节都会变成事故。</p>
+  <div class="meta">
+    <span>前置 · <b>备忘 03 的三层发布物</b></span>
+    <span>现状 · <b>驱动随 Runner 一体发布</b></span>
+    <span>日期 · <b>2026-11-08</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">Verdict</div>
+    <div>
+      <p>开发侧：所有包放一个私有代码库，按目录切包、按路径触发 CI；每个包必须过「契约一致性 + 仿真回归 + 双台型用例」三道门禁才能出包。</p>
+      <p>部署侧：包以 zip 形态落在 <code>packages/&lt;name&gt;/&lt;version&gt;/</code>，同机多版本共存；每台测试台有一份 <code>bench.lock.json</code> 锁定解析结果，安装与回滚都只动这份文件，从不重装平台。</p>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>包的形态：带清单的 zip，自带私有依赖</h2>
+    <p class="sub">不用 wheel + pip。原因很实际：内嵌 Python 运行时装 pip 要多一层引导，离线 wheelhouse 要同步维护，多版本共存还得靠 <code>--target</code> 各装一份 —— 换来的好处在 ATE 场景里几乎没有。</p>
+    <pre><span class="c"># 一个共享包解压后的样子</span>
+optical-power-meter__exfo-pm-100/1.4.2/
+├── <span class="k">manifest.json</span>          <span class="c"># 身份 + 契约 + 兼容 + 依赖 + 签名</span>
+├── pkg/
+│   └── exfo_pm100/        <span class="c"># 驱动实现，实现 L1 能力契约</span>
+│       ├── __init__.py
+│       └── driver.py
+├── vendor/                <span class="c"># 该包私有的第三方依赖（自带的，不共享）</span>
+│   └── pyvisa/ ...
+├── conformance/           <span class="c"># 随包发布的契约测试，安装后可本地跑</span>
+│   └── test_contract.py
+└── CHANGELOG.md</pre>
+    <pre><span class="c">// manifest.json</span>
+{
+  "name": "exfo-pm-100",
+  "version": "1.4.2",
+  "capability": "optical-power-meter",
+  "contract": "2.3",                 <span class="c">// 实现的能力契约版本</span>
+  "runtime": { "runner": "&gt;=1.6 &lt;2.0", "python": "3.13" },
+  "owner": "光测组",
+  "entry": "pkg.exfo_pm100:Driver",
+  "vendor_deps": ["pyvisa==1.15.0"],
+  "simulate": true,                  <span class="c">// 无硬件可跑，CI 依赖这一条</span>
+  "sha256": "…",
+  "signature": "ed25519:…"
+}</pre>
+    <p class="note">清单里三个字段决定了整套机制能不能运转：<code>capability</code>（台型按它解析）、<code>contract</code>（和平台的契约版本对不对得上）、<code>simulate</code>（没有硬件能不能回归）。缺任何一个，这个包在几百台上就是不可验证的。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>开发：一个库、路径触发、三道门禁</h2>
+    <p class="sub">包多了不要拆成几十个仓库 —— 共享契约测试、共享 CI、共享依赖基线，拆开就享受不到了。用 monorepo，按目录切包，按路径触发流水线。</p>
+    <pre><span class="c"># 代码库结构</span>
+ate-drivers/
+├── contracts/               <span class="c"># L1 能力契约（平台发版物，包只依赖不修改）</span>
+│   ├── optical_power_meter.py
+│   └── camera.py
+├── packages/
+│   ├── exfo-pm-100/         <span class="c"># 每个目录 = 一个包 = 独立版本</span>
+│   ├── keysight-34461a/
+│   └── basler-pylon/
+├── kit/                     <span class="c"># 契约一致性测试、仿真替身、用例回归夹具</span>
+└── ci/</pre>
+    <table>
+      <caption>流水线五段，后两段是硬门禁</caption>
+      <thead>
+        <tr><th style="width:16%">阶段</th><th style="width:34%">做什么</th><th style="width:26%">失败即阻断</th><th style="width:24%">耗时量级</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1 · 静态</td><td>lint、类型、禁止 import 平台内部私有模块</td><td class="muted">是</td><td class="muted">秒级</td></tr>
+        <tr><td>2 · 契约</td><td>跑 <code>kit/conformance</code>：方法签名、返回体、异常语义是否满足能力契约</td><td class="gate">是</td><td class="muted">秒级</td></tr>
+        <tr><td>3 · 仿真</td><td>在 <code>simulate=true</code> 下跑包内自测与行为断言</td><td class="gate">是</td><td class="muted">分钟级</td></tr>
+        <tr><td>4 · 双台型回归</td><td>拉两个真实使用该包的台型用例集，用仿真硬件跑通</td><td class="gate">是</td><td class="muted">十分钟级</td></tr>
+        <tr><td>5 · 出包</td><td>打 zip、算 sha256、签名、写 CHANGELOG、更新私有索引</td><td class="muted">是</td><td class="muted">分钟级</td></tr>
+      </tbody>
+    </table>
+    <p class="note">第 4 段是共享包和普通驱动包的分水岭。只跑自己那份单测的包，改一次就可能踩坏另一个台型 —— 这是几百台规模下最贵的错误，代价是产线停机而不是 CI 红一次。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>部署：离线介质 + 每台一份 lock</h2>
+    <p class="sub">产线没有外网，所以「安装」这件事必须能在断网、无管理员、无 pip 的前提下完成。设计上把它拆成三个动作：放文件、改 lock、重启服务。</p>
+    <pre><span class="c"># Runner 安装目录</span>
+ATERunner/
+├── app/backend/            <span class="c"># 平台基线（含基线驱动包）</span>
+├── packages/               <span class="c"># 共享包，多版本并存</span>
+│   ├── exfo-pm-100/
+│   │   ├── 1.3.9/
+│   │   └── 1.4.2/
+│   └── basler-pylon/
+│       └── 8.1.2/
+├── benches/
+│   └── BENCH-017/
+│       └── <span class="k">bench.lock.json</span>   <span class="c"># 这台测试台的确定解析结果</span>
+└── var/packages.index.json <span class="c"># 私有索引的本地快照（离线可用）</span></pre>
+    <pre><span class="c">// bench.lock.json —— 安装与回滚只动这个文件</span>
+{
+  "bench": "BENCH-017",
+  "station_type": "optical-coupling-01",
+  "runner": "1.7.3",
+  "resolved": [
+    { "capability": "dmm", "package": "keysight-34461a", "version": "2.3.1", "sha256": "…" },
+    { "capability": "optical-power-meter", "package": "exfo-pm-100", "version": "1.4.2", "sha256": "…" },
+    { "capability": "camera", "package": "basler-pylon", "version": "8.1.2", "sha256": "…" }
+  ],
+  "locked_at": "2026-11-08T12:00:00+08:00"
+}</pre>
+    <table>
+      <caption>三种安装通道，主路径是第二种</caption>
+      <thead>
+        <tr><th style="width:22%">通道</th><th style="width:34%">怎么做</th><th style="width:22%">适用</th><th style="width:22%">校验</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>随平台预置</td><td>基线包打进安装包，装完即用</td><td>每个柜都有的设备</td><td>安装包签名</td></tr>
+        <tr><td><b>离线包导入</b></td><td>U 盘或内网共享放 zip → 界面「导入驱动包」→ 解压校验 → 重算 lock → 重启服务</td><td>共享包（主路径）</td><td>ed25519 签名 + sha256 + 索引比对</td></tr>
+        <tr><td>内网索引同步</td><td>Runner 定时拉 <code>packages.index.json</code>，只提示可用更新，仍需人工确认</td><td>有内网文件服务的厂区</td><td>同左，且需索引签名</td></tr>
+      </tbody>
+    </table>
+    <p class="note">关键约束写死两条：<b>安装过程中不编译、不联网、不装 pip</b>；<b>解析结果一旦写入 lock 就固定</b>，运行期不再自动升级。自动升级在产线上不是便利，是不可控变量。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>版本与共存规则</h2>
+    <p class="sub">共享包最常见的翻车不是写错代码，是版本语义混乱导致「升级一个、坏三个」。规则要少，但要硬。</p>
+    <ul class="rules">
+      <li><span class="rid">版本语义</span><span class="rbody"><b>MAJOR</b> 跟着能力契约走（契约不兼容才跳）；<b>MINOR</b> 是新增能力或行为变化（需要双台型回归）；<b>PATCH</b> 是修 bug 不改行为（仍需回归，但可灰度更快）。</span></li>
+      <li><span class="rid">共存策略</span><span class="rbody">同机可共存多个版本，但<b>一个 Runner 进程只加载 lock 里指定的那一版</b>：只把解析结果目录加入 <code>sys.path</code>，不加整个 <code>packages/</code>。多台架并发就跑多进程，不要在一个进程里塞两套解析结果。</span></li>
+      <li><span class="rid">兼容矩阵</span><span class="rbody">manifest 声明 <code>runner</code> 与 <code>contract</code> 范围；安装时校验，不满足直接拒绝并打印「该包要求 Runner ≥ 1.6，当前 1.5.2」这类可执行提示。</span></li>
+      <li><span class="rid">撤销机制</span><span class="rbody">索引里可把某版本标 <code>revoked</code> 并附原因。启动时命中撤销版本 → 拒绝加载并提示回滚到 lock 中上一版，而不是静默使用。</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>升级、灰度、回滚</h2>
+    <ol class="road">
+      <li><b>出包即入索引，不直接推现场</b><span class="d">新版本先进私有索引并标记为 <code>candidate</code>，只有被某个台型的 lock 引用后才算真在用。</span></li>
+      <li><b>先灰度一台</b><span class="d">选该包复用台型里最不敏感的一台，改 lock 指向新版本，跑完整产线用例 + 连跑至少一个班次。有问题当场回滚，影响面 = 1 台。</span></li>
+      <li><b>扩到同台型的 1–2 台</b><span class="d">同台型不同台架再验证一轮，覆盖硬件个体差异（不同固件小版本、不同夹具）。</span></li>
+      <li><b>按台型批量下发</b><span class="d">以「台型模板」为单位更新 lock，而不是逐台点。批次之间留 ≥3 天观察窗。</span></li>
+      <li><b>回滚 = 改回 lock</b><span class="d">旧版本目录仍在，回滚只改 lock 的 version 与 sha256，重启服务生效，通常一分钟内完成。不需要重装平台，不需要联网。</span></li>
+    </ol>
+    <p class="note">回滚速度是这套方案唯一值得炫耀的指标：<b>从发现问题到恢复生产，代价应该是「改一个 JSON 字段 + 重启」</b>，而不是「等研发发个安装包」。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>与现状的差距：只差一个发布单元</h2>
+    <p class="sub">你们现在「驱动随 Runner 一体发布、现场不做版本选择」——这套在纯基线场景是成立的，共享包正好是它唯一撑不住的地方。</p>
+    <table>
+      <caption>迁移三步，不必推翻现有结构</caption>
+      <thead>
+        <tr><th style="width:22%">现状</th><th style="width:34%">要加什么</th><th style="width:44%">不动什么</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>驱动在 <code>backend/drivers/</code>，随安装包发</td>
+          <td>引入 <code>packages/</code> 目录与 <code>manifest.json</code>，注册表增加「按 lock 解析」这一条路径</td>
+          <td>能力契约、设备档案、别名解析、用例写法全部不动</td>
+        </tr>
+        <tr>
+          <td>驱动类型表在 <code>factory.py</code> 硬编码</td>
+          <td>改为「基线表 + 包清单合并」，合并结果启动时打印一次，便于排障</td>
+          <td>「精确查表、不回退相似驱动」这条原则保留</td>
+        </tr>
+        <tr>
+          <td>构建期跑 <code>check_drivers.py</code></td>
+          <td>扩展成对每个包跑 conformance + 仿真回归，作为出包门禁</td>
+          <td>现有构建脚本与安装包流程保留，基线包仍随包发</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">换句话说：<b>共享包不是新建一套体系，是给现有体系加一个「包」的发布单元</b>。基线包继续随 Runner 发，只是从「唯一的发布方式」变成「三种发布方式里的一种」。</p>
+  </section>
+
+  <div class="closing">
+    <span>结论：包 = zip + manifest；开发 monorepo + 三道门禁；部署离线导入 + lock 锁定</span>
+    <span>ATE Runner · 驱动战略</span>
+  </div>
+
+</div>
+</body>
+</html>

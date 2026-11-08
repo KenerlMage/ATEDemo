@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>连接层取舍 · 当 RsInstrument / pypylon 已封装链路</title>
+<style>
+  :root{
+    --paper:#fafaf9;
+    --ink:#141414;
+    --ink-soft:#3c3b36;
+    --muted:#6f6e66;
+    --rule:#dbd7cf;
+    --rule-strong:#b9b4a9;
+    --accent:#8b0f1a;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.62;
+    font-feature-settings:"kern" 1;
+  }
+  .page{max-width:1060px;margin:0 auto;padding:72px 56px 96px}
+  .mono{font-family:"Consolas","SFMono-Regular","Menlo",monospace}
+
+  /* ---------- 封面区 ---------- */
+  .kicker{
+    font-family:"Consolas","SFMono-Regular",monospace;
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 22px
+  }
+  h1{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC","SimSun",serif;
+    font-weight:600;font-size:clamp(30px,4.4vw,46px);line-height:1.14;
+    letter-spacing:-.02em;margin:0 0 20px;max-width:24ch;
+  }
+  .lede{font-size:17.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch;margin:0 0 30px}
+  .meta{
+    display:flex;flex-wrap:wrap;gap:10px 34px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:11.5px;
+    letter-spacing:.04em;color:var(--muted);
+    border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+    padding:12px 0;margin:0 0 52px
+  }
+  .meta b{color:var(--ink);font-weight:600}
+
+  /* ---------- 结论块 ---------- */
+  .verdict{
+    border:1px solid var(--ink);padding:26px 28px;margin:0 0 56px;
+    display:grid;grid-template-columns:88px 1fr;gap:24px;align-items:start
+  }
+  .verdict .tag{
+    font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);border-top:2px solid var(--accent);
+    padding-top:8px
+  }
+  .verdict p{margin:0;font-size:19px;line-height:1.5}
+  .verdict p + p{margin-top:12px;font-size:15px;color:var(--ink-soft);line-height:1.62}
+
+  /* ---------- 章节 ---------- */
+  section{margin:0 0 60px}
+  h2{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    font-size:25px;font-weight:600;letter-spacing:-.01em;line-height:1.25;
+    margin:0 0 6px;display:flex;gap:16px;align-items:baseline
+  }
+  h2 .num{
+    font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;
+    color:var(--accent);font-weight:400;flex:none
+  }
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px;max-width:70ch}
+  p{margin:0 0 16px;max-width:72ch}
+
+  /* ---------- 表 ---------- */
+  table{width:100%;border-collapse:collapse;margin:8px 0 20px;font-size:14px;table-layout:fixed}
+  caption{
+    text-align:left;font-family:"Consolas",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:10px
+  }
+  th{
+    text-align:left;font-family:"Consolas",monospace;font-weight:400;
+    font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1px solid var(--rule-strong);padding:0 14px 9px 0;vertical-align:bottom
+  }
+  td{border-bottom:1px solid var(--rule);padding:13px 14px 13px 0;vertical-align:top;line-height:1.55}
+  th:last-child,td:last-child{padding-right:0}
+  td:first-child{color:var(--ink);font-weight:600}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+  .yes{color:var(--accent);font-family:"Consolas",monospace;font-size:12px;letter-spacing:.06em}
+  .no{color:var(--muted);font-family:"Consolas",monospace;font-size:12px;letter-spacing:.06em}
+  code{
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:12.5px;
+    background:#f0eee9;padding:1px 5px;word-break:break-word;
+  }
+
+  /* ---------- 分层栈 ---------- */
+  .stack{border-top:1px solid var(--rule-strong);margin:10px 0 18px}
+  .layer{
+    display:grid;grid-template-columns:74px 1fr 190px;gap:20px;
+    border-bottom:1px solid var(--rule);padding:15px 0;align-items:baseline
+  }
+  .layer .lv{
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.08em;color:var(--accent)
+  }
+  .layer .what{font-size:14.5px;line-height:1.55}
+  .layer .what b{font-weight:600}
+  .layer .who{
+    font-family:"Consolas",monospace;font-size:11.5px;color:var(--muted);line-height:1.5
+  }
+  .who-inline{display:block;font-family:"Consolas","SFMono-Regular",monospace;font-size:11px;color:var(--muted);line-height:1.45;margin-top:4px;font-weight:400}
+  .stack-note{margin-top:18px;
+    font-size:13.5px;color:var(--muted);max-width:74ch;margin:0 0 8px;
+    padding-left:16px;border-left:2px solid var(--rule)
+  }
+
+  /* ---------- 自检清单 ---------- */
+  .checks{list-style:none;padding:0;margin:12px 0 0}
+  .checks li{
+    display:grid;grid-template-columns:26px 1fr;gap:14px;
+    padding:14px 0;border-bottom:1px solid var(--rule);align-items:start
+  }
+  .checks li:first-child{border-top:1px solid var(--rule-strong)}
+  .box{
+    width:14px;height:14px;border:1.4px solid var(--rule-strong);margin-top:5px;display:block
+  }
+  .checks .q{font-weight:600;display:block;margin-bottom:3px}
+  .checks .a{color:var(--ink-soft);font-size:14px}
+
+  /* ---------- 动作 ---------- */
+  ol.actions{list-style:none;counter-reset:a;padding:0;margin:12px 0 0}
+  ol.actions li{
+    counter-increment:a;display:grid;grid-template-columns:38px 1fr;gap:16px;
+    padding:16px 0;border-bottom:1px solid var(--rule);align-items:start
+  }
+  ol.actions li:first-child{border-top:1px solid var(--rule-strong)}
+  ol.actions li::before{
+    content:counter(a,decimal-leading-zero);
+    font-family:"Consolas",monospace;font-size:12px;color:var(--accent);letter-spacing:.08em;
+    padding-top:2px
+  }
+  ol.actions b{font-weight:600}
+  ol.actions span.d{display:block;color:var(--ink-soft);font-size:14px;margin-top:3px}
+
+  /* ---------- 风险两栏 ---------- */
+  .risk{
+    display:grid;grid-template-columns:1fr 1fr;gap:0;margin:14px 0 0;
+    border:1px solid var(--rule-strong)
+  }
+  .risk > div{padding:22px 24px}
+  .risk > div + div{border-left:1px solid var(--rule-strong)}
+  .risk h3{
+    font-family:"Consolas",monospace;font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);font-weight:400;margin:0 0 12px
+  }
+  .risk ul{margin:0;padding-left:16px}
+  .risk li{font-size:13.5px;line-height:1.6;margin-bottom:8px;color:var(--ink-soft)}
+  .risk li:last-child{margin-bottom:0}
+
+  .closing{
+    border-top:1px solid var(--rule-strong);margin-top:64px;padding-top:22px;
+    font-family:"Consolas",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap
+  }
+  @media (max-width:760px){
+    .page{padding:44px 22px 64px}
+    .verdict{grid-template-columns:1fr;gap:14px}
+    .layer{grid-template-columns:1fr;gap:6px}
+    .risk{grid-template-columns:1fr}
+    .risk > div + div{border-left:0;border-top:1px solid var(--rule-strong)}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="kicker">ATE Runner · 驱动软件设计 · 决策备忘</p>
+  <h1>底层已被 RsInstrument / pypylon 封装，连接层还留不留</h1>
+  <p class="lede">结论先说：<b>要删的是「自己写协议实现」这件事，不是「连接抽象」这一层。</b>把连接层从自研实现降级为一份契约加若干适配器，代码量掉一大半，而仿真、换后端、离线跑 TPS 这些能力全部保住。</p>
+  <div class="meta">
+    <span>适用范围 · <b>ATE Runner 驱动子系统（sdk/ate_drivers）</b></span>
+    <span>日期 · <b>2026-11-08</b></span>
+    <span>结论强度 · <b>建议采纳</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">Verdict</div>
+    <div>
+      <p>保留 <code>Transport</code> 契约，砍掉自研的链路实现（socket / 串口 / VISA 会话管理），把 RsInstrument、pypylon、pyvisa 一律收进适配器层。</p>
+      <p>理由不是「抽象好看」，而是这三个能力厂商库永远不提供：真实与仿真同构（同一份驱动无硬件也能跑）、设备档案到资源名的解析、整条链路的可替换与可观测。这三个一旦散进驱动代码，就再也收不回来了。</p>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>先把「连接层」拆成三件事</h2>
+    <p class="sub">争「要不要连接层」之所以吵不清，是因为大家说的不是同一件事。三件职责的归属必须分开看。</p>
+    <table>
+      <caption>职责归属</caption>
+      <thead>
+        <tr><th style="width:17%">职责</th><th style="width:26%">具体内容</th><th style="width:24%">谁来做</th><th style="width:33%">SDK 库代劳后还需要你写吗</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>会话建立</td>
+          <td>TCP、串口、VISA 会话、GenICam 流通道、超时与重连</td>
+          <td>RsInstrument / pyvisa / pypylon</td>
+          <td class="no">不需要 —— 这正是它们的核心价值</td>
+        </tr>
+        <tr>
+          <td>命令语义</td>
+          <td><code>*IDN?</code>、测量命令、曝光/增益节点、错误队列</td>
+          <td>驱动家族层（<code>scpi.py</code> / <code>camera.py</code>）</td>
+          <td class="no">不需要 —— 本来就属于驱动，不属于连接层</td>
+        </tr>
+        <tr>
+          <td>运行形态与替换</td>
+          <td>仿真链路、离线回放、测试替身、后端切换、连接统计与自检</td>
+          <td>你自己的连接契约</td>
+          <td class="yes">需要 —— 厂商库不管「没有硬件怎么跑」</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="stack-note">第三行就是连接层存在的真正理由。它不是「帮驱动连设备」，而是「让驱动在连不上设备时也能被测试」。把这条想清楚，「要不要」的问题就变成了「留多大」。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>三个方案，只有中间那个站得住</h2>
+    <p class="sub">「全删」听起来最干净，但它把成本从连接层转移到了每个驱动和每次 CI 上。</p>
+    <table>
+      <caption>方案对比</caption>
+      <thead>
+        <tr><th style="width:17%">方案</th><th style="width:35%">驱动代码里会留下什么</th><th style="width:33%">代价</th><th style="width:15%">判断</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>全删连接层<br><span class="who-inline">驱动直连 SDK</span></td>
+          <td>每支驱动里出现 <code>import RsInstrument</code>、资源名拼接、<code>if mode == "simulate"</code> 分支</td>
+          <td>无硬件跑不了 CI 与演示；换 VISA 后端要改所有驱动；现场缺 R&amp;S VISA 时无回退</td>
+          <td class="no">不可取</td>
+        </tr>
+        <tr>
+          <td>保留契约 + 适配器<br><span class="who-inline">契约约 200 行</span></td>
+          <td>只出现 <code>self.transport.query(...)</code>，不认厂商、不认 IP / 串口号</td>
+          <td>多一层薄抽象，需要守住契约稳定性与 conformance 测试</td>
+          <td class="yes">推荐</td>
+        </tr>
+        <tr>
+          <td>维持现状<br><span class="who-inline">自研实现 + 适配器并存</span></td>
+          <td>同一套超时、错误语义、读行逻辑在 socket / 串口 / VISA / RsInstrument 四处各写一遍</td>
+          <td>四份实现同步演进，行为容易漂移；排障时要先判断「走的是哪条链」</td>
+          <td class="no">可收敛</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>你的代码已经跑通了两个范式</h2>
+    <p class="sub">这不是纸上推演 —— 两条相反的路径都已经在仓库里落地，而且都对。</p>
+    <table>
+      <caption>已落地的两种形态</caption>
+      <thead>
+        <tr><th style="width:22%">实现</th><th style="width:40%">做法</th><th style="width:38%">说明什么</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>RsInstrumentLink</td>
+          <td>把 RsInstrument 会话包成 <code>Transport</code>，对外仍是 open / write / query；缺 RsVisa 时回落到标准库 socket</td>
+          <td>文本命令面（SCPI）完全可以统一到一条字节管道，驱动对厂商库无感</td>
+        </tr>
+        <tr>
+          <td>BaslerPylonCamera</td>
+          <td>不经过 <code>make_transport()</code>，直接持有 <code>InstantCamera</code>；<code>CameraChannel</code> 只把动作记进日志</td>
+          <td>帧数据面（流、缓冲、抓取状态机）不该被硬塞进请求-响应模型</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="stack-note">这两条放在一起才是完整答案：连接层不是「所有设备共用一个字节管道」，而是「同一类数据面提供同一个可替换的调用面」。强行统一到 <code>read/write</code>，只会在 <code>_read_line</code> 里长出 <code>if camera</code> 分支，比不做更糟。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>目标分层：L0 只剩契约</h2>
+    <p class="sub">下面这四层是收敛后的形态。关键变化在 L0 —— 它不再实现任何协议，只定义「怎么接」。</p>
+    <div class="stack">
+      <div class="layer">
+        <div class="lv">L0</div>
+        <div class="what"><b>连接契约</b> · <code>Transport</code> 接口 + <code>SimulateTransport</code> + <code>endpoint</code> 资源解析 + <code>make_transport</code> 分叉</div>
+        <div class="who">不做协议，不认厂商</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L1</div>
+        <div class="what"><b>链路适配器</b> · <code>rs_link</code>（RsInstrument）、<code>voyager/visa</code>、<code>socket</code> / <code>serial</code> 回退、<code>pylon_link</code>（相机会话）</div>
+        <div class="who">每支适配器几十到一百行</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L2</div>
+        <div class="what"><b>驱动家族</b> · <code>scpi.py</code> 文本命令族、<code>camera.py</code> 帧数据族，只依赖 L0 契约</div>
+        <div class="who">不认识任何厂商库</div>
+      </div>
+      <div class="layer">
+        <div class="lv">L3</div>
+        <div class="what"><b>厂商驱动</b> · <code>rohde_schwarz_mxo</code>、<code>basler_pylon</code> 等，SDK 只允许出现在这一层</div>
+        <div class="who">可整体卸载不影响别家</div>
+      </div>
+    </div>
+    <p class="stack-note">判据一句话：<b>SDK 出现在 L0 就是漏层，出现在 L2 就是越层，只有 L1 / L3 合法。</b>现在 <code>RsInstrumentLink</code> 放在 vendors 下、<code>transport.py</code> 用 set_visa_factory 注入后端，已经符合这条线，剩下的是把文档和命名对齐。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>什么时候可以真的删掉</h2>
+    <p class="sub">给未来的自己三条硬判据。三条同时为真，连接层就该退化成三十行工厂函数；现在三条都不成立。</p>
+    <ul class="checks">
+      <li>
+        <span class="box"></span>
+        <div><span class="q">驱动源码里 grep 不到厂商库</span><span class="a">除 L1 适配器与 L3 厂商驱动之外，任何文件出现 <code>import RsInstrument</code> / <code>pypylon</code> 都算判据失败。</span></div>
+      </li>
+      <li>
+        <span class="box"></span>
+        <div><span class="q">资源名拼接全部在 endpoint</span><span class="a">驱动里不出现 <code>host:port</code>、<code>ASRL3::INSTR</code>、<code>TCPIP0::</code> 这类字符串，只拿设备档案。</span></div>
+      </li>
+      <li>
+        <span class="box"></span>
+        <div><span class="q">无硬件环境能跑完整 TPS 且全绿</span><span class="a">CI 里没有任何真实仪器，用例仍然过 —— 这说明仿真链路还在，删掉连接层就做不到这条。</span></div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>落地动作</h2>
+    <ol class="actions">
+      <li><b>给 L0 改名定性</b><span class="d"><code>transport.py</code> 的模块说明写死一句：本层只定义契约，不实现任何厂商协议。避免下一个人继续往里加 VISA 细节。</span></li>
+      <li><b>厂商库只准进 L1 / L3</b><span class="d">RsInstrument、pypylon、pyvisa 的 import 收敛到 <code>links/</code> 与 <code>vendors/</code>，其余层一律通过契约调用。</span></li>
+      <li><b>socket / serial 标为回退链</b><span class="d">文档写明适用场景：没有 RsVisa 的现场、私有文本协议老设备、继电器板这类 RS485 器件。不是主路径，但别删。</span></li>
+      <li><b>相机改用会话抽象</b><span class="d">相机需要的是 open / close / state / acquire 四件事，不是 write / read。定义 <code>DeviceSession</code>，把 pypylon 的抓取状态机封在里面，上层的取帧代码一行不用改。</span></li>
+      <li><b>补一条 conformance 测试</b><span class="d">同一支驱动分别在 simulate、真实适配器、回退链三种链路下跑同一组断言，行为必须一致。<code>kit/conformance.py</code> 已有骨架，缺的是把三种链路都纳进矩阵。</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span>代价摆清楚</h2>
+    <div class="risk">
+      <div>
+        <h3>删掉连接层的隐性成本</h3>
+        <ul>
+          <li>CI、培训、客户演示没有硬件时全部失效，只能靠录制回放补</li>
+          <li>换 VISA 后端（RsVisa / NI-VISA / pyvisa-py）要动所有驱动</li>
+          <li>现场缺 R&amp;S VISA 时没有回退，故障从「能跑」变成「装环境」</li>
+          <li>连接统计、自检、超时策略会散落到各驱动，无法统一调</li>
+        </ul>
+      </div>
+      <div>
+        <h3>保留契约的成本</h3>
+        <ul>
+          <li>一层薄抽象，契约本身约两百行，理解成本低</li>
+          <li>契约一旦变更要同步所有适配器，需要版本纪律</li>
+          <li>排障多一跳：要先确认走的是哪条链路（用 <code>describe()</code> 能直接看出来）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <span>结论：连接层保留为契约，实现交给适配器</span>
+    <span>ATE Runner · 驱动软件设计</span>
+  </div>
+
+</div>
+</body>
+</html>

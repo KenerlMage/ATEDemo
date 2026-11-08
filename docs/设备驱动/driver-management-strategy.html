@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATE 驱动软件管理方案</title>
+<style>
+  :root{
+    --bg:#f7f7f6; --surface:#ffffff; --ink:#141414; --ink-2:#3a3a38; --muted:#5f5e57;
+    --rule:#d9d8d3; --rule-2:#b7b5ad; --accent:#1f4e79; --wash:#f1f0ea;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",Arial,sans-serif;
+    font-size:15px;line-height:1.62;font-weight:400}
+  .mono,code,pre,.folio,.kicker,th,.metric-k{font-family:"Consolas","SFMono-Regular",Menlo,monospace}
+  .page{max-width:1030px;margin:0 auto;padding:64px 52px 88px}
+
+  header.top{border-bottom:1px solid var(--ink);padding-bottom:26px;margin-bottom:12px}
+  .kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+  h1{font-size:clamp(30px,4.2vw,44px);line-height:1.12;letter-spacing:-.025em;font-weight:600;margin:0 0 16px;max-width:22ch}
+  .lede{font-size:17px;line-height:1.58;color:var(--ink-2);max-width:62ch;margin:0}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px 30px;font-size:11.5px;color:var(--muted);
+    letter-spacing:.04em;padding:14px 0 0;margin:0}
+  .meta-row b{color:var(--ink);font-weight:600}
+
+  nav.toc{display:flex;flex-wrap:wrap;gap:6px 26px;padding:16px 0;border-bottom:1px solid var(--rule);margin-bottom:56px}
+  nav.toc a{font-size:12px;letter-spacing:.03em;color:var(--muted);text-decoration:none;border-bottom:1px solid transparent}
+  nav.toc a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+  nav.toc span{color:var(--rule-2);margin-right:6px}
+
+  section{margin:0 0 62px;scroll-margin-top:24px}
+  .sec-head{display:grid;grid-template-columns:52px 1fr;gap:16px;align-items:baseline;
+    border-top:1px solid var(--rule-2);padding-top:14px;margin-bottom:20px}
+  .folio{font-size:11px;letter-spacing:.1em;color:var(--accent)}
+  h2{font-size:25px;line-height:1.24;letter-spacing:-.015em;font-weight:600;margin:0}
+  h2 small{display:block;font-size:13.5px;font-weight:400;color:var(--muted);letter-spacing:0;margin-top:7px}
+  h3{font-size:15.5px;font-weight:600;letter-spacing:-.005em;margin:26px 0 8px}
+  p{margin:0 0 14px;max-width:72ch}
+  p.note{font-size:13.4px;color:var(--muted);padding-left:14px;border-left:2px solid var(--rule-2);max-width:70ch}
+
+  .problems{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule)}
+  .problem{padding:22px 18px 24px;border-right:1px solid var(--rule)}
+  .problem:last-child{border-right:0}
+  .problem svg{display:block;margin:0 0 16px}
+  .problem .idx{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--muted)}
+  .problem h4{font-size:14.5px;font-weight:600;margin:6px 0 8px;line-height:1.35}
+  .problem p{font-size:12.8px;color:var(--ink-2);margin:0;line-height:1.55}
+
+  table{width:100%;border-collapse:collapse;font-size:13.4px;table-layout:fixed;margin:6px 0 16px}
+  caption{text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:8px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    font-weight:400;border-bottom:1px solid var(--rule-2);padding:0 12px 8px 0;vertical-align:bottom}
+  td{border-bottom:1px solid var(--rule);padding:11px 12px 11px 0;vertical-align:top;line-height:1.52}
+  th:last-child,td:last-child{padding-right:0}
+  td.row-h{color:var(--muted);font-weight:600}
+  td.em{color:var(--accent)}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-2)}
+
+  .keyline{display:flex;gap:22px;align-items:baseline;padding:12px 0 0;font-size:12.6px;color:var(--ink-2)}
+  .keyline .k{font-family:"Consolas",monospace;font-size:10.8px;letter-spacing:.08em;color:var(--accent);flex:none;padding-top:2px}
+  .keyline div{flex:1}
+
+  pre{background:var(--wash);border:1px solid var(--rule-2);padding:16px 18px;overflow-x:auto;
+    font-size:12.4px;line-height:1.66;color:#20211d;margin:10px 0 14px}
+  code{font-size:12.6px;background:var(--wash);padding:1px 4px}
+  pre code{background:none;padding:0}
+  pre .s{color:var(--accent)}
+
+  .steps{list-style:none;padding:0;margin:14px 0 0;counter-reset:s}
+  .steps li{counter-increment:s;display:grid;grid-template-columns:26px 1fr;gap:10px;
+    padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.6px}
+  .steps li::before{content:counter(s);font-family:"Consolas",monospace;font-size:11px;color:var(--accent);padding-top:3px}
+  .steps li:last-child{border-bottom:1px solid var(--rule-2)}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:36px}
+  ul.plain{list-style:none;padding:0;margin:8px 0 0}
+  ul.plain li{position:relative;padding:7px 0 7px 16px;font-size:13.6px;border-bottom:1px solid var(--rule)}
+  ul.plain li::before{content:"";position:absolute;left:0;top:15px;width:5px;height:5px;background:var(--accent)}
+  ul.plain.neg li::before{background:#8b0f1a}
+  ul.plain li:last-child{border-bottom:1px solid var(--rule-2)}
+
+  .metrics{display:flex;gap:34px;flex-wrap:wrap;border-top:1px solid var(--rule-2);
+    border-bottom:1px solid var(--rule-2);padding:16px 0;margin:18px 0 8px}
+  .metric-k{font-size:10.6px;letter-spacing:.08em;color:var(--muted);display:block}
+  .metric-v{font-size:22px;font-weight:600;letter-spacing:-.02em}
+
+  .road{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--rule-2);margin-top:18px}
+  .road > div{padding:16px 16px 18px 0;border-right:1px solid var(--rule)}
+  .road > div:last-child{border-right:0}
+  .road .p{font-family:"Consolas",monospace;font-size:11px;letter-spacing:.1em;color:var(--accent)}
+  .road .w{font-size:11.4px;color:var(--muted);margin:3px 0 10px}
+  .road h4{font-size:14px;margin:0 0 8px;font-weight:600}
+  .road ul{list-style:none;padding:0;margin:0 0 10px;font-size:12.4px;color:var(--ink-2)}
+  .road ul li{padding:3px 0 3px 12px;position:relative}
+  .road ul li::before{content:"–";position:absolute;left:0;color:var(--rule-2)}
+  .road .gate{font-size:11.8px;color:var(--accent);line-height:1.45}
+
+  footer{border-top:1px solid var(--ink);margin-top:20px;padding-top:14px;
+    font-size:11.4px;letter-spacing:.04em;color:var(--muted);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+  @media (max-width:860px){
+    .page{padding:40px 22px 60px}
+    .problems{grid-template-columns:1fr 1fr}
+    .problem:nth-child(2){border-right:0}
+    .problem:nth-child(1),.problem:nth-child(2){border-bottom:1px solid var(--rule)}
+    .twocol{grid-template-columns:1fr;gap:20px}
+    .road{grid-template-columns:1fr 1fr}
+    .road > div:nth-child(2){border-right:0}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <p class="kicker">ATE Runner · 驱动软件管理方案</p>
+    <h1>把驱动从子系统的附属品，变成可独立发布的单元</h1>
+    <p class="lede">当前每个子系统各自维护驱动与用例，问题不随台型收敛而消失。本方案用三类发布物划出变更边界，用注册解析与锁定决定版本，用仿真模式把回归从硬件上解耦。</p>
+    <p class="meta-row">
+      <span>范围 · <b>全部标准化主控柜</b></span>
+      <span>对象 · <b>驱动软件与发布单元</b></span>
+      <span>版本 · <b>方案稿 v2</b></span>
+      <span>日期 · <b>2026-11-08</b></span>
+    </p>
+  </header>
+
+  <nav class="toc">
+    <a href="#s1"><span>01</span>问题背景</a>
+    <a href="#s2"><span>02</span>驱动软件分类</a>
+    <a href="#s3"><span>03</span>代码方案</a>
+    <a href="#s4"><span>04</span>分层与解析</a>
+    <a href="#s5"><span>05</span>开发视图</a>
+    <a href="#s6"><span>06</span>仿真模式</a>
+    <a href="#s7"><span>07</span>落地顺序</a>
+  </nav>
+
+  <section id="s1">
+    <div class="sec-head">
+      <span class="folio">01</span>
+      <h2>问题背景<small>驱动软件分散在各子系统独立的驱动包与 TPS 包中，缺少统一的契约标准与版本边界</small></h2>
+    </div>
+
+    <div class="problems">
+      <div class="problem">
+        <svg width="52" height="46" viewBox="0 0 52 46" fill="none" stroke="#1f4e79" stroke-width="1.4">
+          <rect x="2" y="4" width="26" height="9"/><rect x="6" y="18" width="26" height="9"/>
+          <rect x="10" y="32" width="26" height="9"/><path d="M44 38V8" stroke-linecap="round"/>
+          <path d="M40 12l4-4 4 4"/>
+        </svg>
+        <span class="idx">01</span>
+        <h4>用例开发成本高</h4>
+        <p>型号变更需在多个包内重复改动；用例与驱动实现耦合，回归范围随台型数量线性增长。</p>
+      </div>
+      <div class="problem">
+        <svg width="52" height="46" viewBox="0 0 52 46" fill="none" stroke="#1f4e79" stroke-width="1.4">
+          <rect x="4" y="16" width="18" height="16"/><rect x="28" y="16" width="18" height="16"/>
+          <path d="M4 9h40" stroke-linecap="round"/><path d="M40 5l4 4-4 4"/>
+          <path d="M6 38h26" stroke-linecap="round"/>
+        </svg>
+        <span class="idx">02</span>
+        <h4>同类设备重复开发</h4>
+        <p>同型号仪器在不同子系统各实现一次，命令用法与判据口径逐渐分叉，同一缺陷要修两处。</p>
+      </div>
+      <div class="problem">
+        <svg width="52" height="46" viewBox="0 0 52 46" fill="none" stroke="#1f4e79" stroke-width="1.4">
+          <rect x="3" y="4" width="14" height="11"/><rect x="35" y="4" width="14" height="11"/>
+          <rect x="19" y="31" width="14" height="11"/>
+          <path d="M17 15l6 12M35 15l-6 12M26 31V21"/>
+          <circle cx="26" cy="19" r="2.4" fill="#1f4e79" stroke="none"/>
+        </svg>
+        <span class="idx">03</span>
+        <h4>问题定位缺少入口</h4>
+        <p>同一现象可能源自驱动、TPS 或台架配置，缺少统一诊断快照与明确的责任归属。</p>
+      </div>
+      <div class="problem">
+        <svg width="52" height="46" viewBox="0 0 52 46" fill="none" stroke="#1f4e79" stroke-width="1.4">
+          <rect x="4" y="4" width="30" height="38"/>
+          <rect x="10" y="10" width="9" height="8" fill="#edf2f8"/><rect x="10" y="24" width="9" height="8" fill="#edf2f8"/>
+          <rect x="38" y="26" width="11" height="10" stroke-dasharray="3 3"/>
+          <path d="M30 31l7-1" stroke-linecap="round"/><path d="M35 27l3 2-3 3"/>
+        </svg>
+        <span class="idx">04</span>
+        <h4>驱动随包散落</h4>
+        <p>驱动被打进各 TPS 包内随用例分发，同一驱动存在多份副本，修复需逐包替换且版本无法统一。</p>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:22px">四类问题不会随台型数量收敛而自动消失，需要通过管理策略规避：把驱动从子系统包与 TPS 包中剥离，建立独立的发布单元、版本边界与回滚能力。</p>
+  </section>
+
+  <section id="s2">
+    <div class="sec-head">
+      <span class="folio">02</span>
+      <h2>驱动软件分类<small>按复用台型数与柜内配置归属划分三类发布物，每类对应一种变更节奏</small></h2>
+    </div>
+
+    <p>分类之后，三类包各自的最大收益是：基础包覆盖八成台型，一次回归覆盖全平台；共享包独立发版，单包回滚分钟级生效；独立包现场自持，不拖累基线与主程序。</p>
+
+    <table>
+      <caption>表 1 · 三类发布物的定义、判据与责任</caption>
+      <thead>
+        <tr><th style="width:15%">维度</th><th style="width:29%">基础包 BASELINE</th><th style="width:29%">共享包 SHARED</th><th style="width:27%">独立包 STATION</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="row-h">定义</td><td>标准柜内固定配置，随平台版本发布，设备族保持十来个</td><td class="em">多台型复用且非柜内标配，独立版本、独立发布</td><td>仅单一台型使用，随建台部署，仍实现同一契约</td></tr>
+        <tr><td class="row-h">归属判据</td><td>≥ 八成台型使用</td><td class="em">2% – 八成台型使用，或停产与固件敏感</td><td>单一台型使用</td></tr>
+        <tr><td class="row-h">发布节奏</td><td>随平台大版本，季度级</td><td class="em">独立发版，月度级，支持灰度</td><td>随建台或换夹具</td></tr>
+        <tr><td class="row-h">回滚粒度</td><td>整平台</td><td class="em">单包单版本，改 lock 生效</td><td>单台</td></tr>
+        <tr><td class="row-h">责任主体</td><td>平台组</td><td class="em">包 owner，无主不入库</td><td>站点负责人</td></tr>
+      </tbody>
+    </table>
+
+    <div class="keyline">
+      <span class="k">适配设备类型</span>
+      <div>基础包：直流电源 · 数字万用表 · 矩阵 · 相机 · 程控负载</div>
+      <div>共享包：R&amp;S MXO 示波器 · 光功率计 · 频谱仪 · 专用采集卡</div>
+      <div>独立包：夹具控制器 · 供应商私有协议设备 · 替代仪器</div>
+    </div>
+
+    <p class="note">归属判定依据是复用面与变更风险，与技术相似性无关；判据落在台型清单上，不落在人员判断上。设备停产风险高或对固件敏感时，即使单一台型使用亦独立成包。</p>
+  </section>
+
+  <section id="s3">
+    <div class="sec-head">
+      <span class="folio">03</span>
+      <h2>代码方案<small>三类包的差异最终落在代码产出物与归档位置上：改哪个目录、出什么产物、谁审、影响几台设备</small></h2>
+    </div>
+
+    <table>
+      <caption>表 2 · 代码产出物、归档与门禁</caption>
+      <thead>
+        <tr><th style="width:15%">维度</th><th style="width:29%">基础包</th><th style="width:29%">共享包</th><th style="width:27%">独立包</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="row-h">代码产出物</td><td>契约实现 + 厂商适配，随平台仓维护</td><td class="em">契约实现 + 命令表 + 仿真 IO + 随包契约测试</td><td>契约实现的最小集合，允许站点本地扩展</td></tr>
+        <tr><td class="row-h">归档位置</td><td><code>app/backend/drivers/&lt;设备族&gt;/</code></td><td class="em"><code>packages/&lt;名称&gt;/&lt;版本&gt;/</code>，出 zip 进私有索引</td><td>台架本地目录 + 台架清单登记</td></tr>
+        <tr><td class="row-h">交付形态</td><td>随安装包分发，装完即用</td><td class="em">离线 zip 导入，安装不编译、不联网</td><td>现场目录挂载，登记后生效</td></tr>
+        <tr><td class="row-h">版本与标签</td><td>跟随平台版本号</td><td class="em">语义化版本 + git tag，多版可共存</td><td>随建台记录，不入主干分支</td></tr>
+        <tr><td class="row-h">评审门禁</td><td>平台全量回归</td><td class="em">契约一致性 + 双台型回归 + 出包校验</td><td>契约一致性 + 本台用例</td></tr>
+        <tr><td class="row-h">变更影响面</td><td>全平台台型</td><td class="em">使用该包的全部台型</td><td>单台设备</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note">归档原则：同一份驱动代码只在一处维护；三类方案的区别是产出物形态与归档边界，不是实现方式。归档位置一旦确定，回滚动作也就随之确定 —— 共享包的回滚是改 lock，独立包的回滚是换目录，基础包的回滚只能整平台。</p>
+  </section>
+
+  <section id="s4">
+    <div class="sec-head">
+      <span class="folio">04</span>
+      <h2>分层与解析<small>用例依赖契约，平台负责解析，包提供契约实现</small></h2>
+    </div>
+
+    <div class="twocol">
+      <div>
+        <h3>各层职责</h3>
+        <table>
+          <thead><tr><th style="width:22%">层</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td class="em">L4 用例层</td><td>只依赖别名与能力，不出现包名、版本、型号</td></tr>
+            <tr><td class="em">L3 契约层</td><td>定义动作集合与返回结构，唯一对用例暴露的接口</td></tr>
+            <tr><td class="em">L2 解析层</td><td>把台型声明与 lock 合成为加载计划，唯一决定版本</td></tr>
+            <tr><td class="em">L1 包层</td><td>唯一允许出现厂商库的地方，实现契约并内置仿真</td></tr>
+            <tr><td class="em">L0 运行时</td><td>持有硬件会话，负责资源仲裁、超时与诊断</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>为什么这样切</h3>
+        <ul class="plain">
+          <li>契约层承担最贵的变更成本，因此只收跨型号稳定的动作，八项测量语义固定量纲。</li>
+          <li>解析层是版本决策的唯一位置，结果写入 lock；运行期不再判断版本，回滚只改 lock。</li>
+          <li>包层是厂商依赖的隔离带，CI 可静态检查只有该目录引用厂商库。</li>
+          <li>运行时不认包名，只认能力与资源，一柜多站争用仪器时在运行时排队。</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>L2 解析的方法</h3>
+    <p>解析做六件事，任一步失败即拒绝启动并给出可执行提示，不做兜底降级。</p>
+    <table>
+      <caption>表 3 · L2 解析的六个步骤与失败处理（方案细节）</caption>
+      <thead>
+        <tr><th style="width:14%">步骤</th><th style="width:24%">输入</th><th style="width:30%">判定</th><th style="width:32%">失败处理</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">1 读声明</td><td><code>station-types/*.json</code></td><td>能力名与版本范围存在且语法合法</td><td>缺字段或未知能力，拒绝启动</td></tr>
+        <tr><td class="em">2 读 lock</td><td><code>benches/*/bench.lock.json</code></td><td>lock 的台型与当前台型一致</td><td>不一致，要求重新锁定</td></tr>
+        <tr><td class="em">3 求解版本</td><td>注册表中的包清单</td><td>版本满足 ^ ~ &gt;= 约束且不冲突</td><td>无解或多解，列出候选并拒绝</td></tr>
+        <tr><td class="em">4 校验完整性</td><td>包目录内容</td><td>tree_sha256 与 lock 记录一致</td><td>不一致，拒绝加载并重新导入</td></tr>
+        <tr><td class="em">5 校验兼容</td><td>manifest 的 runtime 段</td><td>Runner 与 Python 在声明范围内</td><td>超范围，给出可用版本</td></tr>
+        <tr><td class="em">6 出计划</td><td>解析结果</td><td>每个能力唯一映射到 包@版本</td><td>同能力两个版本，抛 VersionConflict</td></tr>
+      </tbody>
+    </table>
+    <p class="note">标注「方案细节」的表格用于说明机制，不承担收益论证。收益在表 1 的发布节奏与回滚粒度两行。</p>
+  </section>
+
+  <section id="s5">
+    <div class="sec-head">
+      <span class="folio">05</span>
+      <h2>开发视图<small>新增一个驱动只动三处：新增包目录、在台型声明里加一行能力约束、重新生成本台 lock；平台仓代码不改</small></h2>
+    </div>
+
+    <div class="twocol">
+      <div>
+        <h3>manifest.json 示例</h3>
+        <pre><code>{
+  "<span class="s">name</span>": "vendor-model",            <span style="color:#5f5e57">// 包唯一名</span>
+  "<span class="s">version</span>": "1.0.0",
+  "<span class="s">capability</span>": "oscilloscope",     <span style="color:#5f5e57">// 能力，不是型号</span>
+  "<span class="s">contract</span>": "1.0",               <span style="color:#5f5e57">// 契约版本</span>
+  "<span class="s">entry</span>": "vendor_model.driver:VendorScope",
+  "<span class="s">vendor_deps</span>": ["VendorLib==2.3.1"],  <span style="color:#5f5e57">// 精确版本</span>
+  "<span class="s">runtime</span>": { "runner": "&gt;=1.6 &lt;2.0",
+             "python": "&gt;=3.11" },
+  "<span class="s">simulate</span>": true,                   <span style="color:#5f5e57">// 支持仿真</span>
+  "<span class="s">verified_on_hardware</span>": false,      <span style="color:#5f5e57">// 真机核对状态</span>
+  "<span class="s">owner</span>": "仪器驱动组",            <span style="color:#5f5e57">// 无主不入库</span>
+  "<span class="s">targets</span>": ["MXO44", "MXO54", "MXO58"]
+}</code></pre>
+      </div>
+      <div>
+        <h3>代码仓影响范围</h3>
+        <table>
+          <caption>表 4 · 影响范围（方案细节）</caption>
+          <thead><tr><th style="width:44%">路径</th><th style="width:16%">变更</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>packages/&lt;名称&gt;/</code></td><td class="em">新增</td><td>manifest + pkg + vendor + conformance</td></tr>
+            <tr><td><code>station-types/&lt;台型&gt;.json</code></td><td class="em">改一行</td><td>加能力名与版本约束</td></tr>
+            <tr><td><code>benches/&lt;台架&gt;/bench.lock.json</code></td><td class="em">重新生成</td><td>记录版本与目录哈希</td></tr>
+            <tr><td><code>app/backend/drivers</code></td><td>不改</td><td>稳定集仍随平台发布</td></tr>
+            <tr><td><code>kit/</code> · <code>runtime/</code></td><td>不改</td><td>契约不变则无需改动</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>开发步骤</h3>
+    <ol class="steps">
+      <li>建包目录并写 manifest：只声明能力、契约、依赖与入口。</li>
+      <li>实现契约子集，跑 conformance 直到 13 项全过。</li>
+      <li>仿真回归通过后，接一个真实台型跑通采集与测量。</li>
+      <li>出包 → 导入私有索引 → 写 lock → 台架重启生效。</li>
+    </ol>
+    <p class="note">不再需要的动作：改平台仓、发主程序、逐台升级。这也是「非标设备变更不再触发主程序发版」这条判据的落点。</p>
+  </section>
+
+  <section id="s6">
+    <div class="sec-head">
+      <span class="folio">06</span>
+      <h2>仿真模式：只实现接口，不实现功能<small>在与真机相同的驱动代码路径上替换 IO 层，返回结构合法、量纲一致的数据</small></h2>
+    </div>
+
+    <p>仿真不是模拟仪器的物理行为，而是满足契约形状：方法可调用、返回结构完整、单位与量纲一致。驱动逻辑与真机共用一套代码，只有 IO 被替换 —— 因此仿真通过能说明契约实现与解析链路正确，不能说明仪器可用。</p>
+
+    <div class="twocol">
+      <div>
+        <h3>实现什么</h3>
+        <ul class="plain">
+          <li>承接全部契约方法，参数校验与真机一致</li>
+          <li>返回合法结构：波形采样、时间轴、身份信息、测量值</li>
+          <li>数值由固定模型生成，服从量程与垂直档位关系</li>
+        </ul>
+      </div>
+      <div>
+        <h3>不实现什么</h3>
+        <ul class="plain neg">
+          <li>不模拟噪声、带宽、探头衰减等物理特性</li>
+          <li>不保证数值精度：仿真通过不等于真机通过</li>
+          <li>不替代现场验收，只替代无硬件环境下的契约回归</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <caption>表 5 · 仿真模式的实现方案（方案细节）</caption>
+      <thead><tr><th style="width:18%">要素</th><th>做法</th></tr></thead>
+      <tbody>
+        <tr><td class="em">入口切换</td><td>设备档案写 <code>mode=simulate</code> 才启用；未写默认硬件模式，缺库即报错</td></tr>
+        <tr><td class="em">IO 替身</td><td>SimIo 实现 write_str / query_str / query_bin_block 三个方法</td></tr>
+        <tr><td class="em">波形生成</td><td>按幅值与垂直档位生成整屏两个周期，采样数与采样间隔固定</td></tr>
+        <tr><td class="em">测量取值</td><td>由最近一次波形推算，量纲与契约一致，不调用仪器测量功能</td></tr>
+        <tr><td class="em">身份信息</td><td>返回固定厂商、型号、序列号与固件串，字段齐全</td></tr>
+        <tr><td class="em">门禁定位</td><td>进入 CI 与双台型回归，替代无硬件环境的契约检查</td></tr>
+        <tr><td class="em">禁止事项</td><td>不参与现场验收；真机核对通过前 verified_on_hardware 保持 false</td></tr>
+      </tbody>
+    </table>
+
+    <div class="metrics">
+      <div><span class="metric-k">契约检查</span><span class="metric-v">13 / 13</span></div>
+      <div><span class="metric-k">流程测试</span><span class="metric-v">9 / 9</span></div>
+      <div><span class="metric-k">待真机核对</span><span class="metric-v">5 处</span></div>
+      <div><span class="metric-k">仿真覆盖</span><span class="metric-v">全部契约方法</span></div>
+    </div>
+    <p class="note">判定标准：仿真通过说明契约实现与解析链路正确；真机核对通过才说明驱动可用。两者不可互相替代。</p>
+  </section>
+
+  <section id="s7">
+    <div class="sec-head">
+      <span class="folio">07</span>
+      <h2>落地顺序<small>先冻结契约，再建仓与门禁，试点闭环后批量迁移</small></h2>
+    </div>
+
+    <div class="road">
+      <div>
+        <div class="p">P0</div><div class="w">第 1–4 周</div>
+        <h4>盘点与冻结</h4>
+        <ul><li>设备清单按能力聚类，收敛至 20 个能力族</li><li>输出三类包归属表</li><li>冻结契约 1.0 与设备档案字段</li></ul>
+        <div class="gate">判据：契约与归属表通过评审</div>
+      </div>
+      <div>
+        <div class="p">P1</div><div class="w">第 5–10 周</div>
+        <h4>仓库与门禁</h4>
+        <ul><li>建立 contracts / packages / kit / runtime</li><li>出包流程与私有索引</li><li>CI：契约 → 仿真 → 双台型回归</li></ul>
+        <div class="gate">判据：空白包可走完流程并产出签名 zip</div>
+      </div>
+      <div>
+        <div class="p">P2</div><div class="w">第 11–16 周</div>
+        <h4>首个共享包试点</h4>
+        <ul><li>首个共享包完成真机核对</li><li>两个台型离线导入并灰度</li><li>回滚演练并计时</li></ul>
+        <div class="gate">判据：回滚 ≤ 5 分钟，双台型回归通过</div>
+      </div>
+      <div>
+        <div class="p">P3</div><div class="w">第 17 周起</div>
+        <h4>批量迁移与治理</h4>
+        <ul><li>按台型分批迁移，批次间留观察窗</li><li>维护包目录：owner、版本、EOL</li><li>基线冻结在十来个设备族</li></ul>
+        <div class="gate">判据：新增设备不再触发主程序发版</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>ATE Runner · 驱动软件管理方案 · v2</span>
+    <span>问题 → 分类 → 代码方案 → 分层 → 开发 → 仿真 → 落地</span>
+  </footer>
+
+</div>
+</body>
+</html>

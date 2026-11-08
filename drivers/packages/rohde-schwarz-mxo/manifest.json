@@ -1,0 +1,29 @@
+{
+  "name": "rohde-schwarz-mxo",
+  "version": "1.2.0",
+  "capability": "oscilloscope",
+  "contract": "1.0",
+  "runtime": {
+    "runner": ">=1.6 <2.0",
+    "python": ">=3.11"
+  },
+  "owner": "仪器驱动组",
+  "entry": "rs_mxo.driver:RsMxoScope",
+  "vendor_deps": [
+    "RsInstrument==1.12.1"
+  ],
+  "mode_support": [
+    "hardware",
+    "simulate"
+  ],
+  "simulate": true,
+  "verified_on_hardware": false,
+  "targets": [
+    "MXO44",
+    "MXO54",
+    "MXO58"
+  ],
+  "changelog": "CHANGELOG.md",
+  "conformance": "conformance/test_contract.py",
+  "notes": "SCPI 映射按 R&S MXO 系列 SCPI 参考实现，未经真机验证；出包前须在至少一台 MXO 上跑 conformance 并把 verified_on_hardware 置 true。"
+}

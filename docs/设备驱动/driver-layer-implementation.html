@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>驱动层重构 · 落地说明</title>
+<style>
+  :root{
+    --paper:#fafaf9;--ink:#141414;--ink-soft:#3c3b36;--muted:#6f6e66;
+    --rule:#dbd7cf;--rule-strong:#b9b4a9;--accent:#8b0f1a;--wash:#f1efe9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Arial,sans-serif;
+    font-size:15.5px;line-height:1.62}
+  .page{max-width:1060px;margin:0 auto;padding:72px 56px 96px}
+  .mono,pre,code,.meta,.kicker,th{font-family:"Consolas","SFMono-Regular",Menlo,monospace}
+
+  .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 22px}
+  h1{font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    font-weight:600;font-size:clamp(29px,4vw,43px);line-height:1.16;letter-spacing:-.02em;margin:0 0 20px;max-width:24ch}
+  .lede{font-size:17.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch;margin:0 0 30px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px 32px;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:12px 0;margin:0 0 46px}
+  .meta b{color:var(--ink);font-weight:600}
+
+  .verdict{border:1px solid var(--ink);padding:24px 26px;margin:0 0 52px;
+    display:grid;grid-template-columns:84px 1fr;gap:22px;align-items:start}
+  .verdict .tag{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+    border-top:2px solid var(--accent);padding-top:8px}
+  .verdict p{margin:0;font-size:18px;line-height:1.5}
+  .verdict p+p{margin-top:12px;font-size:14.6px;color:var(--ink-soft)}
+
+  section{margin:0 0 54px}
+  h2{font-family:"Iowan Old Style",Georgia,"Songti SC",serif;font-size:24px;font-weight:600;
+    line-height:1.26;margin:0 0 6px;display:flex;gap:14px;align-items:baseline}
+  h2 .num{font-size:11px;letter-spacing:.1em;color:var(--accent);font-weight:400;flex:none}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px;max-width:74ch}
+  p{margin:0 0 16px;max-width:74ch}
+
+  pre{background:var(--wash);border:1px solid var(--rule-strong);border-left:3px solid var(--ink);
+    padding:15px 17px;overflow-x:auto;margin:14px 0 12px;font-size:12.2px;line-height:1.6;color:#26251f}
+  pre .c{color:var(--muted)}
+  pre .k{color:var(--accent)}
+  code{font-size:12.5px;background:var(--wash);padding:1px 5px;word-break:break-word}
+
+  table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:13.6px;table-layout:fixed}
+  caption{text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:9px}
+  th{text-align:left;font-weight:400;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1px solid var(--rule-strong);padding:0 13px 8px 0;vertical-align:bottom}
+  td{border-bottom:1px solid var(--rule);padding:12px 13px 12px 0;vertical-align:top;line-height:1.55}
+  th:last-child,td:last-child{padding-right:0}
+  td:first-child{font-weight:600}
+  tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+  .ok{color:var(--accent);font-family:"Consolas",monospace;font-size:12px}
+
+  ul.rows{list-style:none;padding:0;margin:12px 0 0}
+  ul.rows li{padding:14px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:160px 1fr;gap:18px}
+  ul.rows li:first-child{border-top:1px solid var(--rule-strong)}
+  ul.rows .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding-top:3px}
+  ul.rows .v{font-size:14px;line-height:1.6}
+
+  .note{font-size:13.4px;color:var(--muted);max-width:76ch;margin:0 0 10px;padding-left:15px;border-left:2px solid var(--rule)}
+  .closing{border-top:1px solid var(--rule-strong);margin-top:56px;padding-top:20px;
+    font-size:11.5px;letter-spacing:.04em;color:var(--muted);display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  @media (max-width:780px){
+    .page{padding:44px 22px 64px}
+    .verdict{grid-template-columns:1fr;gap:12px}
+    ul.rows li{grid-template-columns:1fr;gap:6px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="kicker">ATE Runner · 驱动层重构 · 落地说明</p>
+  <h1>把驱动从"平台的一部分"拆成"可独立发布的包"</h1>
+  <p class="lede">已按「能力契约 / 驱动包 / 注册解析 / 运行时」四层建成 <code>D:\ATE\drivers</code> 仓库，并完成首个共享包 <b>rohde-schwarz-mxo 1.2.0</b>（基于 PyPI RsInstrument）。契约一致性 13/13、流程测试 9/9、出包与完整性校验全部通过；真机核对项已显式标记，未验证前不进入共享包目录。</p>
+  <div class="meta">
+    <span>仓库 · <b>D:\ATE\drivers</b></span>
+    <span>规模 · <b>24 文件 / 约 80 KB</b></span>
+    <span>契约 · <b>scope 1.0</b></span>
+    <span>日期 · <b>2026-11-08</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">结论</div>
+    <div>
+      <p>分层不是把代码挪到几个目录，而是把「谁会改、多久改、改坏影响几台」写进结构里。</p>
+      <p>契约层只保留 9 个方法与 8 个测量项；厂商库被限制在 <code>packages/*/pkg/**</code>，由 CI 静态检查；版本选择从代码里消失，改由 <code>bench.lock.json</code> 决定。旧仓库 <code>sdk/ate_drivers</code> 未改动，按能力逐项迁移。</p>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>分层落地后的结构</h2>
+    <p class="sub">四个层各自不可越界：契约不认厂商，包不认档案，解析器不碰硬件，运行时不认包名。</p>
+    <pre><span class="c">D:\ATE\drivers</span>
+├── <span class="k">contracts/</span>scope.py          能力契约 1.0：TPS 唯一依赖；禁止 import 厂商库
+├── <span class="k">kit/</span>registry.py            清单校验 + 目录哈希（tree_sha256）
+│   ├── resolve.py             台型清单 + lock → 加载哪个包、哪个版本
+│   └── conformance.py         契约一致性套件（13 项，可随包发布）
+├── <span class="k">runtime/</span>session.py        会话、仪器资源仲裁、超时、拓扑快照
+├── <span class="k">packages/</span>rohde-schwarz-mxo/
+│   ├── manifest.json          身份 / 契约 / 兼容范围 / 入口 / 依赖 / 验证状态
+│   ├── pkg/rs_mxo/driver.py   契约实现（301 行）
+│   ├── pkg/rs_mxo/scpi.py     SCPI 命令表（5 处标记待真机核对）
+│   ├── pkg/rs_mxo/simulate.py 仿真 IO（与真机同一驱动路径）
+│   ├── vendor/                RsInstrument==1.12.1 离线随包
+│   └── conformance/           随包契约测试
+├── station-types/scope-bench.json   台型声明：要什么能力、版本范围
+├── benches/BENCH-DEMO/              devices.json（档案投影）+ bench.lock.json
+├── ci/pack.py                 出包 → zip → sha256 → 私有索引；含边界检查
+└── tools/                     lock_bench.py（锁定）、demo_acquire.py（端到端）</pre>
+    <table>
+      <caption>四层的职责与禁则</caption>
+      <thead>
+        <tr><th style="width:15%">层</th><th style="width:30%">负责</th><th style="width:30%">明确不做</th><th style="width:25%">越界后果</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>契约</td><td>动作集合、返回结构、异常层级、量纲</td><td>不认型号、不认协议、不认连接方式</td><td>型号变更即改用例</td></tr>
+        <tr><td>驱动包</td><td>把厂商库与 SCPI 翻译成契约语义</td><td>不读设备档案、不拼资源名、不选版本</td><td>同一设备在多台型里各存一份</td></tr>
+        <tr><td>解析</td><td>版本约束、目录哈希、契约与运行环境兼容</td><td>不建连接、不碰硬件</td><td>版本选择散落在代码里，现场不可复现</td></tr>
+        <tr><td>运行时</td><td>会话、资源独占、超时重试、诊断</td><td>不解析包、不认包名</td><td>一柜多站争用仪器，表现为偶发读数异常</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>契约：只描述用例会用的语义</h2>
+    <p class="sub">契约是最贵的一层，改一次全公司回归，因此只收「跨型号稳定」的动作。</p>
+    <ul class="rows">
+      <li><span class="k">9 个方法</span><span class="v">connect / close / identify / configure_timebase / configure_channel / configure_trigger / acquire / measure / describe。生命周期固定为「构造 → connect → 配置 → 采集/测量 → close」，close 之后任何操作必须抛 <code>ScopeNotConnected</code>。</span></li>
+      <li><span class="k">8 个测量项</span><span class="v">vpp / vmax / vmin / mean / rms / frequency / period / rise_time。量纲写死在契约：电压类为 V，频率 Hz，时间 s。未知测量项抛 <code>ScopeUnsupported</code>，不允许返回 None 或 NaN。</span></li>
+      <li><span class="k">返回结构</span><span class="v">波形用 <code>t0_s + dt_s * i</code> 表达时间轴，不使用厂商时间数组；不把厂商对象交给用例层。这样跨型号、跨厂商的数据可以直接比较与存档。</span></li>
+      <li><span class="k">异常层级</span><span class="v"><code>ScopeError</code> 下分 NotConnected / Timeout / Unsupported / DataError。驱动包负责把厂商库异常映射进来，运行时按类型决定重试或中止。</span></li>
+    </ul>
+    <p class="note">设计取舍：测量值默认从最近一次采集推算，而不是调仪器内部测量功能。代价是精度受采样率限制，收益是八项语义在所有型号上完全一致 —— 换型号不会让判定阈值漂移。需要仪器级精度时用 <code>prefer_instrument_measure=True</code> 显式切换，并在档案里记录。</p>
+
+    <h3 style="font-family:'Iowan Old Style',Georgia,'Songti SC',serif;font-size:16.5px;font-weight:600;margin:28px 0 8px">代码视图：生命周期与厂商库边界</h3>
+    <pre><span class="c"># packages/rohde-schwarz-mxo/pkg/rs_mxo/driver.py · 119–140</span>
+    <span class="k">def</span> connect(self) -&gt; <span class="k">None</span>:
+        <span class="k">if</span> self._io <span class="k">is not</span> None:
+            <span class="k">return</span>
+        <span class="k">if</span> self.mode == "simulate":
+            io = SimIo(self.resource)
+        <span class="k">else</span>:
+            io = self._open_rsinstrument()
+        self._io = io
+        <span class="k">try</span>:
+            self._io.write_str(scpi.data_format())
+            self._io.write_str(scpi.CLEAR_STATUS)
+            self._identity = self._read_identity()
+        <span class="k">except</span> ScopeError:
+            self._io = None
+            <span class="k">raise</span>
+        <span class="k">except</span> Exception <span class="k">as</span> exc:      <span class="c"># 厂商库异常不得外泄</span>
+            self._io = None
+            <span class="k">raise</span> DriverUnavailable(f"连接初始化失败: {exc}") from exc
+
+    <span class="k">def</span> _open_rsinstrument(self):
+        <span class="k">try</span>:
+            <span class="k">from</span> RsInstrument <span class="k">import</span> RsInstrument  <span class="c"># 仅本包内出现</span></pre>
+    <p class="note">两处值得注意：厂商库导入写在方法内部，因此缺库不影响仿真与契约测试；<code>except Exception</code> 兜底后换成契约异常，用例层永远看不到厂商库的异常类型。146–151 行完成实例化与 <code>visa_timeout</code> 设置，失败同样映射为 <code>DriverUnavailable</code>。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>示例包：R&amp;S MXO 与 RsInstrument 的边界</h2>
+    <p class="sub">RsInstrument 在本包里只承担一件事：把字符串与二进制块送进送出。它不承担版本管理、不承担档案解析、不承担重试策略。</p>
+    <pre><span class="c">// manifest.json 关键字段</span>
+{
+  "name": "rohde-schwarz-mxo",
+  "version": "1.2.0",
+  "capability": "oscilloscope",
+  "contract": "1.0",
+  "runtime": { "runner": "&gt;=1.6 &lt;2.0", "python": "&gt;=3.11" },
+  "owner": "仪器驱动组",
+  "entry": "rs_mxo.driver:RsMxoScope",
+  "vendor_deps": ["RsInstrument==1.12.1"],
+  "simulate": true,
+  "verified_on_hardware": <span class="k">false</span>
+}</pre>
+    <ul class="rows">
+      <li><span class="k">延迟 import</span><span class="v"><code>from RsInstrument import RsInstrument</code> 写在 <code>_open_rsinstrument()</code> 内。构建机、CI、无库现场仍可跑仿真与契约测试，不会因为缺库而无法验证。</span></li>
+      <li><span class="k">不静默降级</span><span class="v"><code>mode="hardware"</code> 下缺库或连不上，抛 <code>DriverUnavailable</code> 并给出可执行提示；只有设备档案显式写 <code>simulate</code> 才走仿真。生产台上"以为在测真机、其实在跑假数据"是最高代价的故障。</span></li>
+      <li><span class="k">命令集中</span><span class="v">全部 SCPI 收在 <code>scpi.py</code>，5 处待核对的路径标 <code>VERIFY</code>。换型号只改这一处，CI 也能一眼确认命令拼接没有散落在业务逻辑里。</span></li>
+      <li><span class="k">仿真同路径</span><span class="v">仿真只替换 IO 层（write_str / query_str / query_bin_block），驱动逻辑一行不分叉。因此仿真通过能说明契约与解析正确，但不能替代真机核对 —— 这一点写在 manifest 里而不是只写在文档里。</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>版本选择交给 lock，不交给代码</h2>
+    <p class="sub">台型声明「要什么」，lock 记录「这台机器实际装了什么」，解析器负责两者一致。</p>
+    <pre><span class="c">// benches/BENCH-DEMO/bench.lock.json</span>
+{
+  "bench": "BENCH-DEMO",
+  "station_type": "scope-bench",
+  "runner": "1.7.3",
+  "resolved": [
+    { "capability": "oscilloscope", "package": "rohde-schwarz-mxo",
+      "version": "1.2.0", "tree_sha256": "d67a6b6a57f1…" }
+  ],
+  "locked_at": "2026-11-08T21:43:12+08:00"
+}</pre>
+    <p>解析时的四道校验，任一不过即拒绝加载：版本是否满足台型约束、目录哈希是否与 lock 一致、包实现的契约版本是否与平台一致、Runner 与 Python 版本是否在包声明范围内。安装与回滚只改 lock，不动平台。</p>
+    <p class="note">实测到的一件事：把包内 <code>CHANGELOG.md</code> 改名后，lock 立即校验失败并拒绝加载。这不是误报 —— 目录内容确实变了，现场的"和研发一致"就此被破坏。宁可要求重新锁定，也不接受静默漂移。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>运行时：把柜内争用挡在包之外</h2>
+    <ul class="rows">
+      <li><span class="k">资源仲裁</span><span class="v">按仪器资源名加锁，一个柜挂多个测试站时，争用同一台仪器的操作排队而不是互相打断量程与触发状态。</span></li>
+      <li><span class="k">超时与重试</span><span class="v">建连按次数重试并记录事件；命令级失败映射为 <code>ScopeTimeout</code>，由上层决定中止还是重试，包内不写业务策略。</span></li>
+      <li><span class="k">拓扑快照</span><span class="v"><code>describe()</code> 汇总「能力 → 包@版本 → 资源名 → 模式 → 连接状态」，现场排障第一步看这里，不必翻日志。</span></li>
+      <li><span class="k">单进程单版本</span><span class="v">同一能力被要求两个版本时抛 <code>VersionConflict</code>。多台架并发走多进程，避免一个进程里混装两套解析结果。</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>验证结果</h2>
+    <table>
+      <caption>本轮实测（无真机，仿真模式）</caption>
+      <thead>
+        <tr><th style="width:34%">检查</th><th style="width:16%">结果</th><th style="width:50%">关键输出</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>契约一致性</td><td class="ok">13 / 13</td><td>元信息、方法齐备、连接、配置幂等、采集、八项测量、自洽性、频率、错误语义、诊断、关闭</td></tr>
+        <tr><td>流程测试</td><td class="ok">9 / 9</td><td>清单字段、版本约束、lock 往返、哈希篡改拒绝、台型不匹配拒绝、采集与测量、未知能力</td></tr>
+        <tr><td>出包</td><td class="ok">通过</td><td><code>rohde-schwarz-mxo-1.2.0.zip</code> 12,181 B，sha256 前缀 8644ca24</td></tr>
+        <tr><td>索引校验</td><td class="ok">通过</td><td>已装目录哈希与 index.json 一致</td></tr>
+        <tr><td>边界检查</td><td class="ok">通过</td><td><code>contracts / kit / runtime</code> 内无 RsInstrument、pyvisa、pypylon 引用</td></tr>
+        <tr><td>端到端</td><td class="ok">通过</td><td>解析 → 会话 → 配置 → 采集 n=2000、dt=5.00e-7 s、vpp=0.800 V → 测量 frequency=2000.02 Hz</td></tr>
+        <tr><td>真机核对</td><td>未完成</td><td>5 处 SCPI 路径待 MXO 实机确认；<code>verified_on_hardware</code> 保持 false</td></tr>
+      </tbody>
+    </table>
+    <p class="note">仿真通过的语义边界：能证明契约实现、解析、lock、运行时、出包链路正确；不能证明 SCPI 命令在真机上返回同样结构。因此 1.2.0 只是内部可用版本，正式进共享包目录前必须升 1.3.0 并完成真机核对。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span>与既有 <code>sdk/ate_drivers</code> 的关系</h2>
+    <p>旧结构按传输栈切分（transport / families / vendors），运行时行为已被封装在 transport 与 families 两层里，与本次「按变化频率切分」的目标不一致。本轮不动旧代码，新仓库承接新结构，按能力逐项迁移：</p>
+    <table>
+      <caption>迁移顺序（先易后难，先高频后长尾）</caption>
+      <thead>
+        <tr><th style="width:22%">阶段</th><th style="width:34%">迁移对象</th><th style="width:44%">前置条件</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>第一步</td><td>示波器（MXO 已具备）</td><td>真机核对通过，两个台型回归</td></tr>
+        <tr><td>第二步</td><td>直流电源、数字万用表</td><td>契约补 <code>DcPower</code> / <code>Dmm</code>，档案字段兼容</td></tr>
+        <tr><td>第三步</td><td>相机与视觉设备</td><td>帧数据面改用 <code>DeviceSession</code>，不进 Transport 抽象</td></tr>
+        <tr><td>第四步</td><td>长尾专机与私有协议设备</td><td>独立包规范就绪，站点可自行挂载</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span>下一步</h2>
+    <ul class="rows">
+      <li><span class="k">真机核对</span><span class="v">在 MXO 上跑 <code>kit.conformance --mode hardware</code>，逐条确认 5 处 <code>VERIFY</code> 路径与返回格式；通过后升 1.3.0。</span></li>
+      <li><span class="k">离线 vendor</span><span class="v">出包机执行 <code>pip download RsInstrument==1.12.1</code> 落到 <code>vendor/</code>，并在加载器里把该目录加入 <code>sys.path</code>。</span></li>
+      <li><span class="k">平台接入</span><span class="v">Runner 注册表增加「按 lock 解析」路径，合并结果在启动时打印一次，便于现场核对。</span></li>
+      <li><span class="k">第二个共享包</span><span class="v">选复用台型最多的光功率计，验证「两个包 + 一个可选能力」的多包解析与共存。</span></li>
+    </ul>
+  </section>
+
+  <div class="closing">
+    <span>仓库 D:\ATE\drivers · 契约 13/13 · 流程 9/9 · 真机待核</span>
+    <span>ATE Runner · 驱动层重构</span>
+  </div>
+
+</div>
+</body>
+</html>
