@@ -1,10 +1,13 @@
-"""出包：校验清单 → 打包 zip → 算 sha256 → 生成私有索引。
+"""出制品：校验清单 → 打包 zip → 算 sha256 → 写制品仓索引。
 
-    python ci/pack.py --root .
-    python ci/pack.py --root . --verify          # 校验已装包与索引是否一致
-    python ci/pack.py --root . --boundaries      # 检查厂商库是否泄漏到契约/基础设施层
+    python ci/pack.py --root .                     # 产出 dist/repo/
+    python ci/pack.py --root . --verify            # 校验已装包与索引是否一致
+    python ci/pack.py --root . --boundaries        # 检查厂商库是否泄漏到契约/基础设施层
 
-出包不联网、不装依赖；zip 自带 vendor/ 目录供离线部署使用。
+产物是「平台制品仓」而不是离线介质：
+- `dist/repo/<name>-<version>.zip` + `dist/repo/index.json`（含 tier / channel / distribution）；
+- 台架侧由 kit.repo 按 bench.lock.json 拉取与切换版本，不手工拷文件、不联网装包；
+- 发布通道 stable / canary 由 --channel 指定，测台可按 channel 取不同范围的版本。
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from kit.registry import Registry, RegistryError, tree_sha256  # noqa: E402
 VENDOR_HINTS = ("RsInstrument", "pyvisa", "pypylon", "pylibfranka", "import visa")
 
 
-def build(root: Path, out_dir: Path) -> dict:
+def build(root: Path, out_dir: Path, channel: str = "stable") -> dict:
     reg = Registry(root)
     reg.load()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +45,9 @@ def build(root: Path, out_dir: Path) -> dict:
             {
                 "name": m.name,
                 "version": m.version,
+                "tier": m.tier,
+                "channel": channel,
+                "distribution": m.distribution,
                 "capability": m.capability,
                 "contract": m.contract,
                 "owner": m.owner,
@@ -56,11 +62,13 @@ def build(root: Path, out_dir: Path) -> dict:
         print(f"  built {zip_path.name:<32} {zip_path.stat().st_size:>8} B  sha256={digest[:16]}…")
     index = {
         "schema": 1,
+        "channel": channel,
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "packages": entries,
     }
     (out_dir / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"index.json: {len(entries)} 个包 → {out_dir / 'index.json'}")
+    print("台架侧用法：python -c \"from kit.repo import Repo; Repo('dist/repo').apply(Repo('dist/repo').plan('benches/X/bench.lock.json', 'dist/site'), dest='dist/site')\"")
     return index
 
 
@@ -106,7 +114,8 @@ def boundaries(root: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
-    ap.add_argument("--out", default="dist")
+    ap.add_argument("--out", default="dist/repo")
+    ap.add_argument("--channel", default="stable", choices=["stable", "canary"])
     ap.add_argument("--verify", action="store_true")
     ap.add_argument("--boundaries", action="store_true")
     a = ap.parse_args()
@@ -118,7 +127,7 @@ def main() -> int:
     if a.verify:
         return 1 if verify(root, out_dir / "index.json") else 0
     try:
-        build(root, out_dir)
+        build(root, out_dir, a.channel)
     except RegistryError as exc:
         print(f"清单校验失败: {exc}")
         return 2

@@ -12,12 +12,18 @@ from typing import Iterable
 REQUIRED_FIELDS = (
     "name",
     "version",
+    "tier",
     "capability",
     "contract",
     "entry",
     "owner",
     "runtime",
 )
+
+#: 三类发布单元。tier 决定发布节奏、回滚粒度与责任人，而不是代码技术栈。
+TIERS = ("baseline", "shared", "station")
+DISTRIBUTIONS = ("platform-repo", "platform-release", "station-local")
+CHANNELS = ("stable", "canary")
 
 _VERSION_RE = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
 
@@ -92,6 +98,7 @@ def tree_sha256(path: Path) -> str:
 class Manifest:
     name: str
     version: str
+    tier: str
     capability: str
     contract: str
     entry: str
@@ -99,6 +106,8 @@ class Manifest:
     runtime: dict
     simulate: bool
     verified_on_hardware: bool
+    channel: str
+    distribution: str
     vendor_deps: tuple[str, ...]
     path: Path
     tree_sha256: str
@@ -146,6 +155,14 @@ class Registry:
         if missing:
             raise RegistryError(f"{manifest_path} 缺字段: {missing}")
         parse_version(raw["version"], strict=True)
+        if raw["tier"] not in TIERS:
+            raise RegistryError(f"{manifest_path} 的 tier 必须属于 {TIERS}: {raw['tier']!r}")
+        channel = str(raw.get("channel", "stable"))
+        if channel not in CHANNELS:
+            raise RegistryError(f"{manifest_path} 的 channel 必须属于 {CHANNELS}: {channel!r}")
+        distribution = str(raw.get("distribution", "platform-repo"))
+        if distribution not in DISTRIBUTIONS:
+            raise RegistryError(f"{manifest_path} 的 distribution 必须属于 {DISTRIBUTIONS}: {distribution!r}")
         pkg_dir = manifest_path.parent / "pkg"
         if not pkg_dir.is_dir():
             raise RegistryError(f"{manifest_path} 缺少 pkg/ 目录")
@@ -154,6 +171,7 @@ class Registry:
         return Manifest(
             name=raw["name"],
             version=raw["version"],
+            tier=raw["tier"],
             capability=raw["capability"],
             contract=str(raw["contract"]),
             entry=raw["entry"],
@@ -161,6 +179,8 @@ class Registry:
             runtime=raw.get("runtime", {}),
             simulate=bool(raw.get("simulate", False)),
             verified_on_hardware=bool(raw.get("verified_on_hardware", False)),
+            channel=channel,
+            distribution=distribution,
             vendor_deps=tuple(raw.get("vendor_deps", [])),
             path=manifest_path.parent,
             tree_sha256=tree_sha256(manifest_path.parent),
@@ -174,6 +194,11 @@ class Registry:
             if m.capability == capability and (name is None or m.name == name) and satisfies(m.version, version_spec)
         ]
         return sorted(pool, key=lambda m: parse_version(m.version), reverse=True)
+
+    def by_tier(self, tier: str) -> list[Manifest]:
+        if tier not in TIERS:
+            raise RegistryError(f"未知 tier: {tier!r}；可选 {TIERS}")
+        return [m for m in self._manifests if m.tier == tier]
 
     def all(self) -> Iterable[Manifest]:
         return tuple(self._manifests)

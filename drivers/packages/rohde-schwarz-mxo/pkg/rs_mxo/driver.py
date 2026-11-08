@@ -2,14 +2,17 @@
 
 分层位置
 --------
-- 本模块是 L2 厂商实现：把 SCPI（通过 RsInstrument 或仿真 IO）翻译成 contracts.scope 的语义。
+- 本模块是 L2 厂商实现：把 SCPI（通过 RsInstrument）翻译成 contracts.scope 的语义。
+- 仿真走能力层：mode="simulate" 时不建会话、不下发命令，直接委托 CapabilitySimulator
+  生成契约结构（1.3.0 起不再提供 SCPI 替身）。
 - 不允许出现「设备档案解析」「文件路径」「端口分配」「用例逻辑」。
 - 厂商库（RsInstrument）只在本文件内 import，且为延迟 import：无硬件/无库的构建机上仍可跑仿真与契约测试。
 
 连接策略
 --------
 mode="hardware"（默认）：必须能用 RsInstrument 建立会话，失败即抛 DriverUnavailable，不静默降级。
-mode="simulate"      ：显式仿真，仅用于 CI、联调与培训；站点配置未声明 simulate 时不得启用。
+mode="simulate"      ：显式仿真，仅在能力层生成数据，不接管连接与链路；仅用于 CI、联调与培训。
+                     站点配置未声明 simulate 时不得启用，也不得用仿真结果替代真机验收。
 """
 
 from __future__ import annotations
@@ -34,9 +37,9 @@ from contracts.scope import (
 )
 
 from . import scpi
-from .simulate import SimIo
+from .simulate import SIM_LAYER, CapabilitySimulator
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 
 class DriverUnavailable(ScopeError):
@@ -108,6 +111,7 @@ class RsMxoScope(ScopeDriver):
         self.visa_options = visa_options
 
         self._io = None
+        self._sim: CapabilitySimulator | None = None
         self._identity: InstrumentIdentity | None = None
         self._time_span_s = 1e-3
         self._channels: dict[int, dict[str, object]] = {}
@@ -117,12 +121,19 @@ class RsMxoScope(ScopeDriver):
 
     # -- 生命周期 -------------------------------------------------------
     def connect(self) -> None:
-        if self._io is not None:
+        if self._io is not None or self._sim is not None:
             return
         if self.mode == "simulate":
-            io = SimIo(self.resource)
-        else:
-            io = self._open_rsinstrument()
+            sim = CapabilitySimulator(
+                self.resource,
+                horizontal_divisions=self.horizontal_divisions,
+                channel_count=self.channel_count,
+            )
+            sim.open()
+            self._sim = sim
+            self._identity = sim.identify()
+            return
+        io = self._open_rsinstrument()
         self._io = io
         try:
             self._io.write_str(scpi.data_format())
@@ -151,12 +162,15 @@ class RsMxoScope(ScopeDriver):
             raise DriverUnavailable(f"无法建立会话 {self.resource}: {exc}") from exc
 
     def close(self) -> None:
+        if self._sim is not None:
+            self._sim.close()
+            self._sim = None
         if self._io is not None:
             try:
                 self._io.close()
             finally:
                 self._io = None
-                self._identity = None
+        self._identity = None
 
     def identify(self) -> InstrumentIdentity:
         self._require()
@@ -180,6 +194,10 @@ class RsMxoScope(ScopeDriver):
         self._require()
         if time_span_s <= 0:
             raise ScopeUnsupported(f"time_span_s 必须为正数: {time_span_s}")
+        if self._sim is not None:
+            self._sim.configure_timebase(time_span_s=time_span_s)
+            self._time_span_s = float(time_span_s)
+            return
         self._write(scpi.timebase_scale(time_span_s / self.horizontal_divisions))
         self._write(scpi.timebase_position(0.0))
         self._time_span_s = float(time_span_s)
@@ -193,6 +211,14 @@ class RsMxoScope(ScopeDriver):
             raise ScopeUnsupported(f"非法通道或档位: channel={channel}, scale_v={scale_v}")
         if coupling.upper() not in ("DC", "AC", "GND"):
             raise ScopeUnsupported(f"非法耦合方式: {coupling}")
+        if self._sim is not None:
+            self._sim.configure_channel(channel, scale_v=scale_v, offset_v=offset_v, coupling=coupling)
+            self._channels[channel] = {
+                "scale_v": float(scale_v),
+                "offset_v": float(offset_v),
+                "coupling": coupling.upper(),
+            }
+            return
         self._write(scpi.channel_state(channel, True))
         self._write(scpi.channel_scale(channel, scale_v))
         self._write(scpi.channel_offset(channel, offset_v))
@@ -203,6 +229,10 @@ class RsMxoScope(ScopeDriver):
         self._require()
         if spec.slope.upper() not in ("RISING", "FALLING"):
             raise ScopeUnsupported(f"非法边沿: {spec.slope}")
+        if self._sim is not None:
+            self._sim.configure_trigger(spec)
+            self._trigger = spec
+            return
         self._write(scpi.trigger_source(spec.source_channel))
         self._write(scpi.trigger_edge_slope(spec.slope))
         self._write(scpi.trigger_level(spec.level_v))
@@ -216,6 +246,11 @@ class RsMxoScope(ScopeDriver):
             raise ScopeUnsupported("channels 不能为空")
         if points < 16:
             raise ScopeUnsupported(f"points 过小: {points}")
+        if self._sim is not None:
+            result = dict(self._sim.acquire(channels, points=points))
+            self._last.update(result)
+            self._ops += 1
+            return result
         self._write(scpi.acquire_points(points))
 
         result: dict[int, Waveform] = {}
@@ -262,6 +297,8 @@ class RsMxoScope(ScopeDriver):
         self._require()
         if item not in MEASURE_ITEMS:
             raise ScopeUnsupported(f"未知测量项: {item}；支持 {sorted(MEASURE_ITEMS)}")
+        if self._sim is not None:
+            return self._sim.measure(channel, item)
         if self.prefer_instrument_measure and self.mode == "hardware":
             value = self._instrument_measure(channel, item)
             if value is not None:
@@ -304,7 +341,8 @@ class RsMxoScope(ScopeDriver):
             "package_version": __version__,
             "resource": self.resource,
             "mode": self.mode,
-            "connected": self._io is not None,
+            "connected": self._io is not None or self._sim is not None,
+            "simulation": {"layer": SIM_LAYER, "active": self._sim is not None},
             "identity": None if self._identity is None else {
                 "vendor": self._identity.vendor,
                 "model": self._identity.model,
@@ -327,7 +365,7 @@ class RsMxoScope(ScopeDriver):
 
     # -- 内部 -----------------------------------------------------------
     def _require(self) -> None:
-        if self._io is None:
+        if self._io is None and self._sim is None:
             raise ScopeNotConnected("会话未建立或已关闭")
 
     def _check_channel(self, channel: int) -> None:
@@ -337,6 +375,8 @@ class RsMxoScope(ScopeDriver):
             )
 
     def _write(self, command: str) -> None:
+        if self._io is None:
+            raise ScopeNotConnected("仿真模式不下发命令；请检查是否误走真机分支")
         try:
             self._io.write_str(command)
         except ScopeError:

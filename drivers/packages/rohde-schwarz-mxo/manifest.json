@@ -1,8 +1,11 @@
 {
   "name": "rohde-schwarz-mxo",
-  "version": "1.2.0",
+  "version": "1.3.0",
+  "tier": "baseline",
   "capability": "oscilloscope",
   "contract": "1.0",
+  "channel": "stable",
+  "distribution": "platform-repo",
   "runtime": {
     "runner": ">=1.6 <2.0",
     "python": ">=3.11"
@@ -17,6 +20,7 @@
     "simulate"
   ],
   "simulate": true,
+  "simulate_layer": "capability",
   "verified_on_hardware": false,
   "targets": [
     "MXO44",
@@ -25,5 +29,5 @@
   ],
   "changelog": "CHANGELOG.md",
   "conformance": "conformance/test_contract.py",
-  "notes": "SCPI 映射按 R&S MXO 系列 SCPI 参考实现，未经真机验证；出包前须在至少一台 MXO 上跑 conformance 并把 verified_on_hardware 置 true。"
+  "notes": "标准柜内固定配置的示波器能力，随平台版本发布（tier=baseline）。SCPI 映射按 R&S MXO 系列 SCPI 参考实现，未经真机验证；出包前须在至少一台 MXO 上跑 conformance 并把 verified_on_hardware 置 true。仿真只在能力层生成契约数据，不接管连接与链路。"
 }

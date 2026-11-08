@@ -26,6 +26,8 @@ def main() -> int:
     ap.add_argument("--station", required=True)
     ap.add_argument("--bench", required=True)
     ap.add_argument("--runner", default="1.7.3")
+    ap.add_argument("--repo", default="dist/repo", help="平台制品仓路径（写入 lock，供现场按 lock 拉取）")
+    ap.add_argument("--channel", default="stable", choices=["stable", "canary"])
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
@@ -35,6 +37,7 @@ def main() -> int:
     station = load_station_type(a.station)
     rs = resolve(station, reg, contract_version="1.0")
     lock = rs.to_lock(bench=a.bench, runner=a.runner)
+    lock["distribution"] = {"mode": "platform-repo", "repo": a.repo, "channel": a.channel}
 
     out = Path(a.out) if a.out else root / "benches" / a.bench / "bench.lock.json"
     out.parent.mkdir(parents=True, exist_ok=True)

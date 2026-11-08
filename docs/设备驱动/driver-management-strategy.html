@@ -116,6 +116,16 @@
   .road .del b,.road .gate b{font-weight:600;letter-spacing:.02em}
   .road .gate{color:var(--accent);margin-top:6px}
 
+
+  .devices{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin:24px 0 4px}
+  .devices figure{margin:0}
+  .devices img{width:100%;height:150px;object-fit:contain;background:#fff;border:1px solid var(--rule-2);display:block}
+  .devices .duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .devices .duo img{height:150px}
+  .devices figcaption{font-size:11.6px;color:var(--muted);margin-top:9px;line-height:1.5}
+  .devices figcaption b{color:var(--accent);font-weight:600;letter-spacing:.04em}
+  td .cell-note{display:block;color:var(--muted);font-size:11.6px;margin-top:3px}
+
   @media (max-width:860px){
     .page{padding:40px 22px 60px}
     .problems{grid-template-columns:1fr 1fr}
@@ -147,7 +157,7 @@
     <a href="#s3"><span>03</span>代码方案</a>
     <a href="#s4"><span>04</span>逻辑视图</a>
     <a href="#s5"><span>05</span>开发视图</a>
-    <a href="#s6"><span>06</span>仿真模式</a>
+    <a href="#s6"><span>06</span>仿真模式定义</a>
     <a href="#s7"><span>07</span>推进策略</a>
   </nav>
 
@@ -219,7 +229,7 @@
         <tr><th style="width:15%">维度</th><th style="width:29%">基础包 BASELINE</th><th style="width:29%">共享包 SHARED</th><th style="width:27%">独立包 STATION</th></tr>
       </thead>
       <tbody>
-        <tr><td class="row-h">定义</td><td>标准柜内固定配置，随平台版本发布，设备族保持十来个</td><td class="em">多台型复用且非柜内标配，独立版本、独立发布</td><td>仅单一台型使用，随建台部署，仍实现同一契约</td></tr>
+        <tr><td class="row-h">定义</td><td>标准柜内固定配置，随平台版本发布，设备族保持十来个</td><td class="em">多台型复用且非柜内标配，独立版本、独立发布</td><td>仅单一台型使用，随 TPS 或建台部署</td></tr>
         <tr><td class="row-h">归属判据</td><td>≥ 八成台型使用</td><td class="em">2% – 八成台型使用，或停产与固件敏感</td><td>单一台型使用</td></tr>
         <tr><td class="row-h">发布节奏</td><td>随平台大版本，季度级</td><td class="em">独立发版，月度级，支持灰度</td><td>随建台或换夹具</td></tr>
         <tr><td class="row-h">回滚粒度</td><td>整平台</td><td class="em">单包单版本，改 lock 生效</td><td>单台</td></tr>
@@ -227,38 +237,51 @@
       </tbody>
     </table>
 
-    <div class="keyline">
-      <span class="k">适配设备类型</span>
-      <div>基础包：直流电源 · 数字万用表 · 矩阵 · 相机 · 程控负载</div>
-      <div>共享包：R&amp;S MXO 示波器 · 光功率计 · 频谱仪 · 专用采集卡</div>
-      <div>独立包：夹具控制器 · 供应商私有协议设备 · 替代仪器</div>
+    <div class="devices">
+      <figure>
+        <img src="assets/scope.jpg" alt="数字示波器">
+        <figcaption><b>基础包 · 适配设备</b><br>数字示波器（R&amp;S MXO4）：柜内固定配置，随平台版本发布</figcaption>
+      </figure>
+      <figure>
+        <div class="duo">
+          <img src="assets/hexapod.jpg" alt="PI 六足机器人">
+          <img src="assets/autocoll.jpg" alt="子准直仪">
+        </div>
+        <figcaption><b>共享包 · 适配设备</b><br>PI 六足机器人（hexapod）· 子准直仪：多台型复用但非柜内标配</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/plc.jpg" alt="PLC 控制器">
+        <figcaption><b>独立包 · 适配设备</b><br>PLC 控制器（S7-1200）：随单台 TPS 自洽交付</figcaption>
+      </figure>
     </div>
 
-    <p class="note">归属判定依据是复用面与变更风险，与技术相似性无关；判据落在台型清单上，不落在人员判断上。设备停产风险高或对固件敏感时，即使单一台型使用亦独立成包。</p>
+    <p class="note">归属判定依据是复用面与变更风险，与技术相似性无关。示波器是标准柜内固定配置，进基础包；六足机器人与子准直仪多台型复用但非标配，进共享包；PLC 随单台 TPS 交付，即使只有一台也独立于平台驱动仓。</p>
   </section>
 
   <section id="s3">
     <div class="sec-head">
       <span class="folio">03</span>
-      <h2>代码方案<small>三类包的差异最终落在代码产出物与归档位置上：改哪个目录、出什么产物、谁审、影响几台设备</small></h2>
+      <h2>代码方案<small>三类包的差别落在代码产出物、归档位置与下发链路上：统一在一个代码仓，发布走制品仓，现场不接触离线介质</small></h2>
     </div>
 
     <table>
-      <caption>表 2 · 代码产出物、归档与门禁</caption>
+      <caption>表 2 · 代码产出物、归档与下发链路</caption>
       <thead>
         <tr><th style="width:15%">维度</th><th style="width:29%">基础包</th><th style="width:29%">共享包</th><th style="width:27%">独立包</th></tr>
       </thead>
       <tbody>
-        <tr><td class="row-h">代码产出物</td><td>契约实现 + 厂商适配，随平台仓维护</td><td class="em">契约实现 + 命令表 + 能力层仿真 + 随包契约测试</td><td>契约实现的最小集合，允许站点本地扩展</td></tr>
-        <tr><td class="row-h">归档位置</td><td><code>app/backend/drivers/&lt;设备族&gt;/</code></td><td class="em"><code>packages/&lt;名称&gt;/&lt;版本&gt;/</code>，出 zip 进私有索引</td><td>台架本地目录 + 台架清单登记</td></tr>
-        <tr><td class="row-h">交付形态</td><td>随安装包分发，装完即用</td><td class="em">离线 zip 导入，安装不编译、不联网</td><td>现场目录挂载，登记后生效</td></tr>
-        <tr><td class="row-h">版本与标签</td><td>跟随平台版本号</td><td class="em">语义化版本 + git tag，多版可共存</td><td>随建台记录，不入主干分支</td></tr>
-        <tr><td class="row-h">评审门禁</td><td>平台全量回归</td><td class="em">契约一致性 + 双台型回归 + 出包校验</td><td>契约一致性 + 本台用例</td></tr>
-        <tr><td class="row-h">变更影响面</td><td>全平台台型</td><td class="em">使用该包的全部台型</td><td>单台设备</td></tr>
+        <tr><td class="row-h">代码产出物</td><td>契约实现 + 厂商适配，随平台仓维护</td><td class="em">契约实现 + 命令表 + 能力层仿真 + 随包契约测试</td><td>契约实现的最小集合，随 TPS 交付</td></tr>
+        <tr><td class="row-h">归档位置</td><td><code>app/backend/drivers/&lt;设备族&gt;/</code></td><td class="em"><code>drivers/packages/&lt;名称&gt;/</code><span class="cell-note">同一代码仓、同一 PR 与门禁</span></td><td>TPS 仓，不进入平台驱动仓</td></tr>
+        <tr><td class="row-h">获取方式</td><td>随平台安装包，无需单独获取</td><td class="em">制品仓按「包 + 版本」拉取，双哈希校验</td><td>随 TPS 部署，不入制品仓</td></tr>
+        <tr><td class="row-h">推送方式</td><td>随平台发版，一次性下发</td><td class="em">CI 出制品并写索引；台架只读拉取，单向不回写</td><td>站点自行部署</td></tr>
+        <tr><td class="row-h">更新方式</td><td>随平台升级</td><td class="em">改 <code>bench.lock</code> 版本 → 拉取 → 重启</td><td>随 TPS 更新</td></tr>
+        <tr><td class="row-h">版本与标签</td><td>跟随平台版本号</td><td class="em">语义化版本 + git tag，多版本共存同一仓</td><td>随建台记录</td></tr>
+        <tr><td class="row-h">变更影响面</td><td>全平台台型</td><td class="em">使用该包的台架</td><td>单台设备</td></tr>
       </tbody>
     </table>
 
-    <p class="note">归档原则：同一份驱动代码只在一处维护；三类方案的区别是产出物形态与归档边界，不是实现方式。归档位置一旦确定，回滚动作也就随之确定 —— 共享包的回滚是改 lock，独立包的回滚是换目录，基础包的回滚只能整平台。</p>
+    <p class="note"><b>管理颗粒度</b>　以「包 + 版本」为最小单元：仓统一（同一 PR 与门禁）、通道分开（stable / canary）。不按整仓发布，影响面过大；也不按文件发布，无法校验与回滚。</p>
+    <p class="note"><b>回滚</b>　把 lock 里的版本改回旧值再拉取，其它包不动。软件侧不存在离线介质这一环，因此也没有「介质版本与索引不一致」这类现场问题。</p>
   </section>
 
   <section id="s4">
@@ -371,10 +394,10 @@
   <section id="s6">
     <div class="sec-head">
       <span class="folio">06</span>
-      <h2>仿真模式：只在能力层实现<small>在能力层提供一个满足契约的替身实现，不接管连接与链路，也不模拟仪器物理行为</small></h2>
+      <h2>仿真模式定义<small>一种运行态：在 L1 包层内部按模式选择真机分支或仿真分支，只替换能力实现，不接管连接与链路</small></h2>
     </div>
 
-    <p>仿真发生在 L1 包层内部：同一个契约实现里，按模式选择真机分支或仿真分支。分层到契约层为止 —— 连接、寻址、会话仍由既有链路负责，仿真不介入，因此逻辑视图里也没有单独的链路层。</p>
+    <p>同一份契约实现，按 mode 分派到两个实现体：hardware 分支经厂商库下发命令并解析返回；simulate 分支由能力层仿真直接产出契约结构（波形、测量值、身份）。上层用例、解析器与会话代码完全一致 —— 所以仿真通过只证明「能力语义」正确，不证明「命令拼写」正确。</p>
 
     <div class="twocol">
       <div>
@@ -396,11 +419,11 @@
     </div>
 
     <table>
-      <caption>表 5 · 能力层仿真的实现方案（方案细节）</caption>
+      <caption>表 5 · 仿真模式的实现要素（方案细节）</caption>
       <thead><tr><th style="width:18%">要素</th><th>做法</th></tr></thead>
       <tbody>
         <tr><td class="em">仿真位置</td><td>L1 包层内部，与真机实现同目录、同契约、同调用路径</td></tr>
-        <tr><td class="em">选择方式</td><td>设备档案写 <code>mode=simulate</code> 时选仿真分支；未写默认真机分支</td></tr>
+        <tr><td class="em">选择方式</td><td>台架装备属性写 <code>mode=simulate</code> 时选仿真分支；未写默认真机分支</td></tr>
         <tr><td class="em">能力覆盖</td><td>只覆盖该包声明实现的能力方法，未实现的能力保持不支持</td></tr>
         <tr><td class="em">返回值</td><td>结构完整、字段齐全、单位与量纲和契约一致</td></tr>
         <tr><td class="em">数值来源</td><td>固定模型生成，随量程与垂直档位变化，不读任何真实数据</td></tr>
@@ -411,10 +434,10 @@
     </table>
 
     <div class="metrics">
-      <div><span class="metric-k">契约检查</span><span class="metric-v">13 / 13</span></div>
-      <div><span class="metric-k">流程测试</span><span class="metric-v">9 / 9</span></div>
+      <div><span class="metric-k">契约一致性</span><span class="metric-v">13 / 13</span></div>
+      <div><span class="metric-k">流程测试</span><span class="metric-v">15 / 15</span></div>
       <div><span class="metric-k">待真机核对</span><span class="metric-v">5 处</span></div>
-      <div><span class="metric-k">仿真覆盖</span><span class="metric-v">全部契约方法</span></div>
+      <div><span class="metric-k">仿真层级</span><span class="metric-v">capability</span></div>
     </div>
     <p class="note">判定标准：仿真通过说明契约实现与解析链路正确；真机核对通过才说明驱动可用。两者不可互相替代。</p>
   </section>
@@ -425,56 +448,36 @@
       <h2>推进策略<small>每阶段有交付物、有判据，才进入下一阶段；顺序不可调换</small></h2>
     </div>
 
-    <div class="road">
-      <div>
-        <div class="p">P0</div><div class="w">第 1–4 周</div>
-        <h4>盘点与冻结</h4>
-        <ul>
-          <li>设备台账按能力聚类，收敛为 20 个能力族清单</li>
-          <li>逐族确定方法、参数、返回字段与量纲</li>
-          <li>出三类包归属表，逐台设备标注归属与责任人</li>
-          <li>冻结契约 1.0、装备属性字段、lock 格式</li>
-        </ul>
-        <div class="del"><b>交付</b> 能力族清单 / 归属表 / 契约 1.0</div>
-        <div class="gate"><b>判据</b> 契约与归属表通过评审，无未归属设备</div>
-      </div>
-      <div>
-        <div class="p">P1</div><div class="w">第 5–10 周</div>
-        <h4>仓库与门禁</h4>
-        <ul>
-          <li>建 contracts / packages / kit / runtime 四层目录</li>
-          <li>实现注册表、解析器、一致性与仿真套件</li>
-          <li>出包流程：打包、哈希、索引条目、离线导入</li>
-          <li>CI 三段：契约 → 仿真 → 双台型回归</li>
-        </ul>
-        <div class="del"><b>交付</b> 可运行骨架 + 模板包 + 私有索引</div>
-        <div class="gate"><b>判据</b> 模板包可出包并被两台架离线加载</div>
-      </div>
-      <div>
-        <div class="p">P2</div><div class="w">第 11–16 周</div>
-        <h4>首个共享包试点</h4>
-        <ul>
-          <li>首个共享包完成真机核对，清空待核实命令</li>
-          <li>两个台型离线导入，灰度一周并记录差异</li>
-          <li>回滚演练：改 lock 回退，计时取证</li>
-          <li>平台注册表改为「基线 + 包清单」合并</li>
-        </ul>
-        <div class="del"><b>交付</b> 首个共享包正式版 + 试点报告</div>
-        <div class="gate"><b>判据</b> 回滚 ≤ 5 分钟，双台型回归全部通过</div>
-      </div>
-      <div>
-        <div class="p">P3</div><div class="w">第 17 周起</div>
-        <h4>批量迁移与治理</h4>
-        <ul>
-          <li>按台型分批迁移，每批 5–8 台，留两周观察窗</li>
-          <li>独立包登记进台架清单，不进入主干分支</li>
-          <li>维护包目录：owner、版本、EOL、兼容矩阵</li>
-          <li>季度复盘：新增设备是否仍触发主程序发版</li>
-        </ul>
-        <div class="del"><b>交付</b> 迁移台账 + 包目录 + 兼容矩阵</div>
-        <div class="gate"><b>判据</b> 新增设备不再触发主程序发版</div>
-      </div>
-    </div>
+    <table>
+      <caption>表 6 · 四个阶段的交付与准入判据</caption>
+      <thead>
+        <tr><th style="width:12%">阶段</th><th style="width:10%">周期</th><th style="width:44%">主要工作</th><th style="width:18%">交付物</th><th style="width:16%">准入判据</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">P0 盘点与冻结</td><td>第 1–4 周</td>
+          <td>设备台账按能力聚类，收敛为 20 个能力族清单；逐族确定方法、参数、返回字段与量纲；出三类包归属表，逐台设备标注归属与责任人；冻结契约 1.0、装备属性字段、lock 格式</td>
+          <td>能力族清单 / 归属表 / 契约 1.0</td><td>契约与归属表通过评审，无未归属设备</td>
+        </tr>
+        <tr>
+          <td class="em">P1 仓库与门禁</td><td>第 5–10 周</td>
+          <td>建 contracts / kit / runtime / packages 四层目录；实现注册表、解析器、一致性套件与制品仓客户端；CI 出制品并写索引（zip → sha256 → index.json）；CI 三段门禁：契约 → 仿真 → 双台型回归</td>
+          <td>可运行骨架 + 制品仓 + 模板包</td><td>模板包可出制品，并被两台架按 lock 拉取成功</td>
+        </tr>
+        <tr>
+          <td class="em">P2 首个共享包试点</td><td>第 11–16 周</td>
+          <td>首个共享包（六足机器人 / 子准直仪）完成真机核对；两个台型按通道灰度：拉取 → 重启 → 记录差异；回滚演练：改 lock 回退版本并计时取证；平台注册表改为「基线 + 包清单」合并</td>
+          <td>首个共享包正式版 + 试点报告</td><td>回滚 ≤ 5 分钟，双台型回归全部通过</td>
+        </tr>
+        <tr>
+          <td class="em">P3 批量迁移与治理</td><td>第 17 周起</td>
+          <td>按台型分批迁移，每批 5–8 台，留两周观察窗；独立包登记进 TPS 清单，不进入平台驱动仓；维护包目录：owner、版本、EOL、兼容矩阵；季度复盘新增设备是否仍触发主程序发版</td>
+          <td>迁移台账 + 包目录 + 兼容矩阵</td><td>新增设备不再触发主程序发版</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>已完成</b>　契约 / 注册表 / 解析器 / 一致性与仿真套件 / 制品仓与 lock 机制均可运行：一致性 13/13、流程测试 15/15、出制品可通过校验。<br><b>待完成</b>　真机核对 5 处待核实命令、第二个共享包、平台侧按装备属性与 lock 加载的改造。</p>
   </section>
 
   <footer>

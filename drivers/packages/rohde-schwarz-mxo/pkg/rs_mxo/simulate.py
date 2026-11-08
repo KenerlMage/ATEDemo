@@ -1,121 +1,239 @@
-"""仿真 IO 后端。
+"""能力层仿真（1.3.0 起）。
 
-用途不是"假数据好看"，而是让契约一致性测试、CI 回归、TPS 联调在没有硬件时也能跑。
-行为约束：
-- 与真机走同一条驱动代码路径，只替换 IO 层（query_str / write_str / query_bin_block）。
-- 波形由已下发的时基与垂直档位决定，因此 acquire 与 measure 的关系可被断言。
-- 不静默替代硬件：只有站点配置显式要求 simulate 时才启用。
+与 1.2.0 的差别
+--------------
+1.2.0 提供的是 SCPI 文本替身（SimIo）：驱动仍然逐条下发命令、再把返回值解析回契约类型，
+本质上是在"链路层"假装一台仪器。1.3.0 去掉这一层——仿真直接实现能力契约：
+
+- 输入是契约参数（时基、垂直档位、触发方式），不是命令字符串；
+- 输出是契约结构（Waveform / 测量值 / InstrumentIdentity），不经过任何解析；
+- 不建立连接、不寻址、不产生报文，资源名只用于身份串。
+
+因此它验证的是"能力语义是否正确"，而不是"命令拼写是否正确"。真机分支仍走
+RsInstrument → SCPI → 解析，两条路径共用上层用例与解析器。
+
+边界
+----
+- 不模拟噪声带宽、探头衰减、触发抖动等物理特性；
+- 数值由固定模型生成，可用于断言配置与结果的关系，但不代表真机精度；
+- 不允许作为现场验收依据；真机核对前 verified_on_hardware 保持 false。
 """
 
 from __future__ import annotations
 
 import math
 import random
-import re
 import struct
+from typing import Mapping, Sequence
 
-_CH_RE = re.compile(r"^CHANnel(\d+)", re.IGNORECASE)
+from contracts.scope import (
+    CAPABILITY,
+    CONTRACT_VERSION,
+    MEASURE_ITEMS,
+    InstrumentIdentity,
+    ScopeNotConnected,
+    ScopeUnsupported,
+    TriggerSpec,
+    Waveform,
+)
+
+SIM_LAYER = "capability"
 
 
-class SimIo:
-    """最小 SCPI 状态机，覆盖本包用到的命令子集。"""
+def _crossings(samples: Sequence[float], level: float) -> list[float]:
+    out: list[float] = []
+    for i in range(1, len(samples)):
+        a, b = samples[i - 1], samples[i]
+        if a - level == 0:
+            out.append(float(i - 1))
+        elif (a - level) * (b - level) < 0:
+            out.append(i - 1 + (level - a) / (b - a))
+    return out
 
-    def __init__(self, resource: str = "SIM::MXO44::INSTR") -> None:
+
+def _frequency(samples: Sequence[float], dt_s: float) -> float:
+    mean = sum(samples) / len(samples)
+    rising = _crossings(samples, mean)[::2]
+    if len(rising) < 2:
+        raise ScopeUnsupported("波形内不足两个上升沿，无法给出频率")
+    period = (rising[-1] - rising[0]) / (len(rising) - 1)
+    return 1.0 / (period * dt_s)
+
+
+def _rise_time(samples: Sequence[float], dt_s: float) -> float:
+    lo, hi = min(samples), max(samples)
+    low_th, high_th = lo + 0.1 * (hi - lo), lo + 0.9 * (hi - lo)
+    t_low = t_high = None
+    for i in range(1, len(samples)):
+        a, b = samples[i - 1], samples[i]
+        if t_low is None and a <= low_th <= b:
+            t_low = (i - 1 + (low_th - a) / (b - a)) * dt_s
+        if t_low is not None and a <= high_th <= b:
+            t_high = (i - 1 + (high_th - a) / (b - a)) * dt_s
+            break
+    if t_low is None or t_high is None:
+        raise ScopeUnsupported("未找到完整上升沿（10%→90%）")
+    return t_high - t_low
+
+
+class CapabilitySimulator:
+    """能力契约的仿真实现：只在契约语义上生成数据。"""
+
+    capability = CAPABILITY
+    contract_version = CONTRACT_VERSION
+    layer = SIM_LAYER
+
+    def __init__(
+        self,
+        resource: str = "SIM::MXO44::INSTR",
+        *,
+        horizontal_divisions: float = 10.0,
+        channel_count: int = 4,
+    ) -> None:
         self.resource = resource
-        self.points = 10000
+        self.horizontal_divisions = float(horizontal_divisions)
+        self.channel_count = int(channel_count)
         self.time_span_s = 1e-3
-        self.channels = {i: {"on": False, "scale": 0.5, "offset": 0.0, "coupling": "DC"} for i in range(1, 5)}
-        self.trigger = {"mode": "NORMAL", "source": 1, "slope": "RISING", "level": 0.0}
-        self._closed = False
+        self.channels: dict[int, dict[str, object]] = {}
+        self.trigger = TriggerSpec()
+        self._last: dict[int, Waveform] = {}
+        self._open = False
+        self.operations = 0
 
-    # -- IO 接口 --------------------------------------------------------
-    def write_str(self, command: str) -> None:
-        c = command.strip()
-        up = c.upper()
-        if up.startswith("FORMat".upper()) or up.startswith("ACQuire:POINts".upper()):
-            if up.startswith("ACQ"):
-                self.points = int(c.split()[-1])
-            return
-        if up.startswith("TIMebase:SCALe".upper()):
-            self.time_span_s = float(c.split()[-1]) * 10.0
-            return
-        if up.startswith("TIMebase:POSition".upper()):
-            return
-        if up.startswith("CHANNEL"):
-            m = _CH_RE.match(c)
-            if not m:
-                return
-            num = int(m.group(1))
-            key = c.split()[0].split(":")[-1].lower()
-            val = c.split()[-1]
-            ch = self.channels.setdefault(num, {"on": True, "scale": 0.5, "offset": 0.0, "coupling": "DC"})
-            if key == "state":
-                ch["on"] = val.upper() == "ON"
-            elif key == "scale":
-                ch["scale"] = float(val)
-            elif key == "offset":
-                ch["offset"] = float(val)
-            elif key == "coupling":
-                ch["coupling"] = val.upper()
-            return
-        if up.startswith("TRIGger".upper()):
-            if up.startswith("TRIGGER:MODE"):
-                self.trigger["mode"] = c.split()[-1].upper()
-            elif up.startswith("TRIGGER:SOURCE"):
-                self.trigger["source"] = int(c.split()[-1].upper().replace("CHANNEL", ""))
-            elif up.startswith("TRIGGER:EDGE:SLOPE"):
-                self.trigger["slope"] = c.split()[-1].upper()
-            elif up.startswith("TRIGGER:LEVEL"):
-                self.trigger["level"] = float(c.split()[-1])
-            return
-        # *CLS / *RST / SINGle / RUN 等无副作用
-        return
-
-    def query_str(self, query: str) -> str:
-        q = query.strip()
-        up = q.upper()
-        if up == "*IDN?":
-            return "Rohde&Schwarz,MXO44,1325.4154K44/101234,SIM-1.0.0"
-        if up == "*OPC?":
-            return "1"
-        if "HEADER" in up:
-            m = _CH_RE.match(q)
-            if not m:
-                return ""
-            ch = 0
-            dt = self.time_span_s / max(self.points - 1, 1)
-            return f"{0.0:.9g},{dt * (self.points - 1):.9g},{self.points}"
-        if "MEASUREMENT" in up and "RESULT" in up:
-            # 由 measure() 前置配置推算：本包默认走波形推算，此路径仅在 prefer_instrument 时使用
-            return "nan"
-        return ""
-
-    def query_bin_block(self, query: str) -> bytes:
-        q = query.strip()
-        up = q.upper()
-        if up.startswith("CHANNEL") and up.endswith("DATA?"):
-            m = _CH_RE.match(q)
-            if not m:
-                raise ValueError(f"无法解析通道: {query}")
-            return self._waveform_bytes(int(m.group(1)))
-        raise ValueError(f"SimIo 未实现该查询: {query}")
+    # -- 生命周期（无链路，仅状态开关）------------------------------------
+    def open(self) -> None:
+        self._open = True
 
     def close(self) -> None:
-        self._closed = True
+        self._open = False
 
-    # -- 波形生成 -------------------------------------------------------
-    def _waveform_bytes(self, channel: int) -> bytes:
-        cfg = self.channels.get(channel, {"scale": 0.5, "offset": 0.0})
-        scale = float(cfg["scale"])
-        offset = float(cfg["offset"])
-        amplitude = 0.8 * scale            # 8 格屏，占 80%
-        cycles = 2.0                        # 整屏两个周期，便于 frequency 断言
+    @property
+    def connected(self) -> bool:
+        return self._open
+
+    def identify(self) -> InstrumentIdentity:
+        self._require()
+        return InstrumentIdentity(
+            vendor="Rohde&Schwarz",
+            model="MXO44",
+            serial="SIM-000000",
+            firmware="sim-1.3.0",
+            resource=self.resource,
+        )
+
+    # -- 契约参数 → 内部状态 --------------------------------------------
+    def configure_timebase(self, *, time_span_s: float) -> None:
+        self._require()
+        if time_span_s <= 0:
+            raise ScopeUnsupported(f"time_span_s 必须为正数: {time_span_s}")
+        self.time_span_s = float(time_span_s)
+
+    def configure_channel(
+        self, channel: int, *, scale_v: float, offset_v: float = 0.0, coupling: str = "DC"
+    ) -> None:
+        self._require()
+        self._check_channel(channel)
+        if scale_v <= 0:
+            raise ScopeUnsupported(f"非法通道或档位: channel={channel}, scale_v={scale_v}")
+        if coupling.upper() not in ("DC", "AC", "GND"):
+            raise ScopeUnsupported(f"非法耦合方式: {coupling}")
+        self.channels[channel] = {
+            "scale_v": float(scale_v),
+            "offset_v": float(offset_v),
+            "coupling": coupling.upper(),
+        }
+
+    def configure_trigger(self, spec: TriggerSpec) -> None:
+        self._require()
+        if spec.slope.upper() not in ("RISING", "FALLING"):
+            raise ScopeUnsupported(f"非法边沿: {spec.slope}")
+        self.trigger = spec
+
+    # -- 能力：采集与测量 -----------------------------------------------
+    def acquire(self, channels: Sequence[int], *, points: int = 10000) -> Mapping[int, Waveform]:
+        self._require()
+        if not channels:
+            raise ScopeUnsupported("channels 不能为空")
+        if points < 16:
+            raise ScopeUnsupported(f"points 过小: {points}")
+        dt = self.time_span_s / max(points - 1, 1)
+        result: dict[int, Waveform] = {}
+        for ch in channels:
+            self._check_channel(ch)
+            cfg = self.channels.get(ch)
+            if cfg is None:
+                raise ScopeUnsupported(f"通道 {ch} 未配置档位，仿真无法生成波形")
+            samples = self._samples(ch, int(points), dt, float(cfg["scale_v"]), float(cfg["offset_v"]))
+            wf = Waveform(channel=ch, t0_s=0.0, dt_s=dt, samples=samples)
+            self._last[ch] = wf
+            result[ch] = wf
+        self.operations += 1
+        return result
+
+    def measure(self, channel: int, item: str) -> float:
+        self._require()
+        if item not in MEASURE_ITEMS:
+            raise ScopeUnsupported(f"未知测量项: {item}；支持 {sorted(MEASURE_ITEMS)}")
+        self._check_channel(channel)
+        wf = self._last.get(channel)
+        if wf is None:
+            wf = self.acquire([channel])[channel]
+        if item == "vpp":
+            return wf.vpp
+        if item == "vmax":
+            return wf.vmax
+        if item == "vmin":
+            return wf.vmin
+        if item == "mean":
+            return wf.mean
+        if item == "rms":
+            return wf.rms
+        if item == "frequency":
+            return _frequency(wf.samples, wf.dt_s)
+        if item == "period":
+            return 1.0 / _frequency(wf.samples, wf.dt_s)
+        return _rise_time(wf.samples, wf.dt_s)
+
+    def describe(self) -> Mapping[str, object]:
+        return {
+            "layer": SIM_LAYER,
+            "connected": self._open,
+            "timebase": {"time_span_s": self.time_span_s, "horizontal_divisions": self.horizontal_divisions},
+            "channels": dict(self.channels),
+            "trigger": {
+                "source_channel": self.trigger.source_channel,
+                "level_v": self.trigger.level_v,
+                "slope": self.trigger.slope,
+                "mode": self.trigger.mode,
+            },
+            "last_acquire": {ch: {"n": wf.n, "dt_s": wf.dt_s, "vpp": wf.vpp} for ch, wf in self._last.items()},
+            "operations": self.operations,
+        }
+
+    # -- 内部 -----------------------------------------------------------
+    def _require(self) -> None:
+        if not self._open:
+            raise ScopeNotConnected("仿真未开启或已关闭")
+
+    def _check_channel(self, channel: int) -> None:
+        if not isinstance(channel, int) or channel < 1 or channel > self.channel_count:
+            raise ScopeUnsupported(f"非法通道 {channel}；本型号可用通道 1..{self.channel_count}")
+
+    def _samples(self, channel: int, points: int, dt: float, scale: float, offset: float) -> tuple[float, ...]:
+        amplitude = 0.8 * scale          # 8 格屏，占 80%
+        cycles = 2.0                     # 整屏两个周期，便于频率断言
         freq = cycles / self.time_span_s
-        rng = random.Random(f"{self.resource}|{channel}|{self.points}|{scale}")
+        rng = random.Random(f"{self.resource}|{channel}|{points}|{scale}")
         noise = amplitude * 1e-4
         out = []
-        for i in range(self.points):
-            t = i * self.time_span_s / max(self.points - 1, 1)
-            v = offset + amplitude * math.sin(2 * math.pi * freq * t)
-            out.append(v + rng.uniform(-noise, noise))
-        return struct.pack("<%df" % len(out), *out)
+        for i in range(points):
+            t = i * dt
+            out.append(offset + amplitude * math.sin(2 * math.pi * freq * t) + rng.uniform(-noise, noise))
+        return tuple(out)
+
+    # 兼容旧工具：直接取二进制块（不做 SCPI 解析）
+    def waveform_bytes(self, channel: int) -> bytes:
+        wf = self._last.get(channel)
+        if wf is None:
+            raise ScopeNotConnected(f"通道 {channel} 尚无采集结果")
+        return struct.pack("<%df" % wf.n, *wf.samples)
