@@ -38,6 +38,7 @@ import license_utils
 import ate_db              # 注册库 -> SQLite 投影（设备 driver 配置）
 import cloud_db           # 云端数据库（演示）上报通道：生产模式结果上报
 import tps_runtime        # TPS 运行环境（workspace / 公共 conftest）
+import deploy_api          # 装备软件部署接口（ATE Controller 拉包 -> 执行 deploy 脚本）
 
 BASE_DIR = Path(__file__).resolve().parent
 TEST_CASE_DIR = BASE_DIR / "test_cases"
@@ -71,6 +72,8 @@ REMOTE_TPS_URL = os.environ.get("ATE_REMOTE_TPS_URL", "http://127.0.0.1:8999").r
 REMOTE_TIMEOUT = 2.0  # 秒
 
 app = FastAPI(title="ATE 自动测试装备", description="FastAPI + pytest 自动测试执行服务", version="1.0.0")
+
+app.include_router(deploy_api.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -674,6 +677,9 @@ def _tps_summary(tps: dict) -> dict:
         "device_alias_count": len(tps.get("device_config") or {}),
         "bench": tps.get("bench", {}),
         "workspace_dir": tps.get("workspace_dir", ""),
+        # 具备常数标定：TPS 构建时选择了机器常数模型
+        "constant_model_count": len(((tps.get("constant_model") or {}).get("models")) or []),
+        "has_constants": bool(((tps.get("constant_model") or {}).get("models")) or []),
     }
 
 

@@ -92,3 +92,8 @@ backend/drivers_legacy/
 # 相机助手的自带运行时（PyInstaller onedir 产物，约 150 MB，随发布包分发不入库）
 **/assistant_shelf/**/runtime/
 
+
+# ---- 部署运行时产物（解压包、日志）----
+backend/deploy_runtime/
+backend/runtime_envs/
+backend/runtime_wheels/

@@ -362,6 +362,58 @@ D:\ATE\workspace\                     # ATE 安装运行目录下的 workspace�
 - 一键走通：`start_all.bat` → 执行页选 TPS → 输入 12 位 UUT → 开始测试；运行目录出现在「装备属性配置 → TPS 运行目录」栏。
 - 无硬件时：TPS 默认 `mode=simulate`，所有仪器动作走仿真驱动（测量值稳定可复现），阈值判定、报告、`run_result.json` 与真机路径完全同构。
 
+## 装备软件自动部署（ATE Controller）
+
+装备软件由独立的 ATE Controller 服务归档，Runner 按 TPS 声明拉取、校验并执行包内的部署脚本。
+
+**Controller 端**（工程 `D:\ATE_CONTROLLER`，默认 `http://127.0.0.1:8070`）：包按 `object/version` 归档到 `D:\ATE_CONTROLLER\repo`，提供 `/api/packages`、`/api/packages/{object}`、`/api/packages/{object}/{version}/manifest`、`/api/packages/{object}/{version}/download` 与归档上传 `POST /api/packages`；下载响应头带 `X-Package-Sha256`。
+
+**TPS 声明**（`deploy` 数组，天然支持多个待部署软件）：
+
+```json
+"deploy": [
+  { "key": "rh-driver", "package": "spm_rh_dyn@1.2.0",
+    "target": { "id": "local" }, "mode": "ensure",
+    "on_failure": "abort", "depends_on": [] },
+  { "key": "line-svc", "package": "line_server@3.4.1",
+    "target": { "id": "linux-srv-01" }, "mode": "force",
+    "on_failure": "continue", "depends_on": ["rh-driver"] }
+]
+```
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `key` | 否 | 本 TPS 内唯一，缺省取 object 名；`depends_on` 用它引用 |
+| `package` | 是 | `object@version` 单字段；旧写法 `object` + `version` 仍接受并自动合并 |
+| `target` | 否 | `{"id": "..."}`，缺省 `local`（Runner 所在 PC） |
+| `mode` | 否 | `ensure`（默认，目标已装同版本则跳过）/ `force`（强制重装） |
+| `on_failure` | 否 | `abort`（默认，前序失败即中止，后续标 skipped）/ `continue` |
+| `depends_on` | 否 | 引用其他 `key`，按拓扑序执行；悬空引用或成环直接拒绝 |
+
+安装脚本与参数不再写在 TPS：由包 manifest 的 `entry` 提供（`GET /api/packages/{object}/{version}/manifest`），TPS 的 `script` 仅在需要覆盖时填写且必须是相对路径。`name`、`required`、`device_info`/`deploy_script` 兜底均不再使用。
+
+归档时 Controller 会校验：`entry` 必须是包内相对路径且真实存在、脚本后缀与 `platform` 匹配（`.ps1/.bat/.cmd/.exe` → windows，`.sh` → linux，`.py` 需显式指定 platform）、同 `object@version` 不可覆盖。
+包可上传探测脚本（`probe_script`），Runner 部署前用它判断是否已安装、部署后用它验收；探测输出为单行 JSON：`{"installed":true,"version":"1.0.0"}`。未提供探测的包回退到部署记录，并在消息中标注「未经验证」。
+
+
+**Runner 端接口**：`GET /api/deploy/preview?tps_id=`、`POST /api/deploy/run`、`GET /api/deploy/status/{batch_id}`、`GET /api/deploy/records`、`GET /api/deploy/controller`。
+
+**执行页**：「📦 部署软件」与「部署状态」两个按钮。部署按批次串行执行，单个包失败不阻断其余包；状态写入 `deploy_batch` / `deploy_item` 两张表，日志落在 `backend/deploy_runtime/<batch_id>/`。
+
+环境变量：`ATE_CONTROLLER_URL`（Controller 地址）、`ATE_DEPLOY_ROOT`（解压与日志根目录）、`ATE_DEPLOY_TIMEOUT`（单包超时秒数，默认 1800）。
+
+部署只支持手动触发，且同一时间只允许一个批次：执行中再次提交返回 `409`，界面按钮同时禁用。批次内按 `deploy` 数组顺序串行执行。进程重启时，上一次遗留的「执行中」批次被标记为中断（失败），避免永久占用执行位。
+
+默认策略为**串行安装**：按 `deploy` 数组顺序执行，前序包失败即中止，后续包记为 `skipped`；需要继续执行时在该条目上显式声明 `"on_failure": "continue"`。
+
+是否已部署：每次成功部署写入 `deploy_installed`（目标 + 对象 → 版本、批次号、路径、时间）。查询方式：
+
+- 接口 `GET /api/deploy/installed`（全部）或 `GET /api/deploy/installed?object=ok_pkg&target=local`（单个）；
+- 批次状态 `GET /api/deploy/status/{batch_id}` 对每一项返回 `installed_version` 与 `up_to_date`；
+- 执行页「已部署软件」列表按目标展示当前已装版本，部署项右侧显示「已装 vX.Y.Z」。
+
+
+
 ## 测试日志与 AI 失败分析
 
 - **测试日志**：每次 TPS 运行自动生成 `backend/logs/test_logs/tps_<task_id>.log`——含 TPS 信息（名称/UUT/项目/DUT）、每个步骤的时间戳、PASS/FAIL 状态、耗时与 pytest 输出摘要，任务结束写入总结果与耗时。

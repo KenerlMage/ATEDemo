@@ -39,6 +39,15 @@ const reportError = ref('')
 // ---- 云端上报（生产模式）----
 const cloud = ref(null)            // 当前任务的云端上报结果
 const cloudError = ref('')
+
+// ---- 装备软件部署 ----
+const deploying = ref(false)
+const deployBatch = ref('')
+const deployItems = ref([])
+const deployMsg = ref('')
+const deployError = ref('')
+let deployTimer = null
+const deployInstalled = ref([])
 const cloudReuploading = ref(false)
 const cloudStatus = ref(null)      // 云端（演示）连接状态与入库统计
 const cloudRecords = ref([])       // 云端库已入库记录
@@ -581,14 +590,89 @@ function onReportError() {
   reportError.value = '报告加载失败，请检查后端报告目录'
 }
 
+// ---- 装备软件部署 ----
+const deployStatusText = (s) => ({ pending: '待部署', running: '部署中', success: '已部署', failed: '失败' }[s] || s || '—')
+const deployStatusCls = (s) => ({ pending: 'wait', running: 'run', success: 'ok', failed: 'err' }[s] || '')
+
+const deployBusy = computed(() =>
+  deploying.value || deployItems.value.some((it) => ['pending', 'running'].includes(it.status))
+)
+
+async function loadInstalled() {
+  try {
+    const res = await api.deployInstalled()
+    deployInstalled.value = res.records || []
+  } catch (e) {
+    /* 查询失败不影响主流程 */
+  }
+}
+
+function stopDeployPoll() {
+  if (deployTimer) { clearInterval(deployTimer); deployTimer = null }
+}
+
+async function refreshDeploy() {
+  if (!deployBatch.value) return
+  try {
+    const res = await api.deployStatus(deployBatch.value)
+    deployItems.value = res.items || []
+    const status = res.batch ? res.batch.status : ''
+    if (['success', 'failed', 'partial'].includes(status)) {
+      stopDeployPoll()
+      deployMsg.value = (res.batch && res.batch.message) || '部署批次已结束'
+      await loadInstalled()
+    }
+  } catch (e) {
+    deployError.value = String(e.message || e)
+  }
+}
+
+async function startDeploy() {
+  if (!selectedTpsId.value || deploying.value) return
+  deploying.value = true; deployError.value = ''; deployMsg.value = ''
+  try {
+    const res = await api.deployRun(selectedTpsId.value, uutInput.value.trim())
+    deployBatch.value = res.batch_id
+    deployItems.value = (res.items || []).map((it, i) => ({ seq: i + 1, ...it, status: 'pending', message: '' }))
+    deployMsg.value = `已提交部署批次 ${res.batch_id}`
+    stopDeployPoll()
+    deployTimer = setInterval(refreshDeploy, 1500)
+  } catch (e) {
+    deployError.value = String(e.message || e)
+  } finally {
+    deploying.value = false
+  }
+}
+
+async function restoreDeploy() {
+  try {
+    const res = await api.deployRecords(3)
+    const batches = res.batches || []
+    if (!batches.length) return
+    const running = batches.find((b) => b.status === 'running') || batches[0]
+    deployBatch.value = running.batch_id
+    deployItems.value = (running.items || []).map((it) => ({ ...it }))
+    if (running.status === 'running') {
+      deployMsg.value = `批次 ${running.batch_id} 执行中`
+      stopDeployPoll()
+      deployTimer = setInterval(refreshDeploy, 1500)
+    }
+  } catch (e) {
+    /* 记录查询失败不阻断页面 */
+  }
+}
+
 // ---- 生命周期 ----
 onMounted(async () => {
   await loadTree()
   await loadCloudStatus()
   await loadCloudRecords()
+  await restoreDeploy()
+  await loadInstalled()
 })
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+  stopDeployPoll()
 })
 </script>
 
@@ -709,6 +793,11 @@ onUnmounted(() => {
                     <div class="tree-row">
                       <span class="twist dim">▪</span>
                       <span class="node-icon tps-icon">🧪</span>
+                      <span
+                        v-if="t.has_constants"
+                        class="mc-flag"
+                        :title="`具备常数标定（${t.constant_model_count} 个模型）`"
+                      >C</span>
                       <span class="node-name">{{ t.name }}</span>
                     </div>
                   </div>
@@ -783,6 +872,32 @@ onUnmounted(() => {
         </div>
         <div v-if="uutError" class="tip err">{{ uutError }}</div>
         <div v-if="cloudError" class="tip err">☁ {{ cloudError }}</div>
+        <div class="deploy-row">
+          <button class="btn ghost small" :disabled="!selectedTps || deployBusy || running" @click="startDeploy">
+            {{ deploying ? '部署中…' : '📦 部署软件' }}
+          </button>
+          <button class="btn ghost small" :disabled="!deployBatch" @click="refreshDeploy">部署状态</button>
+          <span v-if="deployMsg" class="tip ok">{{ deployMsg }}</span>
+          <span v-if="deployError" class="tip err">{{ deployError }}</span>
+          <span v-if="deployBusy" class="tip">同一时间只执行一个部署批次</span>
+        </div>
+        <div v-if="deployItems.length" class="deploy-panel">
+          <div class="deploy-head">待部署软件（{{ deployItems.length }}）</div>
+          <div v-for="it in deployItems" :key="it.seq" class="deploy-item">
+            <span class="deploy-name">{{ it.name || it.object }}<span v-if="it.version" class="deploy-ver"> · {{ it.version }}</span></span>
+            <span class="deploy-badge" :class="deployStatusCls(it.status)">{{ deployStatusText(it.status) }}</span>
+            <span class="deploy-msg">{{ it.message }}</span>
+            <span v-if="it.installed_version" class="deploy-badge ok">已装 {{ it.installed_version }}</span>
+          </div>
+        </div>
+        <div v-if="deployInstalled.length" class="deploy-panel">
+          <div class="deploy-head">已部署软件（{{ deployInstalled.length }}）</div>
+          <div v-for="r in deployInstalled" :key="r.target_id + r.object" class="deploy-item">
+            <span class="deploy-name">{{ r.object }}<span class="deploy-ver"> · v{{ r.version }}</span></span>
+            <span class="deploy-badge ok">{{ r.target_id === 'local' ? '本机' : r.target_id }}</span>
+            <span class="deploy-msg">{{ r.updated_at }}</span>
+          </div>
+        </div>
 
         <div v-if="currentTask" class="task-status-row">
           <span class="status-label">任务状态</span>
@@ -1585,4 +1700,21 @@ onUnmounted(() => {
 .monitor-btn { margin-left: auto; }
 
 .monitor-hint { font-size: 11.5px; color: var(--ok); margin-left: 6px; }
+
+.deploy-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.deploy-panel { margin-top: 8px; border: 1px solid #e6e1d8; border-radius: 8px; padding: 8px 10px; background: #fbfbf9; }
+.deploy-head { font-size: 12px; font-weight: 700; color: #6b6b66; margin-bottom: 6px; }
+.deploy-item { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
+.deploy-name { min-width: 180px; color: #141414; }
+.deploy-ver { color: #6b6b66; }
+.deploy-badge { padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.deploy-badge.wait { background: #eeeeee; color: #6b6b66; }
+.deploy-badge.run { background: #fff4e5; color: #b45309; }
+.deploy-badge.ok { background: #e8f5ec; color: #15803d; }
+.deploy-badge.err { background: #fdeaea; color: #b91c1c; }
+.deploy-msg { color: #6b6b66; }
+
+.mc-flag { display: inline-block; min-width: 16px; height: 16px; line-height: 16px; padding: 0 3px;
+  margin-right: 6px; border-radius: 3px; background: #8b0f1a; color: #fff; font-size: 11px;
+  font-weight: 700; text-align: center; vertical-align: 1px; }
 </style>

@@ -136,8 +136,115 @@ def validate_v2(raw: dict) -> list[str]:
     # `steps`（v1 遗留）与 cmd_suit 同时出现时给出明确提示，避免误解
     if raw.get("steps") and cmd_suit:
         errors.append("TPS 同时包含 steps（v1）与 cmd_suit（v2），请只保留一种")
+    # ---- deploy（可选，部署对象清单）----
+    errors.extend(_validate_deploy(raw))
     return errors
 
+
+def _validate_deploy(raw: dict) -> list[str]:
+    """校验 deploy：key / package(object@version) / target / mode / on_failure / depends_on。"""
+    errors: list[str] = []
+    deploy = raw.get("deploy")
+    if deploy is None:
+        return errors
+    if not isinstance(deploy, list) or not deploy:
+        return ["deploy 必须是非空数组"]
+
+    pkg_re = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$")
+    key_re = re.compile(r"^[a-z0-9_-]{1,32}$")
+    declared: list[str] = []
+
+    for i, item in enumerate(deploy, 1):
+        if not isinstance(item, dict):
+            errors.append(f"deploy[{i}] 必须是对象")
+            continue
+
+        package = str(item.get("package") or "").strip()
+        if not package:
+            legacy_obj = str(item.get("object") or "").strip()
+            legacy_ver = str(item.get("version") or "").strip()
+            if legacy_obj and legacy_ver:
+                package = f"{legacy_obj}@{legacy_ver}"
+            else:
+                errors.append(f"deploy[{i}] 缺少 package（格式 object@version）")
+                continue
+        if not pkg_re.match(package):
+            errors.append(f"deploy[{i}].package 格式应为 object@version: {package}")
+            continue
+
+        key = str(item.get("key") or package.split("@", 1)[0]).strip()
+        if not key_re.match(key):
+            errors.append(f"deploy[{i}].key 只允许小写字母、数字、下划线、短横线且不超过 32 位: {key}")
+        elif key in declared:
+            errors.append(f"deploy[{i}].key 重复: {key}")
+        else:
+            declared.append(key)
+
+        target = item.get("target")
+        if target is not None and (not isinstance(target, dict) or not str(target.get("id") or "").strip()):
+            errors.append(f'deploy[{i}].target 必须是 {{"id": "..."}}')
+
+        mode = str(item.get("mode") or "ensure")
+        if mode not in ("ensure", "force"):
+            errors.append(f"deploy[{i}].mode 只能是 ensure 或 force: {mode}")
+
+        on_failure = str(item.get("on_failure") or "abort")
+        if on_failure not in ("abort", "continue"):
+            errors.append(f"deploy[{i}].on_failure 只能是 abort 或 continue: {on_failure}")
+
+        deps = item.get("depends_on") or []
+        if not isinstance(deps, list) or any(not isinstance(d, str) for d in deps):
+            errors.append(f"deploy[{i}].depends_on 必须是字符串数组")
+
+        script = str(item.get("script") or "").strip()
+        if script and (script.startswith(("/", "\\")) or ":" in script):
+            errors.append(f"deploy[{i}].script 必须是相对路径: {script}")
+
+    # 依赖引用与环
+    graph: dict[str, list[str]] = {}
+    for i, item in enumerate(deploy, 1):
+        if not isinstance(item, dict):
+            continue
+        package = str(item.get("package") or "").strip()
+        if not package:
+            continue
+        key = str(item.get("key") or package.split("@", 1)[0]).strip()
+        deps = [d for d in (item.get("depends_on") or []) if isinstance(d, str)]
+        for dep in deps:
+            if dep not in declared:
+                errors.append(f"deploy[{key}].depends_on 引用了未声明的 key: {dep}")
+        graph[key] = deps
+
+    def _has_cycle() -> list[str] | None:
+        state: dict[str, int] = {}
+        stack: list[str] = []
+
+        def visit(node: str) -> list[str] | None:
+            if state.get(node) == 2:
+                return None
+            if state.get(node) == 1:
+                return stack[stack.index(node):] + [node]
+            state[node] = 1
+            stack.append(node)
+            for dep in graph.get(node, []):
+                if dep in graph:
+                    found = visit(dep)
+                    if found:
+                        return found
+            stack.pop()
+            state[node] = 2
+            return None
+
+        for node in graph:
+            found = visit(node)
+            if found:
+                return found
+        return None
+
+    cycle = _has_cycle()
+    if cycle:
+        errors.append("deploy 依赖存在环: " + " -> ".join(cycle))
+    return errors
 
 def _validate_case(case: Any, index: int, testconfig: dict, seen_ids: set, prefix: str) -> list[str]:
     errors: list[str] = []

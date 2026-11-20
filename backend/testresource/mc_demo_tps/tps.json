@@ -1,0 +1,70 @@
+{
+  "dut": "Demo DUT",
+  "id": "mc_demo_tps",
+  "testconfig": {
+    "TC_A": {
+      "label": "A",
+      "min": 0,
+      "unit": "V",
+      "max": 10
+    }
+  },
+  "version": "1.0.0",
+  "project": "Demo 项目",
+  "setup": [
+    {
+      "case": "testcase.env::setup",
+      "name": "初始化",
+      "id": "S1"
+    }
+  ],
+  "teardown": [
+    {
+      "case": "testcase.env::teardown",
+      "name": "终止",
+      "id": "T1"
+    }
+  ],
+  "name": "常数标定演示 TPS",
+  "schema": "tps.v2",
+  "device_config": {
+    "psu": {
+      "role": "psu"
+    }
+  },
+  "cmd_suit": [
+    {
+      "case": "testcase.demo::case_one",
+      "name": "用例一",
+      "id": "C1",
+      "checks": {
+        "a": "TC_A"
+      }
+    }
+  ],
+  "constant_model": {
+    "version": "V-DEMO-1",
+    "pn": "PN-DEMO-1",
+    "models": [
+      "M1",
+      "M2"
+    ],
+    "updated_at": "2026-11-19 20:48:09"
+  },
+  "deploy": [
+    {
+      "key": "drv",
+      "package": "ok_pkg@1.0.0",
+      "mode": "ensure"
+    },
+    {
+      "key": "svc",
+      "package": "slow_pkg@1.0.0",
+      "mode": "ensure",
+      "depends_on": [
+        "drv"
+      ],
+      "on_failure": "abort"
+    }
+  ]
+}

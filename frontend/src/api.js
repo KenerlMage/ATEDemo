@@ -35,6 +35,18 @@ export const api = {
       })
     }),
   getTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}`),
+  // ---- 装备软件部署（ATE Controller）----
+  deployPreview: (tpsId) => request(`/api/deploy/preview?tps_id=${encodeURIComponent(tpsId)}`),
+  deployRun: (tpsId, uut, benchId = '') =>
+    request('/api/deploy/run', { method: 'POST', body: JSON.stringify({ tps_id: tpsId, uut, bench_id: benchId }) }),
+  deployStatus: (batchId) => request(`/api/deploy/status/${encodeURIComponent(batchId)}`),
+  deployRecords: (limit = 20) => request(`/api/deploy/records?limit=${limit}`),
+  deployInstalled: (object = '', target = '') => {
+    const q = new URLSearchParams()
+    if (object) q.set('object', object)
+    if (target) q.set('target', target)
+    return request(`/api/deploy/installed${q.toString() ? `?${q}` : ''}`)
+  },
   // 按等级读取任务日志: levels 为逗号分隔（error,warning,info）；errorsOnly 等价于只看 error
   getTpsTaskLogs: (taskId, { levels = '', errorsOnly = false, limit = 0 } = {}) => {
     const qs = new URLSearchParams()

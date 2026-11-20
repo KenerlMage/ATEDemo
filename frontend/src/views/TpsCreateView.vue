@@ -33,6 +33,13 @@ const zipOverwrite = ref(true)
 // 空白模板
 const form = ref({ id: '', name: '', version: '1.0.0', project: '', dut: '', schema: 'tps.v2' })
 
+// 新建时的机器常数模型选择（可多选，随 TPS 一并保存）
+const newMc = ref({ version: '', pn: '', models: [] })
+const newMcModels = ref([])
+const newMcErr = ref('')
+const newMcMsg = ref('')
+const newMcBusy = ref(false)
+
 // 常数关联
 const constVersions = ref([])
 const constPns = ref([])         // [{pn, product, subsystem, label}]
@@ -257,6 +264,57 @@ function generateTemplate() {
 
 // ---------- 常数关联 ----------
 
+async function loadNewMcModels() {
+  newMcErr.value = ''
+  newMcModels.value = []
+  if (!newMc.value.pn) return
+  try {
+    const res = await api.getConstantsByPn(newMc.value.pn, newMc.value.version)
+    newMcModels.value = res.models || []
+    const keys = newMcModels.value.map((m) => m.model_key)
+    newMc.value.models = newMc.value.models.filter((k) => keys.includes(k))
+  } catch (e) {
+    newMcErr.value = '读取常数模型失败：' + e.message
+  }
+}
+
+function toggleNewMc(key) {
+  const list = newMc.value.models
+  const i = list.indexOf(key)
+  if (i >= 0) list.splice(i, 1)
+  else list.push(key)
+}
+
+async function createWithMc() {
+  newMcBusy.value = true
+  newMcErr.value = ''
+  newMcMsg.value = ''
+  try {
+    const data = form.value.schema === 'tps.v1' ? buildV1() : buildV2()
+    const res = await api.importTps(JSON.stringify(data), `${data.id}.json`)
+    if (!res.success) throw new Error(res.message || '保存失败')
+    const id = (res.tps && res.tps.id) || data.id
+    currentTpsId.value = id
+    if (newMc.value.pn && newMc.value.models.length) {
+      const r = await api.saveTpsConstants(id, {
+        version: newMc.value.version,
+        pn: newMc.value.pn,
+        models: newMc.value.models
+      })
+      newMcMsg.value = r.message || '已关联常数模型'
+    } else {
+      newMcMsg.value = 'TPS 已保存（未关联常数模型）'
+    }
+    await loadList()
+    await loadBinding(id)
+    tab.value = 'text'
+  } catch (e) {
+    newMcErr.value = '保存失败：' + e.message
+  } finally {
+    newMcBusy.value = false
+  }
+}
+
 async function loadBinding(tpsId) {
   bindingMsg.value = ''
   bindingErr.value = ''
@@ -398,7 +456,14 @@ onMounted(async () => {
             :class="{ active: currentTpsId === t.id }"
             @click="openTps(t)"
           >
-            <span class="t-name">{{ t.name }}</span>
+            <span class="t-name">
+              <span
+                v-if="t.has_constants"
+                class="mc-flag"
+                :title="`具备常数标定（${t.constant_model_count} 个模型）`"
+              >C</span>
+              {{ t.name }}
+            </span>
             <span class="t-id">{{ t.id }}</span>
             <span class="t-meta">
               v{{ t.version || '—' }} ·
@@ -510,8 +575,39 @@ onMounted(async () => {
               </select>
             </label>
           </div>
+          <div class="mc-block">
+            <div class="mc-head">
+              <span class="mc-title">机器常数模型（可多选）</span>
+              <span class="mc-sub">仅新建时设置；勾选后随 TPS 保存，执行时按所选模型标定</span>
+            </div>
+            <div class="mc-row">
+              <select v-model="newMc.version" class="input" @change="loadNewMcModels">
+                <option value="">标定版本（缺省为生效版本）</option>
+                <option v-for="v in constVersions" :key="v.version" :value="v.version">
+                  {{ v.version }}{{ v.is_active ? '（生效）' : '' }}
+                </option>
+              </select>
+              <select v-model="newMc.pn" class="input" @change="loadNewMcModels">
+                <option value="">选择 PN</option>
+                <option v-for="p in constPns" :key="p.pn" :value="p.pn">{{ p.pn }} · {{ p.label }}</option>
+              </select>
+            </div>
+            <div v-if="newMcModels.length" class="mc-list">
+              <label v-for="m in newMcModels" :key="m.model_key" class="mc-item">
+                <input type="checkbox" :checked="newMc.models.includes(m.model_key)" @change="toggleNewMc(m.model_key)" />
+                <span class="mc-key">{{ m.model_key }}</span>
+                <span class="mc-name">{{ m.name }}</span>
+              </label>
+            </div>
+            <div v-else class="hint-line">选择 PN 后列出该 PN 下的常数模型</div>
+            <div v-if="newMcErr" class="notice err">{{ newMcErr }}</div>
+            <div v-if="newMcMsg" class="notice ok">{{ newMcMsg }}</div>
+          </div>
           <div class="tpl-actions">
             <button class="btn primary" type="button" @click="generateTemplate">生成模板并编辑</button>
+            <button class="btn" type="button" :disabled="newMcBusy" @click="createWithMc">
+              {{ newMcBusy ? '保存中…' : '生成并保存（含常数模型）' }}
+            </button>
             <span class="hint-line">模板只含最小可运行结构，生成后在「文本编辑」里补全阈值、设备与用例。</span>
           </div>
         </template>
@@ -608,7 +704,9 @@ onMounted(async () => {
 .tps-item { display: flex; flex-direction: column; gap: 2px; text-align: left; border: 1px solid var(--border); background: #fff; border-radius: 9px; padding: 9px 11px; cursor: pointer; }
 .tps-item:hover { border-color: var(--border-strong); background: var(--panel-2); }
 .tps-item.active { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.07); }
-.t-name { font-size: 13px; font-weight: 700; }
+.t-name { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.mc-flag { display: inline-block; min-width: 16px; height: 16px; line-height: 16px; padding: 0 3px;
+  border-radius: 3px; background: #8b0f1a; color: #fff; font-size: 11px; font-weight: 700; text-align: center; }
 .t-id { font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
 .t-meta { color: var(--muted); font-size: 11px; font-family: var(--mono); }
 
@@ -673,6 +771,17 @@ onMounted(async () => {
 .loading { color: var(--muted); font-size: 12.5px; padding: 10px 2px; }
 .btn.sm { padding: 5px 12px; font-size: 12.5px; }
 .btn.ghost { background: transparent; border: 1px solid var(--border-strong); }
+
+.mc-block { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: #fbfbf9; }
+.mc-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.mc-title { font-size: 13px; font-weight: 700; }
+.mc-sub { font-size: 12px; color: var(--muted); }
+.mc-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.mc-row .input { min-width: 240px; }
+.mc-list { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+.mc-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.mc-key { font-family: Consolas, monospace; }
+.mc-name { color: var(--muted); }
 
 @media (max-width: 1100px) {
   .tc-body { grid-template-columns: 1fr; }
