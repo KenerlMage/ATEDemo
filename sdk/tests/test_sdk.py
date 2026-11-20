@@ -3,7 +3,7 @@
 
 用平台自带 venv 跑：
 
-    D:\\ATE\\backend\\.venv\\Scripts\\python.exe -m pytest tests -q
+    D:\\ATE\\MockRunner\\backend\\.venv\\Scripts\\python.exe -m pytest tests -q
 """
 
 from __future__ import annotations

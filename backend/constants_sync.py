@@ -32,7 +32,11 @@ from typing import Optional
 import machine_constants
 
 BASE_DIR = Path(__file__).resolve().parent
-CONTROLLER_URL = os.environ.get("ATE_CONTROLLER_URL", "http://127.0.0.1:8070").rstrip("/")
+CONTROLLER_URL = (
+    os.environ.get("MOCK_CONTROLLER_URL")
+    or os.environ.get("ATE_CONTROLLER_URL")
+    or "http://127.0.0.1:8070"
+).rstrip("/")
 CACHE_DIR = Path(os.environ.get("ATE_TPS_CACHE_DIR") or (BASE_DIR / "tps_cache"))
 MODE = (os.environ.get("ATE_CONSTANTS_SYNC") or "auto").strip().lower()
 TIMEOUT = float(os.environ.get("ATE_CONSTANTS_TIMEOUT") or 15)

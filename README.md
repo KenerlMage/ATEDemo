@@ -366,7 +366,7 @@ D:\ATE\workspace\                     # ATE 安装运行目录下的 workspace�
 
 装备软件由独立的 ATE Controller 服务归档，Runner 按 TPS 声明拉取、校验并执行包内的部署脚本。
 
-**Controller 端**（工程 `D:\ATE_CONTROLLER`，默认 `http://127.0.0.1:8070`）：包按 `object/version` 归档到 `D:\ATE_CONTROLLER\repo`，提供 `/api/packages`、`/api/packages/{object}`、`/api/packages/{object}/{version}/manifest`、`/api/packages/{object}/{version}/download` 与归档上传 `POST /api/packages`；下载响应头带 `X-Package-Sha256`。
+**Controller 端**（工程 `D:\ATE\MockController`，默认 `http://127.0.0.1:8070`）：包按 `object/version` 归档到 `D:\ATE\MockController\repo`，提供 `/api/packages`、`/api/packages/{object}`、`/api/packages/{object}/{version}/manifest`、`/api/packages/{object}/{version}/download` 与归档上传 `POST /api/packages`；下载响应头带 `X-Package-Sha256`。
 
 **TPS 声明**（`deploy` 数组，天然支持多个待部署软件）：
 
@@ -400,7 +400,7 @@ D:\ATE\workspace\                     # ATE 安装运行目录下的 workspace�
 
 **执行页**：「📦 部署软件」与「部署状态」两个按钮。部署按批次串行执行，单个包失败不阻断其余包；状态写入 `deploy_batch` / `deploy_item` 两张表，日志落在 `backend/deploy_runtime/<batch_id>/`。
 
-环境变量：`ATE_CONTROLLER_URL`（Controller 地址）、`ATE_DEPLOY_ROOT`（解压与日志根目录）、`ATE_DEPLOY_TIMEOUT`（单包超时秒数，默认 1800）。
+环境变量：`MOCK_CONTROLLER_URL`（Controller 地址，旧名 `ATE_CONTROLLER_URL` 仍兼容）、`ATE_DEPLOY_ROOT`（解压与日志根目录）、`ATE_DEPLOY_TIMEOUT`（单包超时秒数，默认 1800）。
 
 部署只支持手动触发，且同一时间只允许一个批次：执行中再次提交返回 `409`，界面按钮同时禁用。批次内按 `deploy` 数组顺序串行执行。进程重启时，上一次遗留的「执行中」批次被标记为中断（失败），避免永久占用执行位。
 

@@ -39,11 +39,11 @@ Runner 侧对应接口：
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `ATE_CONTROLLER_URL` | `http://127.0.0.1:8070` | Controller 地址 |
+| `MOCK_CONTROLLER_URL` | `http://127.0.0.1:8070` | Controller 地址（旧名 `ATE_CONTROLLER_URL` 兼容） |
 | `ATE_TPS_SOURCE` | `controller` | `controller` 走协议，`local` 仅用本地目录（验收回退） |
 | `ATE_TPS_CACHE_DIR` | `backend/tps_cache` | 缓存目录，不入库 |
 | `ATE_TPS_TIMEOUT` | `8` | 单次请求超时（秒） |
-| `ATE_CONTROLLER_REPO` | `D:\ATE_CONTROLLER\repo` | Controller 数据根（包、TPS、树、库） |
+| `MOCK_CONTROLLER_REPO` | `<程序目录>\repo` | Controller 数据根（包、TPS、树、库） |
 
 ## 四、离线与缓存语义
 
