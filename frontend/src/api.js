@@ -280,8 +280,10 @@ export const api = {
   importTpsZip: (payload) =>
     request('/api/tps/import/zip', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
-  // ---- 装备助手货架（清单与安装包当前由后端本地持有，等价于远端下发）----
+  // ---- 装备助手货架（清单由 MockController 下发；不可达时用本地缓存 / 本地兜底清单）----
   getAssistantCatalog: () => request('/api/assistants/catalog'),
+  // 清单来源状态：controller_url / mode(controller|cache|local) / cached_at / cached_count
+  getAssistantSource: () => request('/api/assistants/source'),
   getInstalledAssistants: () => request('/api/assistants/installed'),
   installAssistant: (id) =>
     request('/api/assistants/install', { method: 'POST', body: JSON.stringify({ id }) }),

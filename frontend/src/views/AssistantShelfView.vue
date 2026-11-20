@@ -2,7 +2,8 @@
 /**
  * 装备货架页
  *  - 入口：装备助手页右上角「装备货架」按钮
- *  - 清单：本应由远端服务下发；本次演示由后端读取本地 catalog.json（source=local）
+ *  - 清单来源：controller（MockController 下发）/ cache（Controller 不可达，用本地缓存）
+ *          / local（完全回退到随程序的本地清单），三态在顶部 chip 与信息区展示
  *  - 下载：把安装包复制到本地安装目录（assistant_shelf/installed/<id>），
  *          完成后该助手即出现在「装备助手」页的卡片列表里
  *  - 启动：调用后端 launch 接口，由安装目录内的启动脚本拉起助手
@@ -15,12 +16,24 @@ const router = useRouter()
 
 const loading = ref(true)
 const err = ref('')
-const info = ref({ source: '', channel: '', updated_at: '', note: '', count: 0 })
+const info = ref({ source: '', channel: '', controller_url: '', updated_at: '', note: '', count: 0 })
+// /api/assistants/source 的来源状态（取不到时保持 available=false，不打断主流程）
+const remote = ref({ available: false, mode: '', controller_url: '', cached_at: '', count: 0 })
 const items = ref([])
 const busyId = ref('')
 const keyword = ref('')
 const confirmId = ref('')
 const toast = ref({ text: '', kind: 'ok' })
+
+const SOURCE_LABEL = {
+  controller: 'MockController 下发',
+  cache: '本地缓存（Controller 不可达）',
+  local: '本地兜底清单'
+}
+const sourceLabel = computed(() => SOURCE_LABEL[info.value.source] || '来源未知')
+const controllerUrl = computed(() => info.value.controller_url || remote.value.controller_url || '')
+// 清单更新时间优先用下发清单自带的时间，其次退回缓存抓取时间
+const updatedAt = computed(() => info.value.updated_at || remote.value.cached_at || '')
 
 const installedCount = computed(() => items.value.filter((x) => x.installed).length)
 const shown = computed(() => {
@@ -36,9 +49,39 @@ function flash(text, kind = 'ok') {
   setTimeout(() => { if (toast.value.text === text) toast.value = { text: '', kind } }, 4200)
 }
 
+// 文件大小：有 size_bytes 用它（KB/MB 自适应，保留 1 位小数），否则沿用 size_hint
+function sizeText(it) {
+  const n = Number(it.size_bytes || 0)
+  if (n > 0) {
+    const kb = n / 1024
+    return kb < 1024 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(1)} MB`
+  }
+  if (it.size_hint) return it.size_hint
+  return it.package_ready ? (it.package_size_text || '—') : '缺失'
+}
+
+// 来源状态接口：可选依赖，失败只记录「不可用」，不影响清单展示
+async function loadSource() {
+  try {
+    const res = await api.getAssistantSource()
+    if (!res || res.success === false) return
+    remote.value = {
+      available: true,
+      // 后端当前返回 mode/cached_count，一并兼容 source/count 命名
+      mode: res.source || res.mode || '',
+      controller_url: res.controller_url || '',
+      cached_at: res.cached_at || '',
+      count: Number(res.count || res.cached_count || 0)
+    }
+  } catch (e) {
+    remote.value = { available: false, mode: '', controller_url: '', cached_at: '', count: 0 }
+  }
+}
+
 async function load() {
   loading.value = true
   err.value = ''
+  loadSource()
   try {
     const res = await api.getAssistantCatalog()
     if (!res || res.success === false) throw new Error((res && res.message) || '读取货架清单失败')
@@ -46,6 +89,7 @@ async function load() {
     info.value = {
       source: res.source || '',
       channel: res.channel || '',
+      controller_url: res.controller_url || res.remote_url || '',
       updated_at: res.updated_at || '',
       note: res.note || '',
       count: res.count || 0
@@ -122,8 +166,8 @@ onMounted(load)
         </div>
       </div>
       <div class="hd-right">
-        <span class="src-chip" :class="info.source === 'local' ? 'local' : ''">
-          {{ info.source === 'local' ? '本地演示清单' : '远端清单' }}
+        <span class="src-chip" :class="info.source || 'unknown'">
+          {{ sourceLabel }}
           <template v-if="info.channel"> · {{ info.channel }}</template>
         </span>
         <span class="cnt-chip">共 {{ info.count }} 个 · 已下载 {{ installedCount }}</span>
@@ -132,9 +176,13 @@ onMounted(load)
       </div>
     </section>
 
-    <div class="sh-note">
-      <b>清单来源：</b>{{ info.note || '货架清单由服务端下发；当前为本地演示数据。' }}
-      <span v-if="info.updated_at" class="muted">· 清单更新于 {{ info.updated_at }}</span>
+    <div class="sh-note" :class="{ degraded: info.source === 'cache' }">
+      <div><b>清单来源：</b>{{ info.note || '货架清单由 MockController 下发；不可达时使用本地缓存或兜底清单。' }}</div>
+      <div class="src-meta">
+        <span><i>Controller</i>{{ controllerUrl || '—' }}</span>
+        <span><i>更新时间</i>{{ updatedAt || '—' }}</span>
+        <span v-if="remote.available" class="muted">· 来源接口已连通{{ remote.count ? `（缓存 ${remote.count} 条）` : '' }}</span>
+      </div>
     </div>
 
     <div class="sh-bar">
@@ -167,7 +215,7 @@ onMounted(load)
         </div>
 
         <div class="facts">
-          <span><i>安装包</i>{{ it.package_ready ? it.package_size_text : '缺失' }}</span>
+          <span><i>安装包</i>{{ sizeText(it) }}</span>
           <span><i>发布</i>{{ (it.published_at || '').slice(0, 10) || '—' }}</span>
           <span v-if="it.installed"><i>下载于</i>{{ it.installed_at }}</span>
         </div>
@@ -221,7 +269,9 @@ onMounted(load)
 .hd-sub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 .hd-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .src-chip { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--muted); }
-.src-chip.local { color: var(--warn); border-color: rgba(180, 120, 20, 0.4); background: rgba(180, 120, 20, 0.08); }
+.src-chip.controller { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.07); }
+.src-chip.cache { color: var(--warn); border-color: rgba(180, 120, 20, 0.4); background: rgba(180, 120, 20, 0.08); }
+.src-chip.local { color: var(--warn); border-color: rgba(180, 120, 20, 0.3); border-style: dashed; background: transparent; }
 .cnt-chip { font-size: 11.5px; color: var(--muted); }
 
 .sh-note {
@@ -230,6 +280,9 @@ onMounted(load)
   border-radius: 8px; padding: 9px 12px;
 }
 .sh-note b { color: var(--text, #222); }
+.sh-note.degraded { border-left-color: var(--warn); }
+.src-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 3px; font-size: 11.5px; }
+.src-meta i { font-style: normal; color: var(--border-strong); margin-right: 5px; }
 
 .sh-bar { display: flex; align-items: center; gap: 12px; }
 .sh-bar .input { max-width: 320px; }

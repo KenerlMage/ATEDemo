@@ -8,10 +8,11 @@
   5) 移除            -> POST /api/assistants/uninstall {id}
   6) 图标            -> GET  /api/assistants/icon/{id}
 
-货架清单在设计上由远端服务下发；本次为演示，清单与安装包均随程序本地持有：
-  assistant_shelf/catalog.json      货架清单（等价于远端返回的 JSON）
-  assistant_shelf/packages/<id>/    安装包（等价于远端下载得到的文件）
-  assistant_shelf/installed/<id>/   下载后的本地安装目录（运行时生成）
+货架清单由 MockController 下发（GET /api/v1/assistants），Runner 不再持有权威清单：
+  assistant_shelf/cache/catalog.json   最近一次 Controller 清单（断网兜底）
+  assistant_shelf/catalog.json         本地兜底清单（Controller 与缓存都不可用时）
+  assistant_shelf/installed/<id>/      下载后的本地安装目录（运行时生成，文件来自 Controller）
+  assistant_shelf/packages/<id>/       历史本地安装包（仅兜底，不再作为主来源）
 
 安装语义:
   「下载」= 把安装包完整复制到本地安装目录，并在该目录写入 install.json 记录来源与时间。
@@ -37,6 +38,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+import hashlib
+import urllib.error
+import urllib.request
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -45,6 +50,18 @@ SHELF_ROOT: Path = Path("assistant_shelf")
 PACKAGES_DIR: Path = Path("assistant_shelf") / "packages"
 INSTALLED_DIR: Path = Path("assistant_shelf") / "installed"
 CATALOG_PATH: Path = Path("assistant_shelf") / "catalog.json"
+
+# 货架清单来源：controller（MockController 下发）| local（随程序本地清单）
+CONTROLLER_URL = (
+    os.environ.get("MOCK_CONTROLLER_URL")
+    or os.environ.get("ATE_CONTROLLER_URL")
+    or "http://127.0.0.1:8070"
+).rstrip("/")
+SOURCE_MODE = (os.environ.get("ASSISTANT_SOURCE") or "controller").strip().lower()
+FETCH_TIMEOUT = float(os.environ.get("ASSISTANT_TIMEOUT") or 8)
+CACHE_DIR: Path = Path("assistant_shelf") / "cache"
+CACHE_CATALOG: Path = CACHE_DIR / "catalog.json"
+CACHE_ICONS: Path = CACHE_DIR / "icons"
 
 ALLOWED_ENTRY_SUFFIX = (".bat", ".cmd", ".exe", ".py")
 MAX_PACKAGE_FILES = 500
@@ -137,9 +154,159 @@ def _fmt_mb(size_bytes: int) -> str:
 # ==================== 货架清单 ====================
 
 
+# ==================== 远端来源（MockController 下发）====================
+
+
+def _http_json(url: str, timeout: float = FETCH_TIMEOUT) -> Optional[dict]:
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError):
+        return None
+
+
+def _http_bytes(url: str, timeout: float = FETCH_TIMEOUT * 6) -> Optional[bytes]:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return resp.read()
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+        return None
+
+
+def _controller_catalog() -> Optional[dict]:
+    """从 MockController 取助手文件清单，成功返回 Controller 结构的目录"""
+    data = _http_json(f"{CONTROLLER_URL}/api/v1/assistants")
+    if not data or not isinstance(data.get("assistants"), list):
+        return None
+    items: list[dict] = []
+    for raw in data["assistants"]:
+        if not isinstance(raw, dict) or not raw.get("id"):
+            continue
+        items.append(
+            {
+                "id": raw.get("id"),
+                "name": raw.get("name") or raw.get("id"),
+                "version": raw.get("version", ""),
+                "vendor": raw.get("vendor", ""),
+                "summary": raw.get("summary", ""),
+                "description": raw.get("description", ""),
+                "tags": raw.get("tags") or [],
+                "requires": raw.get("requires", ""),
+                "release_note": raw.get("release_note", ""),
+                "published_at": raw.get("published_at", ""),
+                "entry": raw.get("entry") or "start.bat",
+                "size_hint": raw.get("size_hint", ""),
+                "size_bytes": int(raw.get("size_bytes") or 0),
+                "file_count": int(raw.get("file_count") or 0),
+                "self_contained": bool(raw.get("self_contained")),
+                "icon": bool(raw.get("icon", True)),
+            }
+        )
+    return {
+        "source": "controller",
+        "channel": data.get("channel") or "stable",
+        "controller_url": CONTROLLER_URL,
+        "updated_at": data.get("updated_at", ""),
+        "note": data.get("note", ""),
+        "items": items,
+    }
+
+
+def _read_cached_catalog() -> Optional[dict]:
+    payload = _read_json(CACHE_CATALOG, default=None)
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        return None
+    cached = dict(payload)
+    cached["source"] = "cache"
+    cached["controller_url"] = CONTROLLER_URL
+    cached["note"] = payload.get("note") or "MockController 不可达，使用本地缓存清单"
+    return cached
+
+
+def _write_cached_catalog(payload: dict) -> None:
+    try:
+        data = dict(payload)
+        data["source"] = "controller"
+        data["fetched_at"] = _now()
+        _write_json(CACHE_CATALOG, data)
+    except OSError:
+        pass
+
+
+def load_catalog_raw() -> tuple[dict, str]:
+    """返回 (原始清单, 错误信息)；来源标记写在清单的 source 字段"""
+    if SOURCE_MODE != "local":
+        remote = _controller_catalog()
+        if remote is not None:
+            _write_cached_catalog(remote)
+            return remote, ""
+
+        cached = _read_cached_catalog()
+        if cached is not None:
+            return cached, f"MockController 不可达：{CONTROLLER_URL}（已使用本地缓存清单）"
+
+        local = _read_json(CATALOG_PATH, default={}) or {}
+        local["source"] = "local"
+        return local, f"MockController 不可达：{CONTROLLER_URL}，且无缓存（已回退本地清单）"
+
+    local = _read_json(CATALOG_PATH, default={}) or {}
+    local["source"] = "local"
+    return local, ""
+
+
+def _controller_files(assistant_id: str) -> Optional[list[dict]]:
+    """取 Controller 上该助手的文件清单（path/size/sha256）"""
+    data = _http_json(f"{CONTROLLER_URL}/api/v1/assistants/{assistant_id}")
+    if not data or not isinstance(data.get("assistant"), dict):
+        return None
+    files = data["assistant"].get("files")
+    return files if isinstance(files, list) else None
+
+
+def _download_package(assistant_id: str, dest: Path) -> tuple[int, int, str]:
+    """按 Controller 文件清单逐文件下载到 dest；返回 (文件数, 字节数, 错误)"""
+    files = _controller_files(assistant_id)
+    if files is None:
+        return 0, 0, "Controller 未返回文件清单"
+    count = 0
+    total = 0
+    for item in files:
+        rel = str((item or {}).get("path") or "").replace("\\", "/").lstrip("/")
+        if not rel or ".." in rel.split("/"):
+            return count, total, f"文件路径不合法：{rel}"
+        blob = _http_bytes(f"{CONTROLLER_URL}/api/v1/assistants/{assistant_id}/files/{rel}")
+        if blob is None:
+            return count, total, f"下载失败：{rel}"
+        expect = str((item or {}).get("sha256") or "").lower()
+        if expect and hashlib.sha256(blob).hexdigest().lower() != expect:
+            return count, total, f"校验不通过：{rel}"
+        target = (dest / rel).resolve()
+        if not str(target).startswith(str(dest.resolve())):
+            return count, total, f"路径越界：{rel}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(blob)
+        count += 1
+        total += len(blob)
+        if count > MAX_PACKAGE_FILES or total > MAX_PACKAGE_BYTES:
+            return count, total, "安装包超出限制，已中止下载"
+    return count, total, ""
+
+
+def source_status() -> dict:
+    payload = _read_json(CACHE_CATALOG, default={}) or {}
+    return {
+        "controller_url": CONTROLLER_URL,
+        "mode": SOURCE_MODE,
+        "cached_count": len(payload.get("items") or []),
+        "cached_at": payload.get("fetched_at", ""),
+        "cache_dir": str(CACHE_DIR),
+    }
+
+
 def catalog() -> dict:
-    """货架清单（本地文件模拟远端下发）"""
-    raw = _read_json(CATALOG_PATH, default={}) or {}
+    """货架清单：MockController 下发优先，其次缓存，最后本地兜底"""
+    raw, fetch_error = load_catalog_raw()
     items = raw.get("items") or []
     if not isinstance(items, list):
         items = []
@@ -153,11 +320,18 @@ def catalog() -> dict:
         except ValueError:
             continue
         pkg = PACKAGES_DIR / aid
-        files, size = _dir_size(pkg)
+        from_remote = raw.get("source") in ("controller", "cache")
+        if from_remote:
+            files = int(item.get("file_count") or 0)
+            size = int(item.get("size_bytes") or 0)
+            ready = files > 0
+        else:
+            files, size = _dir_size(pkg)
+            ready = pkg.is_dir()
         rec = installed.get(aid)
         entry = dict(item)
         entry["id"] = aid
-        entry["package_ready"] = pkg.is_dir()
+        entry["package_ready"] = ready
         entry["package_files"] = files
         entry["package_size"] = size
         entry["package_size_text"] = _fmt_mb(size) if size else "—"
@@ -170,9 +344,12 @@ def catalog() -> dict:
     return {
         "source": raw.get("source", "local"),
         "channel": raw.get("channel", ""),
-        "remote_url": raw.get("remote_url", ""),
+        "remote_url": raw.get("controller_url") or CONTROLLER_URL,
+        "controller_url": CONTROLLER_URL,
         "updated_at": raw.get("updated_at", ""),
+        "fetched_at": raw.get("fetched_at", ""),
         "note": raw.get("note", ""),
+        "error": fetch_error,
         "count": len(out),
         "installed_count": len([x for x in out if x["installed"]]),
         "items": out,
@@ -228,33 +405,64 @@ def list_installed() -> list[dict]:
 
 
 def install(assistant_id: str) -> dict:
+    """下载安装：优先从 MockController 拉文件，Controller 不可用时回退本地安装包"""
     aid = _safe_id(assistant_id)
-    pkg = PACKAGES_DIR / aid
-    if not pkg.is_dir():
-        return {"success": False, "message": f"货架中没有该助手的安装包：{aid}"}
-    manifest = _read_json(pkg / "assistant.json", default={}) or {}
-    if not manifest:
-        return {"success": False, "message": "安装包缺少 assistant.json 清单"}
-    if manifest.get("id") and str(manifest["id"]) != aid:
-        return {"success": False, "message": "安装包清单与货架标识不一致"}
-
     dest = INSTALLED_DIR / aid
     prev = _install_meta(dest)
     existed = dest.is_dir()
-    try:
-        files, size = _copy_tree(pkg, dest)
-    except ValueError as exc:
-        return {"success": False, "message": str(exc)}
-    except OSError as exc:
-        return {"success": False, "message": f"复制安装包失败：{exc}"}
 
-    catalog_item = next((x for x in (catalog().get("items") or []) if x["id"] == aid), {})
+    cat = catalog()
+    catalog_item = next((x for x in (cat.get("items") or []) if x["id"] == aid), {})
+    # 仅当清单直接来自 Controller 时才走下载；缓存态说明 Controller 不可达，回退本地安装包
+    from_remote = cat.get("source") == "controller"
+    fetch_error = ""
+
+    if from_remote:
+        dest.mkdir(parents=True, exist_ok=True)
+        files, size, fetch_error = _download_package(aid, dest)
+        if fetch_error:
+            if not existed:
+                try:
+                    for item in dest.rglob("*"):
+                        if item.is_file():
+                            item.unlink()
+                except OSError:
+                    pass
+            return {"success": False, "message": f"从 MockController 下载失败：{fetch_error}"}
+        manifest = _read_json(dest / "assistant.json", default={}) or {}
+        if not manifest:
+            manifest = {
+                "id": aid,
+                "name": catalog_item.get("name") or aid,
+                "version": catalog_item.get("version", ""),
+                "entry": catalog_item.get("entry") or "start.bat",
+                "vendor": catalog_item.get("vendor", ""),
+                "summary": catalog_item.get("summary", ""),
+            }
+            _write_json(dest / "assistant.json", manifest)
+    else:
+        pkg = PACKAGES_DIR / aid
+        if not pkg.is_dir():
+            return {"success": False, "message": f"MockController 不可达，且本地没有该助手的安装包：{aid}"}
+        manifest = _read_json(pkg / "assistant.json", default={}) or {}
+        if not manifest:
+            return {"success": False, "message": "安装包缺少 assistant.json 清单"}
+        try:
+            files, size = _copy_tree(pkg, dest)
+        except ValueError as exc:
+            return {"success": False, "message": str(exc)}
+        except OSError as exc:
+            return {"success": False, "message": f"复制安装包失败：{exc}"}
+
+    if manifest.get("id") and str(manifest["id"]) != aid:
+        return {"success": False, "message": "安装包清单与货架标识不一致"}
     meta = {
         "id": aid,
         "name": manifest.get("name", aid),
         "version": manifest.get("version", ""),
         "entry": manifest.get("entry", "start.bat"),
-        "source": "shelf",
+        "source": "controller" if from_remote else "shelf",
+        "source_url": CONTROLLER_URL if from_remote else "",
         "source_updated_at": catalog_item.get("published_at", ""),
         "installed_at": prev.get("installed_at") or _now(),
         "updated_at": _now(),
@@ -372,8 +580,26 @@ def launch(assistant_id: str) -> dict:
     }
 
 
+def _cached_icon(assistant_id: str) -> Optional[Path]:
+    """未安装时从 Controller 拉图标并缓存到 assistant_shelf/cache/icons/<id>.png"""
+    cached = CACHE_ICONS / f"{assistant_id}.png"
+    if cached.is_file() and cached.stat().st_size > 0:
+        return cached
+    if SOURCE_MODE == "local":
+        return None
+    blob = _http_bytes(f"{CONTROLLER_URL}/api/v1/assistants/{assistant_id}/files/icon.png")
+    if not blob:
+        return None
+    try:
+        CACHE_ICONS.mkdir(parents=True, exist_ok=True)
+        cached.write_bytes(blob)
+    except OSError:
+        return None
+    return cached
+
+
 def icon_file(assistant_id: str) -> Optional[Path]:
-    """优先取已安装目录的图标，其次取安装包图标"""
+    """优先取已安装目录的图标，其次安装包，最后向 Controller 取（带缓存）"""
     try:
         aid = _safe_id(assistant_id)
     except ValueError:
@@ -391,7 +617,7 @@ def icon_file(assistant_id: str) -> Optional[Path]:
         fallback = base / "icon.png"
         if fallback.is_file():
             return fallback
-    return None
+    return _cached_icon(aid)
 
 
 # ==================== 路由 ====================
@@ -408,11 +634,17 @@ def register_routes(app: FastAPI, base_dir: Path) -> None:
     INSTALLED_DIR = SHELF_ROOT / "installed"
     CATALOG_PATH = SHELF_ROOT / "catalog.json"
     INSTALLED_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     @app.get("/api/assistants/catalog")
     def assistants_catalog():
         data = catalog()
         return {"success": True, **data}
+
+    @app.get("/api/assistants/source")
+    def assistants_source():
+        """货架清单来源状态：Controller 地址、模式、缓存条目"""
+        return {"success": True, **source_status()}
 
     @app.get("/api/assistants/installed")
     def assistants_installed():

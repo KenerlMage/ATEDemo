@@ -92,3 +92,23 @@ Runner 侧对应接口：
 2. Controller 鉴权（当前内网明文，无 Token）；
 3. Runner 侧 `machine_constants` 的编辑代码可清理（现已全部短路为只读提示）；
 4. 常数版本生效切换目前由 Controller 决定，Runner 同步时整体替换为导出包中的生效版本。
+
+## 九、装备助手货架来源
+
+助手货架的清单与安装文件由 MockController 统一发布，Runner 不再持有权威清单。
+
+| 环节 | 接口 / 行为 |
+| --- | --- |
+| Controller 清单 | `GET /api/v1/assistants` → `{ok, count, source, channel, updated_at, assistants[]}` |
+| Controller 详情 | `GET /api/v1/assistants/{id}` → 含 `files[{path,size,sha256}]` |
+| Controller 文件 | `GET /api/v1/assistants/{id}/files/{path}`，防路径穿越 |
+| Controller 发布 | `POST /api/v1/assistants`（元数据 + base64 文件），`DELETE` 下架 |
+| 数据落盘 | `repo/assistants/<id>/manifest.json` + `files/<相对路径>`；迁移脚本 `seed_assistants.py` 从 Runner 旧目录导入 |
+| Runner 清单 | `GET /api/assistants/catalog` → `source` ∈ `controller`（下发）/`cache`（不可达，用缓存）/`local`（本地兜底） |
+| Runner 状态 | `GET /api/assistants/source` → Controller 地址、模式、缓存条目、缓存时间 |
+| Runner 安装 | 逐文件下载并校验 `sha256`，写 `install.json`（`source=controller`、`source_url`）；Controller 不可达时回退本地 `packages/<id>/`（`source=shelf`） |
+| 图标 | 已安装目录 → 本地包 → Controller 下载并缓存到 `assistant_shelf/cache/icons/` |
+
+离线语义：清单缓存 `assistant_shelf/cache/catalog.json`（不入库）；断网时仍可浏览清单、启动已下载助手，安装新助手需本地留有安装包。
+
+实测：在线清单 `source=controller`、6 个助手；安装 `therm-log` 得到 4 文件 / 8921 字节、`install.json` 记 `source=controller`；停机后清单 `source=cache` 并带不可达提示，安装 `log-pack` 回退本地包 `source=shelf`，未安装助手的图标仍可从缓存返回。
