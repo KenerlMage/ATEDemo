@@ -71,9 +71,24 @@ Runner 侧对应接口：
 
 把 `ATE_TPS_SOURCE` 设为 `local` 即恢复「只用本地 testresource」的旧行为，无需回退代码。
 
-## 七、待办
+## 七、常数库同步（Runner 侧运行期副本）
 
-1. Runner 侧 `machine_constants` 仍作为运行期取值来源保留，需增加「从 Controller 同步常数库到本地库」的步骤（当前 TPS 执行读取本地 `ate.db`）；
-2. Runner 常量编辑页面已从导航移除，模块文件保留，待常数同步完成后删除；
-3. 双跑比对脚本（同一 TPS 在 Controller 与 Runner 侧的摘要一致性）；
-4. Controller 鉴权（当前内网明文，无 Token）。
+事实源在 Controller，Runner 保留本地 `ate.db` 作为运行期副本：
+
+| 环节 | 行为 |
+| --- | --- |
+| 导出 | Controller `GET /api/v1/constants/export?version=` 还原本版本的 groups / models / fields 与标定值 |
+| 导入 | Runner `constants_sync.sync()` 调 `import_bundle(mode=overwrite, keep_values=True)` |
+| 启动 | `ATE_CONSTANTS_SYNC=auto` 时后台线程同步一次，版本未变则跳过 |
+| 手动 | `GET /api/constants/sync-status`、`POST /api/constants/sync?force=true` |
+| 离线 | Controller 不可达时用 `tps_cache/constants_bundle.json` 恢复 |
+| 写操作 | 导入 / 切换版本 / 写标定值 / TPS 绑定均返回 `moved_to_controller`，Runner 只读 |
+
+实测：启动同步得到 `local_version=V-CTL-1 source=controller`；强制同步 `imported=true`；Controller 停机后强制同步 `source=cache`；写接口返回 `moved_to_controller`。
+
+## 八、待办
+
+1. 双跑比对脚本（同一 TPS 在 Controller 与 Runner 侧的摘要一致性）；
+2. Controller 鉴权（当前内网明文，无 Token）；
+3. Runner 侧 `machine_constants` 的编辑代码可清理（现已全部短路为只读提示）；
+4. 常数版本生效切换目前由 Controller 决定，Runner 同步时整体替换为导出包中的生效版本。
