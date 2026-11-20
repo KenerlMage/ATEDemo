@@ -2112,6 +2112,39 @@ import metadata_registry  # noqa: E402
 import machine_constants  # noqa: E402
 machine_constants.register_routes(app, BASE_DIR, TPS_DIR, ate_db.DB_PATH)
 
+# ==================== 常数库同步（Controller -> Runner 本地运行库）====================
+# 常数库事实源在 ATE Controller；Runner 保留本地 ate.db 作为运行期副本，
+# 启动时按 ATE_CONSTANTS_SYNC=auto 尝试同步一次，写操作接口已改为只读提示。
+import constants_sync  # noqa: E402
+
+
+@app.get("/api/constants/sync-status")
+def constants_sync_status():
+    return {"success": True, **constants_sync.status()}
+
+
+@app.post("/api/constants/sync")
+def constants_sync_run(force: bool = True):
+    result = constants_sync.sync(force=force)
+    return {"success": result["ok"], **result}
+
+
+def _startup_constants_sync() -> None:
+    if constants_sync.MODE == "off":
+        return
+    try:
+        result = constants_sync.sync(force=False)
+        print(f"[constants] {result['source']} {result['version']} {result['message']}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[constants] 同步失败: {exc}")
+
+
+@app.on_event("startup")
+def _on_startup_constants():
+    import threading
+
+    threading.Thread(target=_startup_constants_sync, daemon=True).start()
+
 # 元数据（装备树 / BOM / 预设）已迁到 ATE Controller：/api/metadata（Controller 提供）
 # Runner 侧不再挂载 metadata_registry，保留模块文件仅作历史参考
 

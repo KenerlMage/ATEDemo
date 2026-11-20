@@ -1021,6 +1021,15 @@ def save_binding(tps_id: str, binding: dict) -> dict:
 # ---------------------------------------------------------------- 路由
 
 
+def _moved(name: str) -> dict:
+    """写操作已迁移到 ATE Controller 控制台；Runner 只保留读取能力。"""
+    return {
+        "success": False,
+        "code": "moved_to_controller",
+        "message": f"{name} 已迁移到 ATE Controller 控制台（/api/constants/*）；Runner 只读",
+    }
+
+
 def register_routes(app, base_dir: Path, tps_dir: Path, db_path: Optional[Path] = None) -> None:
     global _BASE_DIR, _TPS_DIR, _DB_PATH
     _BASE_DIR = Path(base_dir)
@@ -1047,6 +1056,7 @@ def register_routes(app, base_dir: Path, tps_dir: Path, db_path: Optional[Path] 
 
     @app.post("/api/constants/versions/active")
     def constants_set_active(payload: dict = Body(...)):
+        return _moved("切换常数版本")
         try:
             return set_active_version(_text((payload or {}).get("version"), 48))
         except ValueError as exc:
@@ -1061,6 +1071,7 @@ def register_routes(app, base_dir: Path, tps_dir: Path, db_path: Optional[Path] 
 
     @app.post("/api/constants/import")
     def constants_import(payload: dict = Body(...)):
+        return _moved("常数导入")
         """全量导入：body = {content|content_base64, filename, mode, operator, keep_values}"""
         payload = payload or {}
         content = payload.get("content")
@@ -1166,6 +1177,7 @@ def register_routes(app, base_dir: Path, tps_dir: Path, db_path: Optional[Path] 
 
     @app.post("/api/constants/values")
     def constants_values(payload: dict = Body(...)):
+        return _moved("标定值写入")
         payload = payload or {}
         try:
             version = _text(payload.get("version"), 48) or active_version()
@@ -1214,6 +1226,7 @@ def register_routes(app, base_dir: Path, tps_dir: Path, db_path: Optional[Path] 
 
     @app.put("/api/tps/{tps_id}/constants")
     def tps_constants_save(tps_id: str, payload: dict = Body(...)):
+        return _moved("TPS 常数绑定")
         try:
             res = save_binding(tps_id, (payload or {}).get("binding") or payload or {})
             return res
