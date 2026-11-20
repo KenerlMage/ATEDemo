@@ -7,10 +7,6 @@ import AssistantShelfView from '../views/AssistantShelfView.vue'
 import RecordsView from '../views/RecordsView.vue'
 import TestbenchNavView from '../views/TestbenchNavView.vue'
 import TestbenchRegisterView from '../views/TestbenchRegisterView.vue'
-import MetadataTreeView from '../views/MetadataTreeView.vue'
-import MetadataBomView from '../views/MetadataBomView.vue'
-import ConstantsView from '../views/ConstantsView.vue'
-import TpsCreateView from '../views/TpsCreateView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import MonitorView from '../views/MonitorView.vue'
 
@@ -34,16 +30,7 @@ const router = createRouter({
     { path: '/testbenches', name: 'testbenches', component: TestbenchNavView, meta: { requiresAuth: true } },
     // 新增测试台注册页 (三步: 选类型+BOM/工位 -> 设备配置 -> 注册并验证)
     { path: '/testbenches/register', name: 'testbench-register', component: TestbenchRegisterView, meta: { requiresAuth: true } },
-    // 元数据管理 (下挂两个子页面: 装备树管理 / 测试台BOM管理)
-    { path: '/metadata', redirect: '/metadata/tree' },
-    //  子页面一: 装备树管理 (新增/维护 产品 -> 子系统 -> 测试台类型 节点, 落盘后端 tree 文件夹)
-    { path: '/metadata/tree', name: 'metadata-tree', component: MetadataTreeView, meta: { requiresAuth: true } },
-    //  子页面二: 测试台BOM管理 (编辑生成某测试台类型的 BOM + 属性, 供新建测试台使用)
-    { path: '/metadata/bom', name: 'metadata-bom', component: MetadataBomView, meta: { requiresAuth: true } },
-    //  子页面三: 机器常数模型 (按 PN 维度管理常数结构 + 标定值, 全量导入按版本覆盖)
-    { path: '/metadata/constants', name: 'metadata-constants', component: ConstantsView, meta: { requiresAuth: true } },
-    // TPS 创建 (文本编辑 / 压缩包导入 / 空白模板, 并可关联机器常数模型)
-    { path: '/tps/create', name: 'tps-create', component: TpsCreateView, meta: { requiresAuth: true } },
+    // 元数据（装备树 / BOM / 机器常数）与 TPS 编辑已迁到 ATE Controller 控制台
     // 系统设置 (当前仅一个页签: 模式权限矩阵 —— 按运行档位限制功能项)
     { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true } }
   ]

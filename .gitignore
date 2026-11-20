@@ -97,3 +97,6 @@ backend/drivers_legacy/
 backend/deploy_runtime/
 backend/runtime_envs/
 backend/runtime_wheels/
+
+# ---- TPS 缓存（Controller 为事实源，缓存不入库）----
+backend/tps_cache/

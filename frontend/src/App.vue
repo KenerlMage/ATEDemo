@@ -44,14 +44,6 @@ const NAV = [
     match: (p) => p === '/execute' || p === '/'
   },
   {
-    to: '/tps/create',
-    icon: '✎',
-    name: 'TPS 创建',
-    desc: '文本编辑 · 压缩包导入',
-    code: 'TPS',
-    match: (p) => p.startsWith('/tps/create')
-  },
-  {
     to: '/equipment',
     icon: '⚙',
     name: '装备属性配置',
@@ -74,20 +66,6 @@ const NAV = [
     desc: '历史记录查询',
     code: 'REC',
     match: (p) => p.startsWith('/records')
-  },
-  {
-    to: '/metadata/tree',
-    icon: '◈',
-    name: '元数据管理',
-    desc: '装备树 · 测试台BOM',
-    code: 'MDA',
-    match: (p) => p.startsWith('/metadata'),
-    // 下挂三个子页面: 装备树管理 / 测试台BOM管理 / 机器常数模型
-    children: [
-      { to: '/metadata/tree', name: '装备树管理', short: '装备树', code: 'TREE', match: (p) => p === '/metadata/tree' || p === '/metadata' },
-      { to: '/metadata/bom', name: '测试台BOM管理', short: '测试台BOM', code: 'BOM', match: (p) => p.startsWith('/metadata/bom') },
-      { to: '/metadata/constants', name: '机器常数模型', short: '常数模型', code: 'CST', match: (p) => p.startsWith('/metadata/constants') }
-    ]
   },
   {
     to: '/settings',

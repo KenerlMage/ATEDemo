@@ -69,6 +69,7 @@ WEB_ENABLED = bool(str(WEB_DIR)) and WEB_DIR.is_dir() and (WEB_DIR / "index.html
 
 # 远端 TPS 源 (环境变量 ATE_REMOTE_TPS_URL 可覆盖; 在线时优先拉取, 离线回退本地)
 REMOTE_TPS_URL = os.environ.get("ATE_REMOTE_TPS_URL", "http://127.0.0.1:8999").rstrip("/")
+import tps_source  # TPS 事实源在 ATE Controller：只读 + 本地缓存
 REMOTE_TIMEOUT = 2.0  # 秒
 
 app = FastAPI(title="ATE 自动测试装备", description="FastAPI + pytest 自动测试执行服务", version="1.0.0")
@@ -634,6 +635,21 @@ def _fetch_remote_tps_detail(tps_id: str) -> dict | None:
     return data["tps"]
 
 
+def _materialize_tps(tps_id: str) -> None:
+    """把 Controller 上的 TPS 附带文件同步为本地运行副本（失败不阻断读取）"""
+    if tps_source.SOURCE == "local":
+        return
+    target = TPS_DIR / tps_id
+    if target.is_dir():
+        return
+    try:
+        result = tps_source.sync_files(tps_id, target)
+        if not result.get("ok"):
+            print(f"[tps] 同步 {tps_id} 失败: {result.get('error')}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[tps] 同步 {tps_id} 异常: {exc}")
+
+
 def _load_tps_files() -> list[Path]:
     """扫描 TPS 定义: testresource/*.json(v1 单文件) + testresource/<目录>/tps.json(v2 包)"""
     if not TPS_DIR.exists():
@@ -685,10 +701,21 @@ def _tps_summary(tps: dict) -> dict:
 
 @app.get("/api/tps")
 def list_tps():
-    """获取 TPS 列表: 在线时从远端服务器拉取; 离线时回退本地默认 TPS 并标记 source"""
-    remote = _fetch_remote_tps_list()
-    if remote is not None:
-        return {"success": True, "count": len(remote), "tps": remote, "source": "remote", "remote_ok": True}
+    """TPS 列表: 事实源在 ATE Controller; 不可达时用本地缓存, 再退本地 testresource"""
+    if tps_source.SOURCE != "local":
+        fetched = tps_source.list_tps()
+        if fetched["items"]:
+            return {
+                "success": True,
+                "count": len(fetched["items"]),
+                "tps": fetched["items"],
+                "source": fetched["source"],
+                "remote_ok": fetched["remote_ok"],
+                "remote_error": fetched["error"],
+                "controller": fetched.get("controller", tps_source.CONTROLLER_URL),
+            }
+        remote_error = fetched["error"]
+
     tps_list = []
     for path in _load_tps_files():
         tps = _read_tps(path)
@@ -700,7 +727,8 @@ def list_tps():
         "tps": tps_list,
         "source": "local",
         "remote_ok": False,
-        "remote_error": f"远端 TPS 服务器不可达: {REMOTE_TPS_URL}（已回退本地默认 TPS）",
+        "remote_error": remote_error if tps_source.SOURCE != "local" else "",
+        "controller": tps_source.CONTROLLER_URL,
     }
 
 
@@ -718,10 +746,10 @@ def get_tps_by_uut(uut: str):
     if not row:
         return {"success": False, "message": f"未找到 UUT {uut} 的测试记录", "tps": None}
     tps_id = row["tps_id"]
-    # 优先远端, 回退本地
-    remote = _fetch_remote_tps_detail(tps_id)
-    if remote is not None:
-        return {"success": True, "tps": remote, "source": "remote"}
+    fetched = tps_source.get_tps(tps_id)
+    if fetched["tps"]:
+        _materialize_tps(tps_id)
+        return {"success": True, "tps": fetched["tps"], "source": fetched["source"], "remote_error": fetched["error"]}
     for path in _load_tps_files():
         tps = _read_tps(path)
         if tps and tps["id"] == tps_id:
@@ -731,10 +759,17 @@ def get_tps_by_uut(uut: str):
 
 @app.get("/api/tps/{tps_id}")
 def get_tps(tps_id: str):
-    # 优先远端, 离线回退本地
-    remote = _fetch_remote_tps_detail(tps_id)
-    if remote is not None:
-        return {"success": True, "tps": remote, "source": "remote"}
+    """TPS 详情: 事实源在 ATE Controller; 不可达时用缓存, 再退本地 testresource"""
+    if tps_source.SOURCE != "local":
+        fetched = tps_source.get_tps(tps_id)
+        if fetched["tps"]:
+            _materialize_tps(tps_id)
+            return {
+                "success": True,
+                "tps": fetched["tps"],
+                "source": fetched["source"],
+                "remote_error": fetched["error"],
+            }
     for path in _load_tps_files():
         tps = _read_tps(path)
         if tps and tps["id"] == tps_id:
@@ -742,49 +777,35 @@ def get_tps(tps_id: str):
     return {"success": False, "message": f"TPS 不存在: {tps_id}"}
 
 
+@app.get("/api/tps-source")
+def tps_source_status():
+    """TPS 源状态: Controller 地址、缓存条目与最近拉取时间"""
+    return {"success": True, **tps_source.status()}
+
+
+@app.post("/api/tps/{tps_id}/sync")
+def sync_tps_files(tps_id: str):
+    """把 Controller 上该 TPS 的附带文件同步为本地运行副本"""
+    if tps_source.SOURCE == "local":
+        return {"success": False, "message": "当前为本地模式（ATE_TPS_SOURCE=local），不执行同步"}
+    target = TPS_DIR / tps_id
+    result = tps_source.sync_files(tps_id, target)
+    return {"success": result["ok"], "synced": result["synced"], "message": result["error"] or "已同步", "target": str(target)}
+
+
 class TpsImportRequest(BaseModel):
-    name: str = ""        # 原始文件名 (仅用于提示)
-    content: str           # TPS JSON 文本内容
+    name: str = ""
+    content: str
 
 
 @app.post("/api/tps/import")
 def import_tps(req: TpsImportRequest):
-    """导入 TPS: 校验 JSON 结构与必填字段, 保存到 testresource 目录立即生效"""
-    try:
-        data = json.loads(req.content)
-    except Exception:
-        return {"success": False, "message": "TPS 文件不是有效的 JSON 格式"}
-    if not isinstance(data, dict):
-        return {"success": False, "message": "TPS 必须是 JSON 对象"}
-    tps_id = str(data.get("id", "")).strip()
-    if not tps_id:
-        return {"success": False, "message": "TPS 缺少必填字段: id"}
-    if not re.match(r"^[A-Za-z0-9_\-]{1,64}$", tps_id):
-        return {"success": False, "message": "TPS id 只能包含英文、数字、下划线、短横线 (1-64 位)"}
-    if tps_runtime.is_v2(data):
-        # TPS v2 包(含 cmd_suit): 落成 testresource/<id>/tps.json, 用例实现放 <id>/testcase/
-        return tps_runtime.import_v2(json.dumps(data, ensure_ascii=False), TPS_DIR)
-    steps = data.get("steps")
-    if not isinstance(steps, list) or not steps:
-        return {"success": False, "message": "TPS 缺少有效字段: steps (非空数组)"}
-    for i, step in enumerate(steps, 1):
-        if not isinstance(step, dict) or not step.get("name"):
-            return {"success": False, "message": f"steps[{i}] 缺少 name 字段"}
-        stype = step.get("type", "test")
-        if stype not in ("init", "test", "teardown"):
-            return {"success": False, "message": f"steps[{i}] type 必须是 init/test/teardown"}
-        if stype == "test" and not step.get("testcase_id"):
-            return {"success": False, "message": f"steps[{i}] (test) 缺少 testcase_id"}
-        if stype != "test" and not step.get("script"):
-            return {"success": False, "message": f"steps[{i}] ({stype}) 缺少 script"}
-    # 去重: 已存在同 id 则覆盖
-    data.setdefault("name", tps_id)
-    data.setdefault("version", "1.0.0")
-    data.setdefault("project", "导入项目")
-    data.setdefault("dut", "导入 DUT")
-    target = TPS_DIR / f"{tps_id}.json"
-    target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"success": True, "message": f"TPS 导入成功: {tps_id}（已加入装备树）", "tps": _tps_summary(data)}
+    """TPS 编辑已迁移到 ATE Controller 控制台，Runner 只读"""
+    return {
+        "success": False,
+        "code": "moved_to_controller",
+        "message": f"TPS 导入已迁移到 ATE Controller 控制台（{tps_source.CONTROLLER_URL}/ui）",
+    }
 
 
 class TpsZipImportRequest(BaseModel):
@@ -795,171 +816,13 @@ class TpsZipImportRequest(BaseModel):
 
 @app.post("/api/tps/import/zip")
 def import_tps_zip(req: TpsZipImportRequest):
-    """压缩包导入 TPS：包内 tps.json + testcase/ (+ resource/) 解包到 TPS 目录。
+    """TPS 编辑已迁移到 ATE Controller 控制台，Runner 只读"""
+    return {
+        "success": False,
+        "code": "moved_to_controller",
+        "message": f"TPS 导入已迁移到 ATE Controller 控制台（{tps_source.CONTROLLER_URL}/ui）",
+    }
 
-    * 支持单层根目录（zip 自带一层文件夹）与直接放文件两种打包方式；
-    * v2 包 -> <TPS目录>/<id>/，v1 单文件清单 -> <TPS目录>/<id>.json；
-    * 拒绝路径穿越、绝对路径、超大文件；同名 TPS 需 overwrite=true 才覆盖。
-    """
-    import base64
-    import io
-    import shutil
-    import tempfile
-    import zipfile
-
-    try:
-        raw = base64.b64decode(req.content_base64 or "")
-    except Exception:
-        return {"success": False, "message": "压缩包内容不是有效的 base64"}
-    if not raw:
-        return {"success": False, "message": "压缩包内容为空"}
-    if len(raw) > 64 * 1024 * 1024:
-        return {"success": False, "message": "压缩包超过 64 MB，请拆分后导入"}
-
-    tmp = Path(tempfile.mkdtemp(prefix="tps_zip_"))
-    try:
-        try:
-            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-                names = [n for n in zf.namelist() if not n.endswith("/")]
-                if len(names) > 4000:
-                    return {"success": False, "message": "压缩包文件数超过 4000，请检查打包内容"}
-                total = sum(zf.getinfo(n).file_size for n in names)
-                if total > 200 * 1024 * 1024:
-                    return {"success": False, "message": "解压后超过 200 MB，请检查打包内容"}
-                for n in names:
-                    pure = Path(n.replace("\\", "/"))
-                    if pure.is_absolute() or ".." in pure.parts:
-                        return {"success": False, "message": f"压缩包内含非法路径: {n}"}
-                zf.extractall(tmp)
-        except zipfile.BadZipFile:
-            return {"success": False, "message": "文件不是有效的 ZIP 压缩包"}
-
-        # 定位 tps.json（根目录或唯一一层子目录）
-        cand = list(tmp.glob("tps.json")) + list(tmp.glob("*/tps.json"))
-        if not cand:
-            return {"success": False, "message": "压缩包内未找到 tps.json（TPS 清单）"}
-        manifest_path = cand[0]
-        root = manifest_path.parent
-        try:
-            data = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
-        except Exception as exc:
-            return {"success": False, "message": f"tps.json 不是有效 JSON: {exc}"}
-        if not isinstance(data, dict):
-            return {"success": False, "message": "tps.json 必须是 JSON 对象"}
-        tps_id = str(data.get("id", "")).strip()
-        if not tps_id or not re.match(r"^[A-Za-z0-9_\-]{1,64}$", tps_id):
-            return {"success": False, "message": "tps.json 的 id 非法（英文/数字/下划线/短横线，1-64 位）"}
-
-        v2 = tps_runtime.is_v2(data)
-        target_dir = TPS_DIR / tps_id
-        target_single = TPS_DIR / f"{tps_id}.json"
-        if not req.overwrite and (target_dir.exists() or target_single.exists()):
-            return {"success": False, "message": f"TPS 已存在: {tps_id}（勾选覆盖后可重新导入）"}
-
-        if v2:
-            errors = tps_runtime.validate_v2(data)
-            if errors:
-                return {"success": False, "message": "校验未通过: " + "；".join(errors), "errors": errors}
-            if target_single.exists():
-                target_single.unlink()
-            if target_dir.exists():
-                shutil.rmtree(target_dir)
-            shutil.copytree(root, target_dir)
-            for junk in target_dir.rglob("__pycache__"):
-                shutil.rmtree(junk, ignore_errors=True)
-            if not (target_dir / "testcase").exists():
-                (target_dir / "testcase").mkdir(parents=True, exist_ok=True)
-                (target_dir / "testcase" / "__init__.py").write_text(
-                    '"""TPS 用例实现包"""\n', encoding="utf-8")
-            tps = tps_runtime.normalize_tps(data, target_dir)
-            files = len([p for p in target_dir.rglob("*") if p.is_file()])
-            return {
-                "success": True,
-                "message": f"压缩包导入成功: {tps_id}（{files} 个文件已解包）",
-                "tps": tps_runtime.summary_tps(tps),
-                "kind": "v2",
-                "path": str(target_dir),
-            }
-
-        steps = data.get("steps")
-        if not isinstance(steps, list) or not steps:
-            return {"success": False, "message": "tps.json 既不是 v2 清单（缺 cmd_suit），也没有 steps"}
-        for i, step in enumerate(steps, 1):
-            if not isinstance(step, dict) or not step.get("name"):
-                return {"success": False, "message": f"steps[{i}] 缺少 name 字段"}
-            stype = step.get("type", "test")
-            if stype not in ("init", "test", "teardown"):
-                return {"success": False, "message": f"steps[{i}] type 必须是 init/test/teardown"}
-            if stype == "test" and not step.get("testcase_id"):
-                return {"success": False, "message": f"steps[{i}] (test) 缺少 testcase_id"}
-            if stype != "test" and not step.get("script"):
-                return {"success": False, "message": f"steps[{i}] ({stype}) 缺少 script"}
-        data.setdefault("name", tps_id)
-        data.setdefault("version", "1.0.0")
-        data.setdefault("project", "导入项目")
-        data.setdefault("dut", "导入 DUT")
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        target_single.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        return {
-            "success": True,
-            "message": f"压缩包导入成功: {tps_id}（v1 单文件清单）",
-            "tps": _tps_summary(data),
-            "kind": "v1",
-            "path": str(target_single),
-        }
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-TPS_TASKS: dict[str, dict] = {}
-TPS_TASKS_LOCK = threading.Lock()
-
-# 人工操作环节（cmd_suit 里 type=manual 的条目）与单步暂停：等待操作员在界面选择
-# 决定取值：next（继续）/ abort（中止本轮）/ cancel（取消本轮）/ timeout（无人应答，按中止处理）
-#   abort  = 操作员判定当前环节不通过，结束本轮
-#   cancel = 操作员主动放弃本轮（如装夹错误需重装），或由界面/接口发起取消
-# 两者的收尾路径一致（跳过剩余测试条目、照常执行收尾段），区别在语义与记录
-# 等待采用分段轮询（_WAIT_TICK_S），因此取消请求可在等待期间立即唤醒任务线程
-# 事件对象不进 task（task 会被 JSON 序列化返回给前端）
-MANUAL_WAITS: dict[str, threading.Event] = {}
-DEFAULT_MANUAL_TIMEOUT_S = 1800
-_WAIT_TICK_S = 1.0
-# 单步执行（cmd_suit 条目 step=true）：跑完一条后等操作员点「下一步」的最长等待
-DEFAULT_STEP_TIMEOUT_S = 1800
-
-
-class TpsRunRequest(BaseModel):
-    tps_id: str | None = None
-    uut: str = ""
-    bench_id: str = ""            # 指定测试台（不填则按 TPS 清单 bench 自动匹配）
-    mode: str = "simulate"        # 设备连接: simulate(默认, 不连设备) | real(真机)
-    run_mode: str = "debug"       # 运行档位: debug(调试, 免工单) | production(生产, 需工单+上报云端)
-    work_order: str = ""          # 生产模式工单号(12 位)；调试模式留空
-
-
-def _decode_output(data: bytes) -> str:
-    """子进程输出智能解码: 逐行优先 UTF-8 严格解码, 失败回退 GBK (Windows 中文环境常见)
-
-    之前用 encoding='utf-8', errors='replace' 会把 GBK 字节流硬按 UTF-8 解码,
-    无效字节被替换成 U+FFFD (乱码) 且信息丢失无法恢复; 改为逐行尝试解码,
-    兼容脚本以 UTF-8 / GBK 混合输出的情况。
-    """
-    if not data:
-        return ""
-    out_lines = []
-    for raw_line in data.splitlines(keepends=True):
-        line = raw_line
-        for enc in ("utf-8", "gbk"):
-            try:
-                line = raw_line.decode(enc)
-                break
-            except (UnicodeDecodeError, LookupError):
-                continue
-        else:
-            line = raw_line.decode("utf-8", errors="replace")
-        out_lines.append(line)
-    return "".join(out_lines)
 
 
 # ==================== 测试日志等级（warning / info / error） ====================
@@ -2249,7 +2112,8 @@ import metadata_registry  # noqa: E402
 import machine_constants  # noqa: E402
 machine_constants.register_routes(app, BASE_DIR, TPS_DIR, ate_db.DB_PATH)
 
-metadata_registry.register_routes(app, BASE_DIR, TPS_DIR)
+# 元数据（装备树 / BOM / 预设）已迁到 ATE Controller：/api/metadata（Controller 提供）
+# Runner 侧不再挂载 metadata_registry，保留模块文件仅作历史参考
 
 
 # ==================== 装备助手 (仪器控制工具, 独立模块) ====================
