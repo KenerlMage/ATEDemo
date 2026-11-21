@@ -2145,8 +2145,119 @@ def _on_startup_constants():
 
     threading.Thread(target=_startup_constants_sync, daemon=True).start()
 
-# 元数据（装备树 / BOM / 预设）已迁到 ATE Controller：/api/metadata（Controller 提供）
-# Runner 侧不再挂载 metadata_registry，保留模块文件仅作历史参考
+# ==================== 元数据源 (只读转发 MockController) ====================
+# 装备树 / 测试台类型 / BOM 的事实源在 MockController（编辑在 /ui 控制台），Runner 侧只读：
+# 转发 Controller 的 JSON 并带本地缓存与离线兜底，写操作一律返回 moved_to_controller。
+# 接口: GET  /api/metadata/tree | /overview | /store | /source
+#            /api/metadata/presets/{id} | /api/metadata/presets/{id}/bom
+#            /api/metadata/device-catalog | /api/metadata/device-templates
+#       POST/PUT/PATCH/DELETE /api/metadata/*  -> moved_to_controller
+# Runner 侧不再挂载 metadata_registry，保留模块文件仅作历史参考（testbench_registry 仍读它取预设）。
+import metadata_source  # noqa: E402
+
+METADATA_MOVED_MESSAGE = "元数据编辑已迁移到 MockController 控制台（/ui）"
+
+
+def _metadata_body(fetched: dict) -> dict:
+    """原样透传 Controller 的 JSON，仅在外层补 source / error / controller_url"""
+    data = fetched.get("data")
+    if not isinstance(data, dict):
+        return {
+            "success": False,
+            "source": fetched["source"],
+            "error": fetched["error"],
+            "controller_url": metadata_source.CONTROLLER_URL,
+        }
+    body = dict(data)
+    body["source"] = fetched["source"]
+    body["error"] = fetched["error"]
+    body["controller_url"] = metadata_source.CONTROLLER_URL
+    return body
+
+
+def _metadata_tree(payload: dict) -> list[dict]:
+    """装备树节点: 在 Controller 结构上补齐注册页读取的 presets 字段（Controller 侧键名为 preset_types）"""
+    nodes = payload.get("tree") if isinstance(payload, dict) else None
+    if not isinstance(nodes, list):
+        return []
+    tree: list[dict] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        branches: list[dict] = []
+        for sub in node.get("subsystems") or []:
+            if not isinstance(sub, dict):
+                continue
+            presets = sub.get("preset_types")
+            if not isinstance(presets, list):
+                presets = sub.get("presets") if isinstance(sub.get("presets"), list) else []
+            branch = dict(sub)
+            branch["presets"] = presets          # 注册页按 presets 读取
+            branch["preset_types"] = presets     # 元数据管理页仍按 preset_types 读取
+            branches.append(branch)
+        item = dict(node)
+        item["subsystems"] = branches
+        tree.append(item)
+    return tree
+
+
+@app.get("/api/metadata/tree")
+def metadata_tree():
+    """装备树: 产品 -> 子系统 -> 预设测试台类型 (只读转发 MockController)"""
+    fetched = metadata_source.tree()
+    body = _metadata_body(fetched)
+    body["tree"] = _metadata_tree(fetched.get("data") or {})
+    # 接口本身可用即 success=true; 数据是否可信由 source 表达（none 时 tree 为空）
+    body["success"] = True
+    return body
+
+
+@app.get("/api/metadata/overview")
+def metadata_overview():
+    """元数据概览 (只读转发 MockController)"""
+    return _metadata_body(metadata_source.overview())
+
+
+@app.get("/api/metadata/store")
+def metadata_store():
+    """tree.json 原始内容 (只读转发 MockController)"""
+    return _metadata_body(metadata_source.store())
+
+
+@app.get("/api/metadata/source")
+def metadata_source_status():
+    """元数据源状态: Controller 地址 / 缓存目录 / 最近一次装备树缓存时间与产品数"""
+    return {"success": True, **metadata_source.status()}
+
+
+@app.get("/api/metadata/presets/{preset_id}")
+def metadata_preset_detail(preset_id: str):
+    """测试台类型详情 (只读转发 MockController)"""
+    return _metadata_body(metadata_source.preset(preset_id))
+
+
+@app.get("/api/metadata/presets/{preset_id}/bom")
+def metadata_preset_bom(preset_id: str):
+    """测试台类型 BOM (只读转发 MockController)"""
+    return _metadata_body(metadata_source.bom(preset_id))
+
+
+@app.get("/api/metadata/device-catalog")
+def metadata_device_catalog():
+    """可复用设备模板库 (只读转发 MockController)"""
+    return _metadata_body(metadata_source.device_catalog())
+
+
+@app.get("/api/metadata/device-templates")
+def metadata_device_templates():
+    """Controller 同批新开发接口; 尚未提供时返回 success=false（不抛 500）"""
+    return _metadata_body(metadata_source.device_templates())
+
+
+@app.api_route("/api/metadata/{path:path}", methods=["POST", "PUT", "PATCH", "DELETE"])
+def metadata_write_moved(path: str = ""):
+    """元数据写操作已迁到 MockController 控制台"""
+    return {"success": False, "code": "moved_to_controller", "message": METADATA_MOVED_MESSAGE}
 
 
 # ==================== 装备助手 (仪器控制工具, 独立模块) ====================

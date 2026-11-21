@@ -100,6 +100,7 @@ backend/runtime_wheels/
 
 # ---- TPS 缓存（Controller 为事实源，缓存不入库）----
 backend/tps_cache/
+backend/metadata_cache/
 
 # ---- 助手货架缓存（清单来源为 MockController，缓存不入库）----
 **/assistant_shelf/cache/

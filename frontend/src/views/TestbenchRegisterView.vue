@@ -28,6 +28,16 @@ const error = ref('')
 const busy = ref(false)
 const tip = ref('')
 const tipErr = ref(false)
+// 元数据来源 (装备树/BOM 事实源在 MockController): controller | cache | none
+const metaSource = ref('')
+const metaError = ref('')
+const metaController = ref('')
+const SOURCE_TEXT = {
+  controller: 'MockController 下发',
+  cache: '本地缓存（Controller 不可达）',
+  none: '不可用（请检查 Controller）'
+}
+const sourceText = computed(() => SOURCE_TEXT[metaSource.value] || '未知来源')
 
 const step = ref(1)
 const stepErr = ref([])
@@ -68,6 +78,11 @@ const typeLabel = (key) => {
 function isNet(d) { return NET.includes((d.interface || '').toUpperCase()) }
 function isSer(d) { return SER.includes((d.interface || '').toUpperCase()) }
 
+// BOM 三要素: 别名 / 设备类型 / 资源描述符 (旧数据用 name / category / default_address / address 兜底)
+function bomAlias(d) { return d.alias || d.name || '—' }
+function bomDeviceType(d) { return d.device_type || d.category || '—' }
+function bomResource(d) { return d.resource || d.default_address || d.address || '—' }
+
 function isConfigured(d) {
   if (isNet(d)) return !!String(d.host || '').trim() && !!d.port
   if (isSer(d)) return !!String(d.serial_port || '').trim()
@@ -103,9 +118,12 @@ async function loadTree() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.getTestbenchTree()
+    const res = await api.getMetadataTree()
     if (!res.success) throw new Error(res.message || '读取预设测试台类型失败')
     tree.value = res.tree || []
+    metaSource.value = res.source || 'none'
+    metaError.value = res.error || ''
+    metaController.value = res.controller_url || ''
   } catch (e) {
     error.value = `无法连接后端：${e.message}`
   } finally {
@@ -161,10 +179,10 @@ async function onPresetChange() {
   stepErr.value = []
   if (!id) return
   try {
-    const res = await api.getTestbenchPreset(id)
+    const res = await api.getMetadataPreset(id)
     if (!res.success) throw new Error(res.message || '读取预设详情失败')
     presetInfo.value = res.preset
-    bom.value = res.preset.bom || []
+    bom.value = res.preset.bom || res.bom || []
     devices.value = buildDevices(bom.value)
     tip.value = `已获取「${res.preset.name}」标准 BOM：${bom.value.length} 台设备，其中可编程 ${devices.value.filter((d) => d.programmable).length} 台`
     tipErr.value = false
@@ -193,10 +211,10 @@ async function loadForEdit(id) {
     const loc = locatePreset(tb.preset_id)
     productId.value = loc ? loc.product : ''
     subsystemId.value = loc ? loc.subsystem : ''
-    const p = await api.getTestbenchPreset(tb.preset_id)
+    const p = await api.getMetadataPreset(tb.preset_id)
     if (p.success) {
       presetInfo.value = p.preset
-      bom.value = p.preset.bom || []
+      bom.value = p.preset.bom || p.bom || []
     }
     tip.value = `编辑模式：正在修改「${tb.title}」的设备配置`
   } catch (e) {
@@ -393,6 +411,12 @@ onMounted(async () => {
         <router-link to="/testbenches" class="btn ghost">返回测试台导航</router-link>
       </div>
 
+      <div v-if="metaSource" class="source-row">
+        <span class="source-chip" :class="'src-' + metaSource">{{ sourceText }}</span>
+        <span class="source-url mono">{{ metaController }}</span>
+      </div>
+      <div v-if="metaError" class="source-err">{{ metaError }}</div>
+
       <div class="stepper">
         <div v-for="s in STEPS" :key="s.n" class="step" :class="{ active: step === s.n, done: step > s.n }">
           <span class="step-marker">{{ step > s.n ? '✓' : s.n }}</span>
@@ -484,18 +508,21 @@ onMounted(async () => {
           <div class="table-wrap">
             <table class="tbr-table">
               <thead>
-                <tr><th>#</th><th>设备</th><th>型号 / 厂商</th><th>接口</th><th>设备类型</th><th>用途</th><th>程控</th><th>BOM 默认配置</th></tr>
+                <tr><th>#</th><th>设备</th><th>别名</th><th>型号 / 厂商</th><th>接口</th><th>类型名称</th><th>设备类型</th><th>资源描述符</th><th>用途</th><th>程控</th><th>BOM 默认配置</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(d, i) in bom" :key="d.id">
                   <td class="td-muted">{{ i + 1 }}</td>
                   <td class="td-name">{{ d.name }}</td>
+                  <td class="mono">{{ bomAlias(d) }}</td>
                   <td>
                     <div>{{ d.model || '—' }}</div>
                     <div class="td-muted">{{ d.vendor || '—' }}</div>
                   </td>
                   <td><span class="iface">{{ (d.interface || 'NONE').toUpperCase() }}</span></td>
                   <td class="td-muted">{{ typeLabel(d.device_type) }}</td>
+                  <td class="td-muted mono">{{ bomDeviceType(d) }}</td>
+                  <td class="td-muted mono">{{ bomResource(d) }}</td>
                   <td class="td-muted">{{ d.role || '—' }}</td>
                   <td>
                     <span class="badge" :class="d.programmable ? 'accent' : 'idle'">{{ d.programmable ? '可编程' : '手动' }}</span>
@@ -739,6 +766,15 @@ onMounted(async () => {
 .sub-title { font-size: 13.5px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sub-note { color: var(--muted); font-weight: 400; font-size: 12px; }
 
+/* ---- 元数据来源 chip ---- */
+.source-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.source-chip { padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--border); color: var(--muted); background: var(--panel-2); }
+.source-chip.src-controller { color: var(--ok); border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.1); }
+.source-chip.src-cache { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.1); }
+.source-chip.src-none { color: var(--err); border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.1); }
+.source-url { color: var(--muted); font-size: 11.5px; }
+.source-err { color: var(--err); font-size: 12px; padding: 7px 11px; border-radius: 8px; background: rgba(248, 113, 113, 0.08); border: 1px solid rgba(248, 113, 113, 0.3); }
+
 /* ---- 步骤条 ---- */
 .stepper { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
 .step {
@@ -834,7 +870,7 @@ onMounted(async () => {
 
 /* ---- 表格 ---- */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-.tbr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 780px; }
+.tbr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1040px; }
 .tbr-table th { text-align: left; padding: 9px 12px; color: var(--muted); font-size: 12px; font-weight: 600; background: var(--panel-2); border-bottom: 1px solid var(--border); white-space: nowrap; }
 .tbr-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .tbr-table tr:last-child td { border-bottom: none; }
