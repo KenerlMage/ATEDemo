@@ -104,3 +104,7 @@ backend/metadata_cache/
 
 # ---- åŠ©æ‰‹è´§æ¶ç¼“å­˜ï¼ˆæ¸…å•æ¥æºä¸º MockControllerï¼Œç¼“å­˜ä¸å…¥åº“ï¼‰----
 **/assistant_shelf/cache/
+
+# ---- Controller Îï»¯ÏÂÀ´µÄ TPS ÔËĞĞ¸±±¾£¨ÔËĞĞÊ±Éú³É£©----
+backend/testresource/*-tps*/
+
