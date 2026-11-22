@@ -2,7 +2,7 @@
 
 > 适用：MockController + MockRunner 部署在**无外网**的测试台小网环境。
 > 对应需求：`docs/需求设计/controller/软件部署功能.md` 的 SR03（Controller 供给）与 SR04（Runner 执行）。
-> 版本：v1.0　2026-11-08
+> 版本：v1.1　2026-11-08（锁文件改为 Controller 扫描用例自动生成）
 
 ## 1. 结论
 
@@ -13,13 +13,15 @@
 ② Controller 离线 wheel 仓              （所有三方包的唯一来源）
 ③ 子系统只读基础环境                     （numpy/scipy 等重包，站点注册时预取）
 ④ TPS 锁哈希叠加环境                     （只装差异包，只读、可多版本并存）
+⑤ Controller 自动生成锁文件               （扫描用例 import，作者不写依赖清单）
 ```
 
-三条不可妥协的规则：
+四条不可妥协的规则：
 
 1. **环境键 = TPS 编号 + 锁文件哈希**。锁不变不重建；同一 TPS 的多个哈希并存，回滚就是切换键。
 2. **不"随用随清"**。保留最近 2 个环境 + 全局磁盘上限 + LRU；正在运行的环境不回收。清空等于放弃复现与回滚。
 3. **Runner SDK 不装进环境**。`ate_dm` / `ate_drivers` / `ate_rt` 由 Runner 以路径注入，锁文件只声明兼容版本范围；Runner 升级不会破坏三方环境。
+4. **锁文件不许手写**。Controller 扫描 TPS 内 Python 文件的 import 自动生成；作者只写业务代码，不看依赖清单。
 
 ## 2. 为什么否决另外三种做法
 
@@ -44,7 +46,7 @@ software/python/
 │       ├── env.zip              # 只读基础环境（venv 目录打包）
 │       └── manifest.json        # 包清单、哈希、Python/平台标签
 └── locks/
-    └── <tpsId>/<lockHash>.json  # 发布时固化的锁副本（便于追溯）
+    └── <tpsId>/<lockHash>.json  # Controller 自动生成后固化的副本（便于追溯）
 ```
 
 - 目录层级固定为 `wheels/<name>/<version>/<pythonTag>-<platformTag>/`，同名多版本自然并存。
@@ -66,7 +68,7 @@ envs/
 
 ## 4. 锁文件 `python.lock`
 
-放在 TPS 包根目录，与 `tps.json` 同级。JSON 便于 Controller 校验与 diff。
+放在 TPS 包根目录，与 `tps.json` 同级。**由 Controller 在发布流程内自动生成，作者不创建、不编辑**；人工改过的文件在下次发布时会被重算覆盖。
 
 ```json
 {
@@ -108,7 +110,73 @@ envs/
 | `packages[].sha256` | 是 | 与 Controller 仓内文件一致，安装前逐个校验 |
 | `packages[].wheel` | 是 | 相对 `wheels/` 的路径，避免同名文件歧义 |
 
-**哈希怎么来**：归档时由 Controller 计算并回填，作者不要手填。`python.lock` 生成命令见第 8 节。
+### 4.1 生成流程
+
+```
+上传 TPS zip
+  → 解包，定位包内全部 .py
+  → AST 解析 import / from ... import
+  → 分类：标准库 / Runner SDK / 包内模块 / 三方模块
+  → 三方模块反查发行包（离线仓 top_level.txt、RECORD）
+  → 选版（基础环境优先，仓内最新兼容版次之）
+  → 传递闭包（wheel METADATA 的 Requires-Dist，过滤环境标记）
+  → 冲突、缺包、平台不符则发布失败
+  → 写 python.lock 并封存进 TPS
+```
+
+生成在发布动作内完成，没有单独的"生成锁文件"按钮；用户看到的只是"发布成功"。
+
+### 4.2 模块 → 发行包反查
+
+import 名与发行包名经常不一致（`cv2` → `opencv-python`、`yaml` → `PyYAML`、`sklearn` → `scikit-learn`），不能靠猜。Controller 在登记 wheel 时解析：
+
+1. `.dist-info/top_level.txt`（首选）；
+2. `.dist-info/RECORD` 中的顶层目录；
+3. `.dist-info/METADATA` 的 `Name` 作为发行包名。
+
+据此建立 `import 名 → (发行包, 版本)` 索引；同一 import 名被多个发行包占用时，发布直接报歧义，要求上传方确认。
+
+### 4.3 选版规则
+
+| 优先级 | 规则 |
+| --- | --- |
+| 1 | 子系统基础环境已含该包 → 用基础环境版本，不重复装 |
+| 2 | 否则取离线仓内满足 Python/平台标签的最新版 |
+| 3 | 传递依赖按上述同样规则逐个选版，已选定的版本不再被后续依赖改写 |
+| 4 | 两个直接依赖对同一包提出互斥范围 → 发布失败，列出两条依赖链 |
+
+不做"自动升降级兜底"：解不出来就失败，把问题留在发布阶段。
+
+### 4.4 动态导入与人工补充
+
+`__import__("cv2")`、`importlib.import_module(name)` 无法静态确定，扫描只能记告警。此时允许在 TPS 包根放一个可选的 `python.extra.txt`：
+
+```
+# 一行一个 import 名，不写版本
+cv2
+serial
+```
+
+Controller 把它并入扫描结果后照常选版；**仍然不接受版本号**，版本一律由 Controller 决定。
+
+### 4.5 生成记录
+
+每次发布保存一份 `generation.json`（不进 TPS 包，存在 Controller 侧）：
+
+```json
+{
+  "scanned_files": 14,
+  "imports": ["numpy", "cv2", "serial"],
+  "resolved": [
+    { "module": "cv2", "package": "opencv-python", "version": "4.10.0.84", "reason": "repo-latest" },
+    { "module": "numpy", "package": "numpy", "version": "2.1.3", "reason": "base-env" }
+  ],
+  "warnings": ["dynamic import in testcase/impl.py:42"],
+  "generated_at": "2026-11-08T10:00:00+08:00"
+}
+```
+
+用于回答"为什么装了这个版本"，也用于对比两次发布的环境差异。
 
 ## 5. Controller 侧职责
 
@@ -137,7 +205,7 @@ Compress-Archive -Path build\base-1000-A-SPM\* -DestinationPath dist\base-cp313-
 
 ### 5.3 发布校验
 
-TPS 发布时对 `python.lock` 逐项检查：
+TPS 发布时先**自动重算** `python.lock`（忽略包内旧文件），再逐项检查：
 
 1. `python` / `platform` 与目标站点一致；
 2. 每个 `packages[].wheel` 在仓内存在且 sha256 相同；
@@ -210,18 +278,23 @@ set "PYTHONPATH=%ENV_ROOT%\venv\Lib\site-packages;%RUNNER_SDK%"
 
 ### 新增一个依赖
 
+用例里直接 `import numpy`，**不需要改任何依赖文件**：
+
 ```powershell
-# 1) 联网机上准备 wheel
+# 1) 联网机上准备 wheel（仅当仓里没有该包时）
 pip download numpy==2.1.3 --only-binary=:all: --platform win_amd64 --python-version 3.13 -d wheels\numpy
 # 2) 上传 Controller（或用归档助手的 python 子命令）
-# 3) TPS 里更新 python.lock，重新发布；Runner 首次执行自动构建叠加环境
+# 3) 重新发布 TPS：Controller 扫描 import、自动选版、生成锁文件
+# 4) Runner 首次执行按新锁构建叠加环境
 ```
+
+若包已登记，第 1、2 步可跳过——作者只提交代码。
 
 ### 回滚到上一版环境
 
 ```powershell
-# 锁文件改回旧内容（或从 git 取回），得到旧 lockHash
-# Runner 发现该环境已存在，直接复用，无需重新安装
+# 不用改锁文件：在 Controller 重新发布上一个版本的 TPS 包
+# 旧锁会随旧包一起重算，得到旧 lockHash；Runner 发现该环境已存在，直接复用
 ```
 
 ### 诊断
@@ -251,7 +324,7 @@ envs\tps\<id>\<hash>\venv\Scripts\python.exe -m pip list --format=freeze > actua
 
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
-| P0 | Controller wheel 登记 + 锁文件校验；Runner 手工命令建环境 | 断网机器能凭 wheel 装出一个可运行环境 |
+| P0 | Controller wheel 登记 + 扫描 import 自动生成锁文件；Runner 手工命令建环境 | 断网机器能凭 wheel 装出可运行环境，锁文件无需手写 |
 | P1 | 基础环境制品与站点注册预取；环境指纹与就绪检查 | 新站点注册后首件 TPS 无需等待下载 |
 | P2 | 叠加环境自动构建、LRU 回收、环境自检界面 | 同 TPS 两版锁文件可并存并切换回滚 |
 
@@ -271,6 +344,15 @@ P0 不依赖任何新界面，可以先用一份 `wheelhouse/` 目录 + 一条 `
 **Q：三方包需要编译（C 扩展）怎么办？**
 在联网的制作者机器上编译成 wheel 再登记。测试台不装编译器，也不允许联网拉源码。
 
+**Q：作者需要写 `python.lock` 或 requirements 吗？**
+不需要。锁文件由 Controller 扫描 import 自动生成，作者只写业务代码。`python.extra.txt` 只在动态导入无法识别时补充模块名，也不写版本。
+
+**Q：自动选版会不会把版本悄悄换掉？**
+不会。锁文件在发布时固化，未重新发布就不会变；重新发布时如果仓里出现新版，选版结果会变化，差异可在 `generation.json` 与两次锁文件对比中看到。需要固定版本时，把该版本放进子系统基础环境即可。
+
+**Q：扫描漏了包怎么办？**
+优先检查是否动态导入（告警会指出文件与行号）；用 `python.extra.txt` 补模块名后重发。若包本身没登记，发布会直接说缺哪个包与平台。
+
 **Q：Runner 自己升级了，TPS 环境要重建吗？**
 不需要。SDK 走路径注入，锁文件只约束范围；只有 SDK 不兼容时才需要改锁并重建。
 
@@ -287,9 +369,16 @@ P0 不依赖任何新界面，可以先用一份 `wheelhouse/` 目录 + 一条 `
 - [ ] TPS 代码看不到 Runner 的 site-packages，但能 import `ate_dm`
 - [ ] 回收后保留最近 2 个环境，正在运行的不被删
 - [ ] 环境构建失败保留目录与日志，可直接定位
+- [ ] 只有 import、没有依赖文件时也能生成正确锁文件
+- [ ] `cv2` / `yaml` / `sklearn` 能反查到正确发行包
+- [ ] 发布成功的界面不出现"编辑依赖 / 锁文件"入口
+- [ ] 动态导入给出文件与行号告警
 
 ## 13. 未决事项
 
 - 是否引入 `uv` 替代 pip 以缩短构建时间（需评估离线与哈希校验兼容性）。
 - 基础环境是否需要签名（当前只做 sha256 完整性，不做来源签名）。
 - 跨架构（win_amd64 / linux_x86_64）是否共用一份锁文件（当前按平台各一份）。
+- 动态导入（插件加载、配置驱动）无法完全静态识别，是否需要运行期探测补齐。
+- 只有 sdist 的包无法自动选版，当前要求先由制作者编译上传 wheel。
+- 用例条件导入（按平台分支）会同时收进锁文件，是否按目标平台裁剪待定。

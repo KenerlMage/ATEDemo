@@ -26,7 +26,7 @@ docs/需求设计/
 | 主题 | Controller 规范 | Runner 侧 |
 | --- | --- | --- |
 | 机器常数 | [机器常数功能模块](controller/机器常数功能模块.md)、[实现契约](controller/机器常数实现契约.md)、[实现说明](controller/机器常数实现说明.md) | [机器常数-Runner侧需求](runner/机器常数-Runner侧需求.md) |
-| 软件部署 | [软件部署功能](controller/软件部署功能.md)（含 3.7 Python 依赖形态方案对比） | [软件部署-Runner侧需求](runner/软件部署-Runner侧需求.md) |
+| 软件部署 | [软件部署功能](controller/软件部署功能.md)（含 3.7 Python 依赖形态方案对比与锁文件自动生成） | [软件部署-Runner侧需求](runner/软件部署-Runner侧需求.md) |
 
 ## 格式
 

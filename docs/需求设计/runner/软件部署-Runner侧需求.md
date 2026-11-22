@@ -7,7 +7,7 @@
 ## 一、范围
 
 本文件只收 Runner 执行侧需求：SR02 三类部署执行、SR04 Python 依赖环境执行。
-Controller 侧的归档、编排与离线仓见 `controller/软件部署功能.md`。
+Controller 侧的归档、编排、离线仓与锁文件自动生成见 `controller/软件部署功能.md`。
 
 ## 二、需求清单
 
