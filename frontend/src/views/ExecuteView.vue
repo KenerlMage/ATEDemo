@@ -337,6 +337,10 @@ const importingTps = ref(false)
 const tpsFileInput = ref(null)
 const tpsImportMsg = ref('')
 const tpsImportErr = ref('')
+const tpsImportHint = ref({ text: '', kind: 'ok' })   // 导入去向：Controller 全局可见 / 本机仅本机可见
+const tpsImportToast = ref({ text: '', note: '', kind: 'ok' })
+let tpsImportToastTimer = null
+const MAX_ZIP_BYTES = 64 * 1024 * 1024   // 前端上限：后端更大，这里先拦，避免浏览器读大包卡死
 
 async function loadTree() {
   loadingTree.value = true
@@ -387,6 +391,97 @@ function buildTreeFromTps(tpsList) {
   }))
 }
 
+function setImportHint(text, kind = 'ok') {
+  tpsImportHint.value = { text, kind }
+}
+
+function hideImportToast() {
+  if (tpsImportToastTimer) {
+    clearTimeout(tpsImportToastTimer)
+    tpsImportToastTimer = null
+  }
+  tpsImportToast.value = { text: '', note: '', kind: 'ok' }
+}
+
+function showImportToast(text, note = '', kind = 'ok') {
+  hideImportToast()
+  tpsImportToast.value = { text, note, kind }
+  tpsImportToastTimer = setTimeout(hideImportToast, 7000)
+}
+
+/** 导入去向探测：Controller 可达 -> 全局可见；否则本机兜底。404 或探测失败不出提示，不影响导入 */
+async function detectImportTarget() {
+  try {
+    const cap = await api.getTpsImportCapability()
+    if (!cap || cap.success === false) {
+      setImportHint('')
+      return
+    }
+    const online = cap.online === true || cap.mode === 'controller'
+    setImportHint(
+      online ? '将导入到 MockController（全局可见）' : 'Controller 不可达，将导入到本机（仅本机可见）',
+      online ? 'ok' : 'warn'
+    )
+  } catch (e) {
+    setImportHint('')
+  }
+}
+
+/** 失败提示优先用后端原文（message / detail），拿不到再退回 HTTP 错误文本 */
+function importFailureText(err, fallback = '导入失败') {
+  const payload = err && err.payload
+  const detail = payload && (payload.message || payload.detail)
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (detail) {
+    try {
+      return JSON.stringify(detail)
+    } catch {
+      /* 无法序列化时退回 err.message */
+    }
+  }
+  return (err && err.message) || fallback
+}
+
+/** 读 zip 为 base64（分块拼接，避免 64MB 包把 fromCharCode 参数撑爆） */
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result || new ArrayBuffer(0))
+      const chunk = 0x8000
+      let bin = ''
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk))
+      }
+      resolve(btoa(bin))
+    }
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+function formatFileSize(bytes) {
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  return Math.max(1, Math.round(bytes / 1024)) + ' KB'
+}
+
+/** 在装备树中定位新导入的 TPS：展开项目/DUT 并加载详情 */
+async function focusTps(id) {
+  for (const p of tree.value) {
+    for (const d of p.duts) {
+      if (d.tps.some((t) => t.id === id)) {
+        expandedProjects.value.add(p.name)
+        expandedDuts.value.add(d.name)
+        selectedTpsId.value = id
+        await loadTpsDetail(id)
+        return
+      }
+    }
+  }
+  selectedTpsId.value = id
+  await loadTpsDetail(id)
+}
+
 async function queryTpsByUut() {
   const uut = uutQuery.value.trim()
   if (!UUT_RE.test(uut)) {
@@ -432,18 +527,48 @@ async function pickTpsFile(e) {
   if (!file) return
   tpsImportMsg.value = ''
   tpsImportErr.value = ''
+  tpsImportHint.value = { text: '', kind: 'ok' }
+  hideImportToast()
+
+  const name = file.name || ''
+  const lower = name.toLowerCase()
+  const isZip = lower.endsWith('.zip')
+  if (!isZip && !lower.endsWith('.json')) {
+    tpsImportErr.value = '❌ 仅支持 .json 清单或 .zip 压缩包'
+    if (tpsFileInput.value) tpsFileInput.value.value = ''
+    return
+  }
+  // 前端先拦大包：后端上限更大，但浏览器读 64MB 以上容易卡死
+  if (isZip && file.size > MAX_ZIP_BYTES) {
+    tpsImportErr.value = `❌ 压缩包 ${formatFileSize(file.size)} 超过 64MB 上限，请精简 testcase/ 后重试`
+    if (tpsFileInput.value) tpsFileInput.value.value = ''
+    return
+  }
+
+  importingTps.value = true
   try {
-    const content = await file.text()
-    importingTps.value = true
-    const res = await api.importTps(content, file.name)
-    if (res.success) {
-      tpsImportMsg.value = '✅ ' + (res.message || 'TPS 导入成功')
-      await loadTree()
-    } else {
-      tpsImportErr.value = '❌ ' + (res.message || '导入失败')
+    await detectImportTarget()
+    const res = isZip
+      ? await api.importTpsZip({ name, content_base64: await readFileAsBase64(file), overwrite: true })
+      : await api.importTps(await file.text(), name)
+    if (!res || res.success === false) {
+      const detail = res && (res.message || res.detail)
+      const text = typeof detail === 'string' ? detail : detail ? JSON.stringify(detail) : '导入失败'
+      tpsImportErr.value = '❌ ' + text
+      return
     }
+    const message = res.message || 'TPS 导入成功'
+    const localOnly = res.source === 'local'
+    tpsImportMsg.value = '✅ ' + message
+    if (localOnly) {
+      showImportToast(message, '仅本机可见，联网后建议在 Controller 重新导入以共享', 'warn')
+    } else {
+      showImportToast(message)
+    }
+    await loadTree()
+    if (res.tps && res.tps.id) await focusTps(res.tps.id)
   } catch (err) {
-    tpsImportErr.value = '❌ 导入失败：' + err.message
+    tpsImportErr.value = '❌ 导入失败：' + importFailureText(err)
   } finally {
     importingTps.value = false
     if (tpsFileInput.value) tpsFileInput.value.value = ''
@@ -673,6 +798,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   stopDeployPoll()
+  hideImportToast()
 })
 </script>
 
@@ -809,10 +935,16 @@ onUnmounted(() => {
 
         <!-- 导入 TPS -->
         <div class="import-row">
-          <button class="btn ghost small block" :disabled="importingTps" @click="tpsFileInput?.click()">
-            {{ importingTps ? '导入中…' : '📂 导入 TPS 文件' }}
+          <button
+            class="btn ghost small block"
+            :disabled="importingTps"
+            title="支持 .json 清单与 .zip 压缩包（tps.json + testcase/）"
+            @click="tpsFileInput?.click()"
+          >
+            {{ importingTps ? '导入中…' : '📂 导入 TPS' }}
           </button>
-          <input ref="tpsFileInput" type="file" accept=".json,application/json" class="hidden-input" @change="pickTpsFile" />
+          <input ref="tpsFileInput" type="file" accept=".json,.zip" class="hidden-input" @change="pickTpsFile" />
+          <div v-if="tpsImportHint.text" class="tip" :class="tpsImportHint.kind">{{ tpsImportHint.text }}</div>
           <div v-if="tpsImportMsg" class="tip ok">{{ tpsImportMsg }}</div>
           <div v-if="tpsImportErr" class="tip err">{{ tpsImportErr }}</div>
         </div>
@@ -1134,6 +1266,12 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 导入结果提示：message 原文 + 本机导入时的回流建议 -->
+    <div v-if="tpsImportToast.text" class="toast" :class="tpsImportToast.kind">
+      <div>{{ tpsImportToast.text }}</div>
+      <div v-if="tpsImportToast.note" class="toast-note">{{ tpsImportToast.note }}</div>
+    </div>
   </div>
 </template>
 
@@ -1180,6 +1318,13 @@ onUnmounted(() => {
 .tip.err { color: var(--err); }
 .tip.ok { color: var(--ok); }
 .tip.warn { color: var(--warn); }
+.toast {
+  position: fixed; right: 22px; bottom: 22px; z-index: 80; max-width: 420px;
+  background: #fff; border: 1px solid rgba(var(--accent-rgb), 0.4); border-left: 4px solid var(--accent);
+  border-radius: 10px; padding: 11px 14px; font-size: 13px; box-shadow: 0 12px 30px rgba(29, 23, 51, 0.16);
+}
+.toast.warn { border-color: rgba(180, 83, 9, 0.45); border-left-color: var(--warn); color: var(--warn); }
+.toast-note { margin-top: 6px; font-size: 12px; opacity: 0.9; }
 .head-actions { display: flex; align-items: center; gap: 8px; }
 .src-badge {
   font-size: 11px;

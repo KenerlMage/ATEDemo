@@ -112,3 +112,7 @@ backend/testresource/*-tps*/
 # ---- pytest 临时目录 ----
 **/.pytest_tmp/
 
+
+# ---- TPS 导入产生的本地运行副本（运行时数据）----
+backend/testresource/*/
+!backend/testresource/spm_rh_dyn/\n!backend/testresource/mc_demo_tps/\n

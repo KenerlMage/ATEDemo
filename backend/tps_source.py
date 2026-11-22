@@ -3,7 +3,9 @@
 
 设计
 ----
-* **Controller 是唯一事实源**：TPS 编辑只在 Controller Web 进行，Runner 只读。
+* **Controller 是唯一事实源**：TPS 编辑只在 Controller Web 进行；Runner 只读，导入默认转发 Controller。
+* **导入兜底**：Controller 不可达（含 `ATE_TPS_SOURCE=local`）时，Runner 本地校验后落
+  `testresource/`，导入的 TPS 仅本机可见。
 * **本地缓存**：每次成功拉取都落盘，断网时用缓存继续执行，响应里标记 `source=cache`。
 * **物化工作副本**：执行前把 TPS 文件同步到本地 TPS 目录（`testresource/<id>/`），
   运行期仍按既有路径读取，不改变执行链路。
@@ -55,6 +57,67 @@ def _http_bytes(url: str, timeout: float = TIMEOUT * 4) -> Optional[bytes]:
         return None
 
 
+def _loads_json(raw: bytes) -> Optional[dict]:
+    """响应体转 dict；非 JSON 或非对象时（例如 HTML 错误页）返回 None"""
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else {"detail": data}
+
+
+def post_json(path: str, payload: dict, timeout: float = TIMEOUT) -> dict:
+    """POST JSON 到 Controller，返回 {status, data, error}。
+
+    * `status is None` 表示连接失败/超时（调用方据此走离线兜底）；
+    * 4xx/5xx 也返回真实状态码与解析后的响应体（detail 原样留给调用方）。
+    """
+    url = f"{CONTROLLER_URL}{path}"
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+    except ValueError as exc:
+        return {"status": None, "data": None, "error": f"Controller 地址无效：{exc}"}
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return {"status": resp.status, "data": _loads_json(resp.read()), "error": ""}
+    except urllib.error.HTTPError as exc:
+        try:
+            raw = exc.read()
+        except OSError:
+            raw = b""
+        return {"status": exc.code, "data": _loads_json(raw), "error": ""}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"status": None, "data": None, "error": f"Controller 不可达：{exc}"}
+    except Exception as exc:  # noqa: BLE001 - 导入链路不允许因网络异常 500
+        return {"status": None, "data": None, "error": f"Controller 请求失败：{exc}"}
+
+
+def probe(timeout: float = 2.0) -> bool:
+    """Controller 可达性探测（健康检查，短超时，不抛异常）"""
+    try:
+        req = urllib.request.Request(f"{CONTROLLER_URL}/api/v1/health",
+                                     headers={"Accept": "application/json"})
+    except ValueError:
+        return False
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status < 500
+    except urllib.error.HTTPError as exc:
+        return exc.code < 500
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+    except Exception:  # noqa: BLE001 - 探测不抛异常
+        return False
+
+
 def cache_dir() -> Path:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     return CACHE_DIR
@@ -91,6 +154,25 @@ def _write_cache_tps(tps: dict) -> None:
     target = _cache_tps_dir(str(tps["id"]))
     target.mkdir(parents=True, exist_ok=True)
     (target / "tps.json").write_text(json.dumps(tps, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def cache_imported(tps: dict, summary: dict) -> None:
+    """导入成功后写本地缓存：详情（完整清单）+ 列表项，Controller 不可达时仍能被列出。
+
+    缓存写失败不影响导入结果（本地 testresource 里已有可用副本）。
+    """
+    tps_id = str((tps or {}).get("id") or "").strip()
+    if not tps_id or not isinstance(summary, dict):
+        return
+    item = dict(summary)
+    item["id"] = tps_id
+    try:
+        _write_cache_tps(tps)
+        items = [it for it in _read_cache_list() if it.get("id") != tps_id]
+        items.insert(0, item)
+        _write_cache_list(items)
+    except OSError:
+        pass
 
 
 def list_tps() -> dict:

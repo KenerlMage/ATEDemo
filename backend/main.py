@@ -15,9 +15,12 @@
 from __future__ import annotations
 
 import ast
+import base64
+import io
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -26,6 +29,7 @@ import urllib.error
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -793,19 +797,415 @@ def sync_tps_files(tps_id: str):
     return {"success": result["ok"], "synced": result["synced"], "message": result["error"] or "已同步", "target": str(target)}
 
 
+# ---- TPS 导入：Controller 优先 + 离线本地兜底 ----
+
+# 单包上限（Controller 侧未设限，Runner 本地兜底按此口径拦截）
+TPS_IMPORT_LIMITS = {"max_files": 4000, "max_bytes": 200 * 1024 * 1024}
+TPS_IMPORT_TIMEOUT = max(tps_source.TIMEOUT, 10.0)
+TPS_IMPORT_ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
+TPS_IMPORT_LOCAL_MESSAGE = "Controller 不可达，已导入本地（仅本机可见）"
+
+
+def _tps_import_body(*, success: bool, source: str, tps: dict | None = None, message: str = "",
+                     files_synced: int = 0, warnings: list[str] | None = None,
+                     code: str = "", errors: list[str] | None = None) -> dict:
+    """导入接口统一返回体（source=controller|local）"""
+    body = {
+        "success": success,
+        "source": source,
+        "tps": tps or {},
+        "message": message,
+        "files_synced": files_synced,
+        "warnings": list(warnings or []),
+    }
+    if code:
+        body["code"] = code
+    if errors:
+        body["errors"] = errors
+    return body
+
+
+def _tps_import_summary(raw: dict) -> dict:
+    """导入返回体里的 tps 摘要：至少 id/name/schema/preset_id"""
+    if not isinstance(raw, dict):
+        return {}
+    if "cmd_suit" in raw or isinstance(raw.get("steps"), list):
+        tps = tps_runtime.normalize_tps(raw) if tps_runtime.is_v2(raw) else dict(raw)
+        summary = tps_runtime.summary_tps(tps)
+    else:
+        summary = dict(raw)          # Controller 返回的摘要，原样透出
+    for key in ("id", "name", "schema", "preset_id"):
+        summary.setdefault(key, "")
+    summary["name"] = summary.get("name") or summary.get("id", "")
+    return summary
+
+
+def _validate_tps_manifest(raw: dict) -> list[str]:
+    """本地导入校验：v2 复用 tps_runtime.validate_v2，v1 沿用 id + steps 约定"""
+    if tps_runtime.is_v2(raw):
+        errors = tps_runtime.validate_v2(raw)
+        # tps_runtime 的 ID_RE 允许点，需额外排除会越出 TPS 目录的 . / ..
+        if str(raw.get("id") or "").strip() in (".", ".."):
+            errors.append("id 不能为 . 或 ..")
+        return errors
+    errors: list[str] = []
+    tps_id = str(raw.get("id") or "").strip()
+    if not tps_id:
+        errors.append("缺少必填字段: id")
+    elif not TPS_IMPORT_ID_RE.match(tps_id):
+        errors.append("id 只能包含英文/数字/下划线/点/短横线 (1-64 位)")
+    elif tps_id in (".", ".."):
+        errors.append("id 不能为 . 或 ..")
+    steps = raw.get("steps")
+    if not isinstance(steps, list) or not steps:
+        errors.append("v1 清单需要非空 steps 数组")
+    return errors
+
+
+def _decode_tps_zip(content_base64: str) -> tuple[bytes, str]:
+    """base64 -> zip 字节，带大小上限"""
+    text = (content_base64 or "").strip()
+    if not text:
+        return b"", "缺少 content_base64"
+    try:
+        blob = base64.b64decode(text, validate=True)
+    except Exception as exc:  # noqa: BLE001
+        return b"", f"content_base64 解码失败：{exc}"
+    if not blob:
+        return b"", "压缩包内容为空"
+    if len(blob) > TPS_IMPORT_LIMITS["max_bytes"]:
+        limit_mb = TPS_IMPORT_LIMITS["max_bytes"] // (1024 * 1024)
+        return b"", f"压缩包超过 {limit_mb}MB 上限（实际 {len(blob) / (1024 * 1024):.1f}MB）"
+    return blob, ""
+
+
+def _zip_file_entries(zf: zipfile.ZipFile) -> tuple[list[tuple[str, zipfile.ZipInfo]], str]:
+    """列出包内文件并检查路径 / 数量 / 声明大小（防路径穿越）"""
+    entries: list[tuple[str, zipfile.ZipInfo]] = []
+    declared = 0
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        norm = info.filename.replace("\\", "/")
+        parts = [p for p in norm.split("/") if p]
+        if not parts or norm.startswith("/") or (len(parts[0]) == 2 and parts[0][1] == ":"):
+            return [], f"压缩包内含非法路径：{info.filename}"
+        if any(p == ".." for p in parts):
+            return [], f"压缩包内含越界路径：{info.filename}"
+        declared += info.file_size
+        entries.append((norm, info))
+    if len(entries) > TPS_IMPORT_LIMITS["max_files"]:
+        return [], (f"压缩包文件数超过上限（{len(entries)} > "
+                    f"{TPS_IMPORT_LIMITS['max_files']}）")
+    if declared > TPS_IMPORT_LIMITS["max_bytes"]:
+        limit_mb = TPS_IMPORT_LIMITS["max_bytes"] // (1024 * 1024)
+        return [], f"压缩包解压后超过 {limit_mb}MB 上限"
+    return entries, ""
+
+
+def _zip_manifest_name(names: list[str]) -> str:
+    """定位 tps.json：根目录优先，其次唯一的一层子目录（允许包一层根目录）"""
+    if "tps.json" in names:
+        return "tps.json"
+    nested = [n for n in names if n.count("/") == 1 and n.endswith("/tps.json")]
+    return nested[0] if len(nested) == 1 else ""
+
+
+def _zip_payload(zf: zipfile.ZipFile, entries: list[tuple[str, zipfile.ZipInfo]],
+                 manifest_name: str) -> tuple[dict[str, bytes], str]:
+    """按清单所在目录取包内文件（相对路径 -> 内容），边读边卡总大小"""
+    prefix = manifest_name[: -len("tps.json")]
+    files: dict[str, bytes] = {}
+    total = 0
+    budget = TPS_IMPORT_LIMITS["max_bytes"]
+    try:
+        for norm, info in entries:
+            if not norm.startswith(prefix):
+                continue
+            rel = norm[len(prefix):]
+            parts = rel.split("/") if rel else []
+            if not rel or parts[0] == "__MACOSX" or parts[-1] == ".DS_Store":
+                continue
+            with zf.open(info) as fh:
+                blob = fh.read(budget - total + 1)
+            total += len(blob)
+            if total > budget:
+                limit_mb = budget // (1024 * 1024)
+                return {}, f"压缩包解压后超过 {limit_mb}MB 上限"
+            files[rel] = blob
+    except (RuntimeError, NotImplementedError, zipfile.BadZipFile, OSError) as exc:
+        return {}, f"读取压缩包失败：{exc}"
+    return files, ""
+
+
+def _install_tps_dir(tps_id: str, files: dict[str, bytes], overwrite: bool) -> tuple[bool, str]:
+    """把 {相对路径: 内容} 原子写入 testresource/<id>/（先写临时目录再替换）"""
+    try:
+        TPS_DIR.mkdir(parents=True, exist_ok=True)
+        root_dir = TPS_DIR.resolve()
+        target = (TPS_DIR / tps_id).resolve()
+        if target.parent != root_dir:
+            return False, f"非法 TPS 编号：{tps_id}"
+        if target.exists() and not overwrite:
+            return False, f"TPS 已存在：{tps_id}（如需覆盖请设置 overwrite=true）"
+        tmp = TPS_DIR / f".import-{tps_id}-{uuid.uuid4().hex[:8]}"
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return False, f"写入失败：{exc}"
+    root = tmp.resolve()
+    try:
+        for rel, blob in files.items():
+            dest = (tmp / rel).resolve()
+            try:
+                dest.relative_to(root)
+            except ValueError as exc:
+                raise ValueError(f"路径越界：{rel}") from exc
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(blob)
+    except ValueError as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False, str(exc)
+    except OSError as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False, f"写入失败：{exc}"
+
+    backup = None
+    try:
+        if target.exists():
+            backup = TPS_DIR / f".old-{tps_id}-{uuid.uuid4().hex[:8]}"
+            target.replace(backup)
+        tmp.replace(target)
+    except OSError as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
+        if backup and backup.exists() and not target.exists():
+            try:
+                backup.replace(target)
+            except OSError:
+                pass
+        return False, f"写入失败：{exc}"
+    if backup:
+        shutil.rmtree(backup, ignore_errors=True)
+    return True, ""
+
+
+def _install_tps_file(tps_id: str, content: str) -> tuple[bool, str]:
+    """v1 单文件清单写入 testresource/<id>.json"""
+    try:
+        TPS_DIR.mkdir(parents=True, exist_ok=True)
+        root_dir = TPS_DIR.resolve()
+        target = (TPS_DIR / f"{tps_id}.json").resolve()
+        if target.parent != root_dir:
+            return False, f"非法 TPS 编号：{tps_id}"
+        tmp = target.with_name(f".{target.name}.{uuid.uuid4().hex[:8]}.tmp")
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(target)
+    except OSError as exc:
+        return False, f"写入失败：{exc}"
+    return True, ""
+
+
+def _tps_manifest_text(raw: dict) -> str:
+    return json.dumps(raw, ensure_ascii=False, indent=2)
+
+
+def _import_tps_zip_local(content_base64: str, overwrite: bool, *, message: str,
+                          reason: str = "") -> dict:
+    """离线导入 zip：本地解包 -> tps_runtime 校验 -> 写 testresource/<id>/"""
+    blob, error = _decode_tps_zip(content_base64)
+    if error:
+        return _tps_import_body(success=False, source="local", message=error, code="invalid_zip")
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(blob))
+    except zipfile.BadZipFile:
+        return _tps_import_body(success=False, source="local", message="不是合法的 zip 压缩包",
+                                code="invalid_zip")
+    with zf:
+        entries, error = _zip_file_entries(zf)
+        if error:
+            return _tps_import_body(success=False, source="local", message=error, code="invalid_zip")
+        by_name = dict(entries)
+        manifest_name = _zip_manifest_name([n for n, _ in entries])
+        if not manifest_name:
+            return _tps_import_body(
+                success=False, source="local", code="invalid_zip",
+                message="压缩包内未找到唯一的 tps.json（允许放在根目录或一层子目录）",
+            )
+        try:
+            with zf.open(by_name[manifest_name]) as fh:
+                manifest_bytes = fh.read(2 * 1024 * 1024 + 1)
+            if len(manifest_bytes) > 2 * 1024 * 1024:
+                raise ValueError("tps.json 超过 2MB 上限")
+            raw = json.loads(manifest_bytes.decode("utf-8-sig"))
+        except (ValueError, UnicodeDecodeError, RuntimeError, zipfile.BadZipFile, OSError) as exc:
+            return _tps_import_body(success=False, source="local", code="invalid_zip",
+                                    message=f"tps.json 解析失败：{exc}")
+        if not isinstance(raw, dict):
+            return _tps_import_body(success=False, source="local", code="invalid_tps",
+                                    message="tps.json 必须是 JSON 对象")
+        errors = _validate_tps_manifest(raw)
+        if errors:
+            return _tps_import_body(
+                success=False, source="local", code="invalid_tps", errors=errors,
+                message=f"TPS 校验未通过（{len(errors)} 项）：{'；'.join(errors[:3])}",
+            )
+        tps_id = str(raw["id"]).strip()
+        files, error = _zip_payload(zf, entries, manifest_name)
+        if error:
+            return _tps_import_body(success=False, source="local", message=error, code="invalid_zip")
+
+    if tps_runtime.is_v2(raw) and not any(k.startswith("testcase/") for k in files):
+        # 与 tps_runtime.import_v2 一致：缺用例目录时补一个包占位，保证 pytest 可收集
+        files["testcase/__init__.py"] = '"""TPS 用例实现包"""\n'.encode("utf-8")
+    ok, error = _install_tps_dir(tps_id, files, overwrite)
+    if not ok:
+        code = "exists" if "已存在" in error else "write_failed"
+        return _tps_import_body(success=False, source="local", message=error, code=code)
+
+    summary = _tps_import_summary(raw)
+    tps_source.cache_imported(raw, summary)
+    warnings = [w for w in (reason,) if w]
+    warnings.append("本机导入的 TPS 仅本机可见，Controller 恢复后不会自动上报")
+    return _tps_import_body(success=True, source="local", tps=summary, message=message,
+                            files_synced=0, warnings=warnings)
+
+
+def _import_tps_json_local(content: str, *, message: str, reason: str = "") -> dict:
+    """离线导入 JSON 文本：v2 落 testresource/<id>/tps.json，v1 落 testresource/<id>.json"""
+    try:
+        raw = json.loads(content)
+    except json.JSONDecodeError as exc:
+        return _tps_import_body(success=False, source="local", message=f"JSON 解析失败：{exc}",
+                                code="invalid_tps")
+    if not isinstance(raw, dict):
+        return _tps_import_body(success=False, source="local", message="TPS 必须是 JSON 对象",
+                                code="invalid_tps")
+    errors = _validate_tps_manifest(raw)
+    if errors:
+        return _tps_import_body(
+            success=False, source="local", code="invalid_tps", errors=errors,
+            message=f"TPS 校验未通过（{len(errors)} 项）：{'；'.join(errors[:3])}",
+        )
+    tps_id = str(raw["id"]).strip()
+    if tps_runtime.is_v2(raw):
+        files = {
+            "tps.json": _tps_manifest_text(raw).encode("utf-8"),
+            "testcase/__init__.py": '"""TPS 用例实现包"""\n'.encode("utf-8"),
+        }
+        ok, error = _install_tps_dir(tps_id, files, True)
+    else:
+        ok, error = _install_tps_file(tps_id, _tps_manifest_text(raw))
+    if not ok:
+        return _tps_import_body(success=False, source="local", message=error, code="write_failed")
+
+    summary = _tps_import_summary(raw)
+    tps_source.cache_imported(raw, summary)
+    warnings = [w for w in (reason,) if w]
+    warnings.append("本机导入的 TPS 仅本机可见，Controller 恢复后不会自动上报")
+    return _tps_import_body(success=True, source="local", tps=summary, message=message,
+                            files_synced=0, warnings=warnings)
+
+
+def _tps_local_message() -> str:
+    """本地导入提示：区分“Controller 不可达”与“显式本地模式”"""
+    if tps_source.SOURCE == "local":
+        return "本地模式（ATE_TPS_SOURCE=local），已导入本地（仅本机可见）"
+    return TPS_IMPORT_LOCAL_MESSAGE
+
+
+def _tps_local_reason() -> str:
+    """离线兜底的原因（写入 warnings，便于排查）"""
+    if tps_source.SOURCE == "local":
+        return "ATE_TPS_SOURCE=local，已跳过 Controller"
+    return f"Controller 不可达（{tps_source.CONTROLLER_URL}），已改用本地导入"
+
+
+def _controller_detail(data: dict | None, status: int) -> str:
+    """Controller 错误体 -> 可读 detail（FastAPI HTTPException 的 detail 优先）"""
+    payload = data or {}
+    detail = payload.get("detail")
+    if isinstance(detail, str) and detail.strip():
+        return detail
+    if detail:
+        return json.dumps(detail, ensure_ascii=False)
+    message = payload.get("message")
+    return str(message) if message else f"Controller 返回 HTTP {status}"
+
+
+def _import_tps_via_controller(*, path: str, payload: dict) -> dict | None:
+    """转发导入给 Controller；连接失败/超时返回 None（调用方走本地兜底）"""
+    resp = tps_source.post_json(path, payload, timeout=TPS_IMPORT_TIMEOUT)
+    status, data = resp["status"], resp["data"] or {}
+    if status is None:
+        return None
+    if status == 200 and data.get("ok"):
+        summary = data.get("tps") if isinstance(data.get("tps"), dict) else {}
+        tps_id = str(summary.get("id") or "")
+        warnings = [str(w) for w in (data.get("warnings") or [])]
+        files_synced = 0
+        if tps_id:
+            # 刷新本地缓存（列表 + 详情），断网后 GET /api/tps 仍能看到该 TPS
+            tps_source.list_tps()
+            tps_source.get_tps(tps_id)
+            try:
+                result = tps_source.sync_files(tps_id, TPS_DIR / tps_id)
+            except Exception as exc:  # noqa: BLE001 - 同步失败只降级为 warning
+                result = {"ok": False, "synced": 0, "error": str(exc)}
+            if result.get("ok"):
+                files_synced = int(result.get("synced") or 0)
+            else:
+                warnings.append(f"运行副本同步失败：{result.get('error')}")
+        else:
+            warnings.append("Controller 未返回 TPS id，未同步运行副本")
+        return _tps_import_body(
+            success=True, source="controller", tps=_tps_import_summary(summary),
+            message=data.get("message") or "TPS 导入成功",
+            files_synced=files_synced, warnings=warnings,
+        )
+    if status == 200:
+        return _tps_import_body(
+            success=False, source="controller", code="controller_bad_response",
+            message="Controller 返回 200 但缺少 ok/tps，无法确认导入结果",
+        )
+    detail = _controller_detail(data, status)
+    if 400 <= status < 500:
+        # 包结构 / 清单校验由 Controller 负责：detail 原样返回，不落本地
+        return _tps_import_body(success=False, source="controller", message=detail,
+                                code="controller_rejected")
+    return _tps_import_body(success=False, source="controller", code="controller_error",
+                            message=f"Controller 内部错误（HTTP {status}）：{detail}")
+
+
 class TpsImportRequest(BaseModel):
     name: str = ""
     content: str
 
 
+@app.get("/api/tps/import/capability")
+def tps_import_capability():
+    """前端据此提示导入去向：Controller 可用则在线导入，否则本机兜底"""
+    online = tps_source.SOURCE != "local" and tps_source.probe()
+    return {
+        "success": True,
+        "online": online,
+        "controller_url": tps_source.CONTROLLER_URL,
+        "mode": "controller" if online else "local",
+        "limits": dict(TPS_IMPORT_LIMITS),
+    }
+
+
 @app.post("/api/tps/import")
 def import_tps(req: TpsImportRequest):
-    """TPS 编辑已迁移到 ATE Controller 控制台，Runner 只读"""
-    return {
-        "success": False,
-        "code": "moved_to_controller",
-        "message": f"TPS 导入已迁移到 ATE Controller 控制台（{tps_source.CONTROLLER_URL}/ui）",
-    }
+    """TPS 文本导入：Controller 优先；不可达时本地校验并落盘"""
+    if not (req.content or "").strip():
+        return _tps_import_body(success=False, source="local", message="缺少 content",
+                                code="invalid_request")
+    if tps_source.SOURCE != "local":
+        forwarded = _import_tps_via_controller(
+            path="/api/v1/tps/import", payload={"content": req.content, "overwrite": True})
+        if forwarded is not None:
+            return forwarded
+    return _import_tps_json_local(req.content, message=_tps_local_message(), reason=_tps_local_reason())
 
 
 class TpsZipImportRequest(BaseModel):
@@ -816,12 +1216,20 @@ class TpsZipImportRequest(BaseModel):
 
 @app.post("/api/tps/import/zip")
 def import_tps_zip(req: TpsZipImportRequest):
-    """TPS 编辑已迁移到 ATE Controller 控制台，Runner 只读"""
-    return {
-        "success": False,
-        "code": "moved_to_controller",
-        "message": f"TPS 导入已迁移到 ATE Controller 控制台（{tps_source.CONTROLLER_URL}/ui）",
-    }
+    """TPS zip 导入：Controller 优先；不可达时本地解包（仅本机可见）"""
+    if not (req.content_base64 or "").strip():
+        return _tps_import_body(success=False, source="local", message="缺少 content_base64",
+                                code="invalid_request")
+    if tps_source.SOURCE != "local":
+        forwarded = _import_tps_via_controller(
+            path="/api/v1/tps/import/zip",
+            payload={"name": req.name, "content_base64": req.content_base64,
+                     "overwrite": req.overwrite},
+        )
+        if forwarded is not None:
+            return forwarded
+    return _import_tps_zip_local(req.content_base64, req.overwrite, message=_tps_local_message(),
+                                 reason=_tps_local_reason())
 
 
 

@@ -3,7 +3,17 @@ async function request(url, options = {}) {
     headers: { 'Content-Type': 'application/json' },
     ...options
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    // 保留后端返回的 message / detail，供调用方按原文提示；status 用于区分 404 等
+    const err = new Error(`HTTP ${res.status}`)
+    err.status = res.status
+    try {
+      err.payload = await res.json()
+    } catch {
+      err.payload = null
+    }
+    throw err
+  }
   return res.json()
 }
 
@@ -20,6 +30,8 @@ export const api = {
   getTpsDetail: (tpsId) => request(`/api/tps/${tpsId}`),
   getTpsByUut: (uut) => request(`/api/tps/by-uut?uut=${encodeURIComponent(uut)}`),
   importTps: (content, name) => request('/api/tps/import', { method: 'POST', body: JSON.stringify({ content, name }) }),
+  // 导入去向探测：{online, controller_url, mode, limits}；接口未就绪时后端返回 404
+  getTpsImportCapability: () => request('/api/tps/import/capability'),
   aiAnalyze: (apiUrl, apiKey, taskId) => request('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ api_url: apiUrl, api_key: apiKey, task_id: taskId }) }),
   // 运行档位: run_mode=production 时必须带 12 位 work_order;
   // mode=real 连真机 / simulate 不连接真实设备（调试模式的「仿真模式」）
