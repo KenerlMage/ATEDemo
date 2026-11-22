@@ -1,0 +1,91 @@
+{
+  "schema": "tps.v2",
+  "id": "spm-rh-dyn-01-tps-2",
+  "name": "SPM 读头动态测试台 TPS",
+  "version": "1.0.0",
+  "description": "面向 SPM 子系统磁读头的动态性能测试台，覆盖读头静态工作点、回放信号波形、供电与带载动态响应、转速扫描下的输出一致性。",
+  "preset_id": "SPM-RH-DYN-01",
+  "product": "1000-A",
+  "subsystem": "SPM",
+  "project": "1000-A 机载电子系统",
+  "dut": "SPM 磁读头组件（GMR / TMR 读头）",
+  "parser": {
+    "name": "tps.v2",
+    "version": "2.0"
+  },
+  "device_config": {
+    "rh-scope": {
+      "device_type": "示波器",
+      "resource": "TCPIP0::192.168.10.41::inst0::INSTR",
+      "role": "rh-scope"
+    },
+    "rh-dmm": {
+      "device_type": "万用表",
+      "resource": "TCPIP0::192.168.10.42::3490::SOCKET",
+      "role": "rh-dmm"
+    },
+    "rh-psu": {
+      "device_type": "可编程电源",
+      "resource": "TCPIP0::192.168.10.43::30000::SOCKET",
+      "role": "rh-psu"
+    },
+    "rh-eload": {
+      "device_type": "电子负载",
+      "resource": "TCPIP0::192.168.10.44::30000::SOCKET",
+      "role": "rh-eload"
+    },
+    "rh-awg": {
+      "device_type": "信号发生器",
+      "resource": "TCPIP0::192.168.10.45::5025::SOCKET",
+      "role": "rh-awg"
+    },
+    "rh-spin": {
+      "device_type": "运动控制器",
+      "resource": "COM6:115200:8N1",
+      "role": "rh-spin"
+    },
+    "rh-fixture": {
+      "device_type": "夹具/工装",
+      "resource": "",
+      "role": "rh-fixture"
+    }
+  },
+  "testconfig": {
+    "TC_MAIN": {
+      "label": "主判据",
+      "min": 0,
+      "max": 1,
+      "unit": ""
+    }
+  },
+  "setup": [
+    {
+      "id": "SETUP01",
+      "name": "上电与夹具准备",
+      "case": "testcase.spm_rh_dyn_01::setup"
+    }
+  ],
+  "cmd_suit": [
+    {
+      "id": "TC001",
+      "name": "主判据采集",
+      "case": "testcase.spm_rh_dyn_01::main",
+      "checks": {
+        "value": "TC_MAIN"
+      }
+    }
+  ],
+  "teardown": [
+    {
+      "id": "TD01",
+      "name": "断电与资源释放",
+      "case": "testcase.spm_rh_dyn_01::teardown"
+    }
+  ],
+  "process": {
+    "id": "PRC-FCT-04",
+    "code": "FCT-04",
+    "name": "功能测试 FCT"
+  },
+  "updated_at": "2026-11-21T17:58:03+08:00"
+}
