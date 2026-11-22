@@ -21,6 +21,8 @@ const info = ref({ source: '', channel: '', controller_url: '', updated_at: '', 
 const remote = ref({ available: false, mode: '', controller_url: '', cached_at: '', count: 0 })
 const items = ref([])
 const busyId = ref('')
+// 部署状态：仅在已下载后才有意义（SR02-AR07）
+const deployState = ref({})
 const keyword = ref('')
 const confirmId = ref('')
 const toast = ref({ text: '', kind: 'ok' })
@@ -131,6 +133,52 @@ async function launch(item) {
   }
 }
 
+async function loadDeployState() {
+  const map = {}
+  for (const it of items.value || []) {
+    if (!it.installed) continue
+    try {
+      const res = await api.assistantDeployStatus(it.id)
+      if (res && res.success) map[it.id] = res
+    } catch (e) {
+      /* 后端未挂载时静默 */
+    }
+  }
+  deployState.value = map
+}
+
+async function deploy(item) {
+  if (busyId.value) return
+  busyId.value = item.id
+  try {
+    const res = await api.deployAssistant(item.id)
+    flash(res.message || (res.success ? '部署完成' : '部署失败'), res.success ? 'ok' : 'err')
+    if (res.success) {
+      // 成功后安装包已清理，刷新清单与状态
+      await load()
+    }
+    await loadDeployState()
+  } catch (e) {
+    flash('部署失败：' + e.message, 'err')
+  } finally {
+    busyId.value = ''
+  }
+}
+
+async function undeploy(item) {
+  if (busyId.value) return
+  busyId.value = item.id
+  try {
+    const res = await api.undeployAssistant(item.id)
+    flash(res.message || (res.success ? '已卸载' : '卸载失败'), res.success ? 'ok' : 'err')
+    await loadDeployState()
+  } catch (e) {
+    flash('卸载失败：' + e.message, 'err')
+  } finally {
+    busyId.value = ''
+  }
+}
+
 async function remove(item) {
   if (confirmId.value !== item.id) {
     confirmId.value = item.id
@@ -152,7 +200,10 @@ async function remove(item) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await loadDeployState()
+})
 </script>
 
 <template>
@@ -204,7 +255,8 @@ onMounted(load)
             <div class="meta">v{{ it.version }} · {{ it.vendor }}</div>
           </div>
           <span v-if="it.installed && it.updated" class="tag update">有新版本</span>
-          <span v-else-if="it.installed" class="tag done">已下载</span>
+          <span v-else-if="deployState[it.id]?.deployed" class="tag done">已部署</span>
+          <span v-else-if="it.installed" class="tag">已下载</span>
         </div>
 
         <div class="sum">{{ it.summary }}</div>
@@ -237,6 +289,20 @@ onMounted(load)
             {{ busyId === it.id ? '下载中…' : '下载到本机' }}
           </button>
           <template v-else>
+            <button
+              v-if="deployState[it.id] && deployState[it.id].needs_deploy !== false && !deployState[it.id].deployed"
+              class="btn primary"
+              data-testid="assistant-deploy"
+              :disabled="busyId === it.id"
+              @click="deploy(it)"
+            >{{ busyId === it.id ? '部署中…' : '部署' }}</button>
+            <button
+              v-else-if="deployState[it.id]?.deployed"
+              class="btn ghost"
+              data-testid="assistant-undeploy"
+              :disabled="busyId === it.id"
+              @click="undeploy(it)"
+            >卸载</button>
             <button class="btn primary" :disabled="busyId === it.id" @click="launch(it)">启动</button>
             <button class="btn ghost" :disabled="busyId === it.id" @click="download(it)">
               {{ it.updated ? '更新到 ' + it.version : '重新下载' }}

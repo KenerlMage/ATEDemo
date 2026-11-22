@@ -365,7 +365,7 @@ def list_tasks():
 
 
 # ---- 机器常数执行侧（需求 SR02）：解析/写入/校验、人工确认、标定 ----
-for _mod_name in ("const_runtime", "manual_check", "calib"):
+for _mod_name in ("const_runtime", "manual_check", "calib", "deploy_extra"):
     try:
         _mod = __import__(_mod_name)
         _register = getattr(_mod, "register_routes", None)

@@ -307,6 +307,10 @@ export const api = {
   // 清单来源状态：controller_url / mode(controller|cache|local) / cached_at / cached_count
   getAssistantSource: () => request('/api/assistants/source'),
   getInstalledAssistants: () => request('/api/assistants/installed'),
+  // 装备助手部署/卸载（SR02-AR06/AR07）
+  assistantDeployStatus: (id) => request(`/api/runner/assistants/${encodeURIComponent(id)}/deploy-status`),
+  deployAssistant: (id) => request(`/api/runner/assistants/${encodeURIComponent(id)}/deploy`, { method: 'POST' }),
+  undeployAssistant: (id) => request(`/api/runner/assistants/${encodeURIComponent(id)}/undeploy`, { method: 'POST' }),
   installAssistant: (id) =>
     request('/api/assistants/install', { method: 'POST', body: JSON.stringify({ id }) }),
   launchAssistant: (id) =>
