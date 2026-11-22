@@ -160,6 +160,53 @@ def test_import_bad_zip_rejected(stack):
         assert body.get("message"), "失败时必须给出可读原因"
 
 
+def _tps_json(tps_id: str, valid: bool = True) -> str:
+    manifest = {
+        "schema": "tps.v2",
+        "id": tps_id,
+        "name": f"JSON 导入 {tps_id}",
+        "version": "1.0.0",
+        "testconfig": {"TC_A": {"label": "A", "min": 0, "max": 10, "unit": "V"}},
+        "device_config": {"psu": {"role": "psu"}},
+        "setup": [{"id": "S1", "name": "初始化", "case": "testcase.impl::setup"}],
+        "cmd_suit": [{"id": "C1", "name": "用例一", "case": "testcase.impl::main", "checks": {"a": "TC_A"}}],
+        "teardown": [{"id": "T1", "name": "终止", "case": "testcase.impl::teardown"}],
+    }
+    if not valid:
+        manifest.pop("testconfig")  # Controller 会因此拒绝
+    return json.dumps(manifest, ensure_ascii=False)
+
+
+def test_import_json_online(stack):
+    tps_id = "imp-json-01"
+    with httpx.Client(base_url=stack["run_base"], timeout=60) as cli:
+        resp = cli.post("/api/tps/import", json={"name": "t.json", "content": _tps_json(tps_id)})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["success"] is True
+        assert body["source"] == "controller"
+        listed = cli.get("/api/tps").json()
+        assert tps_id in [t["id"] for t in listed["tps"]]
+
+
+def test_controller_rejection_not_saved_locally(stack):
+    """Controller 明确拒绝时，Runner 不应偷偷落到本地。"""
+    tps_id = "imp-reject-01"
+    local_dir = BACKEND / "testresource" / tps_id
+    if local_dir.exists():
+        import shutil
+
+        shutil.rmtree(local_dir, ignore_errors=True)
+
+    with httpx.Client(base_url=stack["run_base"], timeout=60) as cli:
+        resp = cli.post("/api/tps/import", json={"name": "bad.json", "content": _tps_json(tps_id, valid=False)})
+        body = resp.json()
+        assert body["success"] is False
+        assert body.get("source") == "controller"
+        assert body.get("message"), "拒绝原因必须透传"
+        assert not local_dir.exists(), "Controller 拒绝时不得在本地落盘"
+
+
 def test_import_zip_offline_fallback(stack):
     """停掉 Controller 后再导入，应落到本机。"""
     if stack["ctrl"].poll() is None:
