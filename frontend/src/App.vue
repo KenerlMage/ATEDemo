@@ -254,7 +254,7 @@ function logout() {
   height: 38px;
   flex: 0 0 38px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #8b5cf6, #5b21b6);
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
   color: #fff;
   font-size: 18px;
   box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.3);
@@ -264,14 +264,14 @@ function logout() {
   font-size: 17px;
   font-weight: 900;
   letter-spacing: 1.4px;
-  background: linear-gradient(180deg, #4c1d95 0%, #6d28d9 46%, #8b5cf6 78%, #6d28d9 100%);
+  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 46%, #3b82f6 78%, #1d4ed8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   font-family: 'Arial Black', 'Segoe UI', sans-serif;
   line-height: 1.15;
 }
-.brand-name em { font-style: normal; color: #7c3aed; -webkit-text-fill-color: #7c3aed; }
+.brand-name em { font-style: normal; color: #2563eb; -webkit-text-fill-color: #2563eb; }
 .brand-sub { color: var(--muted); font-size: 11px; letter-spacing: 0.6px; }
 
 /* 当前测试台 */

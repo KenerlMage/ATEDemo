@@ -197,7 +197,7 @@ onMounted(checkLicense)
   transform: translateX(-50%);
   width: 64px;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--accent), #7c3aed, transparent);
+  background: linear-gradient(90deg, transparent, var(--accent), #60a5fa, transparent);
 }
 .ht-main {
   display: block;
@@ -205,7 +205,7 @@ onMounted(checkLicense)
   font-weight: 900;
   letter-spacing: 6px;
   line-height: 1.1;
-  background: linear-gradient(180deg, #ddd6fe 0%, #a78bfa 32%, #6d28d9 62%, #8b5cf6 80%, #a78bfa 100%);
+  background: linear-gradient(180deg, #dbeafe 0%, #93c5fd 30%, #1d4ed8 62%, #3b82f6 80%, #60a5fa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
