@@ -192,6 +192,42 @@ def _norm_binding(item: Any, index: int, default_sn: str = "") -> dict:
     }
 
 
+def _expand_controller_bindings(raw: Any) -> list[dict]:
+    """把 Controller 侧关联字段展开成逐模型绑定。
+
+    - 新版：``[{version, pn, model_key, alias, source, sn, values}]`` 原样透传；
+    - 旧版：``[{version, pn, models: [键...], alias, source}]`` 按 models 展开，
+      多个模型时别名依次加 ``#1``、``#2`` 后缀保证唯一。
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, dict):
+        raw = raw.get("bindings") if isinstance(raw.get("bindings"), list) else [raw]
+    if not isinstance(raw, list):
+        raise ValueError("machine_constant_bindings 必须是数组")
+
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        models = item.get("models")
+        base = {k: item[k] for k in ("version", "pn", "source", "sn", "values", "parser") if k in item}
+        alias = _text(item.get("alias"), 64)
+        if isinstance(models, list) and models:
+            for pos, key in enumerate(models, 1):
+                row = dict(base)
+                row["model_key"] = _text(key, 64)
+                row["alias"] = alias + (f"#{pos}" if len(models) > 1 else "") if alias else _text(key, 64)
+                out.append(row)
+        else:
+            row = dict(base)
+            row["model_key"] = _text(item.get("model_key") or item.get("model"), 64)
+            row["alias"] = alias or row["model_key"]
+            if row["model_key"]:
+                out.append(row)
+    return out
+
+
 def parse_bindings(tps: dict) -> list[dict]:
     """把 TPS 的 ``machine_constants`` 段归一化为绑定列表。
 
@@ -210,6 +246,12 @@ def parse_bindings(tps: dict) -> list[dict]:
     elif isinstance(tps, dict):
         if "machine_constants" in tps:
             section = tps.get("machine_constants")
+        elif "machine_constant_bindings" in tps:
+            # Controller 新版字段：逐模型展开，alias 直接沿用
+            section = _expand_controller_bindings(tps.get("machine_constant_bindings"))
+        elif "constant_bindings" in tps:
+            # Controller 旧版字段：{version, pn, models: [...]}，按模型展开
+            section = _expand_controller_bindings(tps.get("constant_bindings"))
         elif "bindings" in tps and "pn" not in tps and "model_key" not in tps:
             section = tps
         else:
