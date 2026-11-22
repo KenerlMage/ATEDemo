@@ -108,3 +108,7 @@ backend/metadata_cache/
 # ---- Controller 物化下来的 TPS 运行副本（运行时生成）----
 backend/testresource/*-tps*/
 
+
+# ---- pytest 临时目录 ----
+**/.pytest_tmp/
+
