@@ -209,7 +209,7 @@ function logout() {
         <div class="side-foot">
           <UpdateBadge />
           <div class="side-user">
-            <span class="user-chip">{{ username }}</span>
+            <span class="user-chip" data-testid="current-user">{{ username }}</span>
           </div>
           <button class="btn ghost side-logout" @click="logout">退出登录</button>
         </div>

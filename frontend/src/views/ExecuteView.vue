@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { api } from '../api'
 // 运行档位（全局共享）: 生产模式需 12 位工单号 + 真机 + 上报云端;
 // 调试模式免工单, 可切「仿真模式」不连接真实设备。
@@ -193,6 +193,10 @@ const stepState = computed(() => {
 const manual = computed(() => currentTask.value?.manual || null)
 const manualOpen = computed(() => manual.value?.status === 'waiting')
 const manualSubmitting = ref(false)
+const manualSubmitted = ref('')     // 已提交的判定：按钮禁用并显示「已提交」，避免重复点击
+const manualNote = ref('')          // 判定失败的备注（写入该步结果与报告）
+const manualNoteOpen = ref(false)   // 点「判定失败」后展开的备注输入框
+const manualBusy = computed(() => manualSubmitting.value || !!manualSubmitted.value)
 const manualError = ref('')
 // 提示内容由后端从 TPS 包 resource/ 目录读出并随任务快照下发
 const manualHtml = computed(() => renderMarkdown(manual.value?.markdown || '', selectedTpsId.value))
@@ -201,6 +205,18 @@ const manualHtml = computed(() => renderMarkdown(manual.value?.markdown || '', s
 const manualKind = computed(() => manual.value?.kind || 'manual')
 const manualIsManual = computed(() => manualOpen.value && manualKind.value === 'manual')
 const stepHoldOpen = computed(() => manualOpen.value && manualKind.value === 'step')
+// 新的暂停点到达时清掉上一次的提交态（同一任务可能连续出现多条人工确认）
+// requested_at 只到秒：单步暂停与紧随其后的人工确认可能落在同一秒，只盯时间戳会漏掉切换，
+// 因此把 kind 与暂停点 id 一并作为 watch 键。
+watch(
+  () => [manual.value?.kind, manual.value?.id, manual.value?.requested_at].join('|'),
+  () => {
+    manualSubmitted.value = ''
+    manualNote.value = ''
+    manualNoteOpen.value = false
+    manualError.value = ''
+  }
+)
 
 function escapeHtml(s) {
   return String(s)
@@ -263,15 +279,20 @@ function renderMarkdown(md, tpsId) {
   return html
 }
 
-async function answerManual(decision) {
+async function answerManual(decision, note = '') {
   const id = currentTask.value?.id
-  if (!id || manualSubmitting.value) return
+  if (!id || manualBusy.value) return
   manualSubmitting.value = true
   manualError.value = ''
   try {
-    const res = await api.decideTpsManual(id, decision)
+    const res = await api.decideTpsManual(id, decision, note)
     if (!res.success) manualError.value = res.message || '提交失败'
-    else await pollTask()
+    else {
+      // 提交成功后按钮置灰并显示「已提交」，等待下一次轮询关闭弹窗
+      manualSubmitted.value = res.decision || decision
+      manualNoteOpen.value = false
+      await pollTask()
+    }
   } catch (e) {
     manualError.value = '提交失败：' + e.message
   } finally {
@@ -807,7 +828,7 @@ onUnmounted(() => {
     <!-- 左列 -->
     <div class="left-col">
       <!-- 左上: 装备树 -->
-      <section class="tree-panel">
+      <section class="tree-panel" data-testid="equipment-tree">
         <div class="panel-head">
           <h2 class="panel-title">装备树</h2>
           <div class="head-actions">
@@ -943,7 +964,7 @@ onUnmounted(() => {
           >
             {{ importingTps ? '导入中…' : '📂 导入 TPS' }}
           </button>
-          <input ref="tpsFileInput" type="file" accept=".json,.zip" class="hidden-input" @change="pickTpsFile" />
+          <input ref="tpsFileInput" type="file" accept=".json,.zip" class="hidden-input" data-testid="tps-file-input" @change="pickTpsFile" />
           <div v-if="tpsImportHint.text" class="tip" :class="tpsImportHint.kind">{{ tpsImportHint.text }}</div>
           <div v-if="tpsImportMsg" class="tip ok">{{ tpsImportMsg }}</div>
           <div v-if="tpsImportErr" class="tip err">{{ tpsImportErr }}</div>
@@ -1061,7 +1082,7 @@ onUnmounted(() => {
           <span v-if="currentTask?.current_step">当前第 {{ currentTask.current_step }} / {{ steps.length }} 步</span>
         </div>
 
-        <div v-if="stepHoldOpen" class="step-hold-banner">
+        <div v-if="stepHoldOpen" class="step-hold-banner" data-testid="step-hold-banner">
           <span class="step-hold-tag">单步暂停</span>
           <span class="step-hold-text">
             第 {{ currentTask.current_step }} 条「{{ manual.name }}」已执行完毕，点「下一步」放行后续用例。
@@ -1123,18 +1144,21 @@ onUnmounted(() => {
           <div class="log-filters">
             <button
               class="log-chip error"
+              data-testid="log-count-error"
               :class="{ off: !levelOn.error }"
               title="显示 / 隐藏 ERROR 级别日志"
               @click="toggleLevel('error')"
             >ERROR {{ logCounts.error }}</button>
             <button
               class="log-chip warning"
+              data-testid="log-count-warning"
               :class="{ off: !levelOn.warning }"
               title="显示 / 隐藏 WARNING 级别日志"
               @click="toggleLevel('warning')"
             >WARNING {{ logCounts.warning }}</button>
             <button
               class="log-chip info"
+              data-testid="log-count-info"
               :class="{ off: !levelOn.info }"
               title="显示 / 隐藏 INFO 级别日志"
               @click="toggleLevel('info')"
@@ -1165,7 +1189,7 @@ onUnmounted(() => {
       </section>
 
       <!-- 右下: 测试报告 -->
-      <section class="report-panel">
+      <section class="report-panel" data-testid="report-panel">
         <div class="panel-head">
           <h2 class="panel-title">测试报告</h2>
           <button class="btn ghost small" :disabled="!currentTask" @click="analyzeWithAi">
@@ -1245,23 +1269,40 @@ onUnmounted(() => {
     <!-- 人工操作环节弹窗：内容取自 TPS 包 resource/ 下清单里标注的 Markdown -->
     <!-- 单步执行（step=true）不弹遮罩，改由步骤列表上方的横幅与暂停行内的「下一步」按钮放行 -->
     <div v-if="manualIsManual" class="manual-mask">
-      <div class="manual-card">
+      <div class="manual-card" data-testid="manual-card">
         <div class="manual-head">
-          <span class="manual-tag">人工操作</span>
+          <span class="manual-tag">人工确认</span>
           <h3 class="manual-title">{{ manual.name }}</h3>
           <span v-if="manual.resource" class="manual-res">resource/{{ manual.resource }}</span>
         </div>
         <div class="manual-body" v-html="manualHtml"></div>
+        <div v-if="manualNoteOpen" class="manual-note">
+          <label class="manual-note-label" for="manual-fail-note">判定失败备注（写入该步结果与测试报告，可留空）</label>
+          <textarea
+            id="manual-fail-note"
+            v-model="manualNote"
+            rows="3"
+            maxlength="500"
+            placeholder="例如：外观有划痕，判定本环节不通过"
+          ></textarea>
+          <div class="manual-note-actions">
+            <button class="btn ghost" :disabled="manualSubmitting" @click="manualNoteOpen = false">返回</button>
+            <button class="btn fail" :disabled="manualBusy" @click="answerManual('fail', manualNote)">
+              {{ manualSubmitted === 'fail' ? '已提交' : '确认判定失败' }}
+            </button>
+          </div>
+        </div>
         <div v-if="manualError" class="tip err manual-err">{{ manualError }}</div>
         <div class="manual-foot">
           <span class="manual-hint">
-            「继续下一步」执行清单里的下一条用例；「中止测试」停止本轮，直接进入收尾与报告。
-            <template v-if="manual.timeout_s">等待超时设为 {{ manual.timeout_s }} 秒，超时按中止处理。「中止」用于判定当前环节不通过并结束本轮；「取消」用于主动放弃本轮（如装夹错误需重装）。</template>
+            「判定通过」该环节记通过并执行下一条；「判定失败」记失败（备注可选），后续用例跳过、直接进入收尾与报告。
+            <template v-if="manual.timeout_s">等待超时设为 {{ manual.timeout_s }} 秒，超时按中止处理。「中止」结束本轮；「取消」主动放弃本轮（如装夹错误需重装）。</template>
           </span>
           <div class="manual-actions">
-            <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('cancel')">取消本轮测试</button>
-            <button class="btn ghost" :disabled="manualSubmitting" @click="answerManual('abort')">中止测试</button>
-            <button class="btn primary" :disabled="manualSubmitting" @click="answerManual('next')">继续下一步</button>
+            <button class="btn ghost" :disabled="manualBusy" @click="answerManual('cancel')">{{ manualSubmitted === 'cancel' ? '已提交' : '取消本轮测试' }}</button>
+            <button class="btn ghost" :disabled="manualBusy" @click="answerManual('abort')">{{ manualSubmitted === 'abort' ? '已提交' : '中止测试' }}</button>
+            <button class="btn fail" :disabled="manualBusy" @click="manualNoteOpen = true; manualError = ''">{{ manualSubmitted === 'fail' ? '已提交' : '判定失败' }}</button>
+            <button class="btn primary" :disabled="manualBusy" @click="answerManual('pass')">{{ manualSubmitted === 'pass' ? '已提交' : '判定通过' }}</button>
           </div>
         </div>
       </div>
@@ -1717,6 +1758,17 @@ onUnmounted(() => {
 .manual-hint { font-size: 12px; color: var(--muted); flex: 1; min-width: 220px; }
 .manual-actions { display: flex; gap: 10px; }
 .manual-err { margin: 0 18px; }
+.manual-note { padding: 0 18px 12px; display: flex; flex-direction: column; gap: 8px; }
+.manual-note-label { font-size: 12px; color: var(--muted); }
+.manual-note textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 64px;
+  padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--panel); color: var(--text); font: inherit; font-size: 13px; line-height: 1.6;
+}
+.manual-note textarea:focus { outline: none; border-color: var(--accent); }
+.manual-note-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn.fail { border-color: rgba(220, 38, 38, 0.45); color: var(--err); font-weight: 600; }
+.btn.fail:hover:not(:disabled) { border-color: var(--err); color: var(--err); background: rgba(220, 38, 38, 0.06); box-shadow: none; }
 .step-type-manual { color: var(--accent); font-weight: 600; }
 
 /* ---- 单步执行（cmd_suit 条目 step=true）---- */

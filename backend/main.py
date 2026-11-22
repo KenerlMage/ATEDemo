@@ -761,6 +761,20 @@ def get_tps_by_uut(uut: str):
     return {"success": False, "message": f"UUT {uut} 对应的 TPS 不存在: {tps_id}"}
 
 
+def _normalize_for_ui(tps: dict) -> dict:
+    """把 v2 清单补出 steps 等派生字段：Controller 与缓存返回的是原始清单，
+    不归一化会导致执行页「测试步骤（0）」且执行按钮不可用。"""
+    if not isinstance(tps, dict) or not tps:
+        return tps
+    if tps.get("steps"):
+        return tps
+    try:
+        normalized = tps_runtime.normalize_tps(tps)
+    except Exception:  # noqa: BLE001 - 归一化失败时保留原样，由调用方报错
+        return tps
+    return normalized or tps
+
+
 @app.get("/api/tps/{tps_id}")
 def get_tps(tps_id: str):
     """TPS 详情: 事实源在 ATE Controller; 不可达时用缓存, 再退本地 testresource"""
@@ -770,7 +784,7 @@ def get_tps(tps_id: str):
             _materialize_tps(tps_id)
             return {
                 "success": True,
-                "tps": fetched["tps"],
+                "tps": _normalize_for_ui(fetched["tps"]),
                 "source": fetched["source"],
                 "remote_error": fetched["error"],
             }
@@ -1176,6 +1190,34 @@ def _import_tps_via_controller(*, path: str, payload: dict) -> dict | None:
                             message=f"Controller 内部错误（HTTP {status}）：{detail}")
 
 
+TPS_TASKS: dict[str, dict] = {}
+TPS_TASKS_LOCK = threading.Lock()
+
+# 人工操作环节（cmd_suit 里 type=manual 的条目）与单步暂停：等待操作员在界面判定
+# 决定取值：pass（判定通过，旧值 next 等价）/ fail（判定失败）/ abort（中止本轮）
+#         / cancel（取消本轮）/ timeout（无人应答，按中止处理）
+#   fail   = 操作员判定当前环节不通过，本步记 failed
+#   abort  = 操作员中止本轮，结束测试
+#   cancel = 操作员主动放弃本轮（如装夹错误需重装），或由界面/接口发起取消
+# abort 与 cancel 的收尾路径一致（跳过剩余测试条目、照常执行收尾段），区别在语义与记录
+# 等待采用分段轮询（_WAIT_TICK_S），因此取消请求可在等待期间立即唤醒任务线程
+# 事件对象不进 task（task 会被 JSON 序列化返回给前端）
+MANUAL_WAITS: dict[str, threading.Event] = {}
+DEFAULT_MANUAL_TIMEOUT_S = 1800
+_WAIT_TICK_S = 1.0
+# 单步执行（cmd_suit 条目 step=true）：跑完一条后等操作员点「下一步」的最长等待
+DEFAULT_STEP_TIMEOUT_S = 1800
+
+
+class TpsRunRequest(BaseModel):
+    tps_id: str | None = None
+    uut: str = ""
+    bench_id: str = ""            # 指定测试台（不填则按 TPS 清单 bench 自动匹配）
+    mode: str = "simulate"        # 设备连接: simulate(默认, 不连设备) | real(真机)
+    run_mode: str = "debug"       # 运行档位: debug(调试, 免工单) | production(生产, 需工单+上报云端)
+    work_order: str = ""          # 生产模式工单号(12 位)；调试模式留空
+
+
 class TpsImportRequest(BaseModel):
     name: str = ""
     content: str
@@ -1527,11 +1569,19 @@ def _manual_md_path(stage_info: dict | None, resource: str, source_dir: Path | N
     return None
 
 
+# 操作员判定取值：人工操作环节可选「判定通过 / 判定失败 / 中止 / 取消本轮」，
+# 单步暂停点沿用「继续 next / 中止 / 取消本轮」（旧值 next 仍是 pass 的别名）
+_MANUAL_DECISIONS = ("pass", "fail", "abort", "cancel")
+_STEP_DECISIONS = ("next", "abort", "cancel")
+
+
 def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource: str,
                    source: str, timeout_s: float, log_label: str, log_path: Path,
                    hold_id: str = "") -> str:
-    """把「等操作员做选择」的暂停点下发到任务快照，并阻塞等待；返回 next / abort / timeout
+    """把「等操作员做选择」的暂停点下发到任务快照，并阻塞等待；返回判定值
 
+    人工操作环节返回 `pass` / `fail` / `abort` / `cancel` / `timeout`（旧值 `next` 等价 `pass`）；
+    单步暂停点返回 `next` / `abort` / `cancel` / `timeout`。
     快照 `task["manual"]` 同时服务于两类暂停点：
     * `kind="manual"` —— 清单里 `type=manual` 的人工操作环节，内容来自 `resource/<名称>`
     * `kind="step"`   —— 条目 `step=true` 的单步暂停，内容由 Runner 生成
@@ -1547,7 +1597,7 @@ def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource
             "name": title,
             "resource": resource,
             "markdown": markdown,
-            "options": ["next", "abort", "cancel"],
+            "options": list(_MANUAL_DECISIONS if kind == "manual" else _STEP_DECISIONS),
             "cancellable": True,
             "requested_at": now_str(),
             "timeout_s": timeout_s,
@@ -1576,8 +1626,10 @@ def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource
     with TPS_TASKS_LOCK:
         MANUAL_WAITS.pop(task_id, None)
         snap = dict(task.get("manual") or {})
-        decision = str(snap.get("decision") or "").lower()
-        if decision in ("next", "abort", "cancel"):
+        decision = str(snap.get("decision") or "").strip().lower()
+        if kind == "manual" and decision == "next":
+            decision = "pass"                      # 旧值 next 保留为 pass 的别名
+        if decision in (_MANUAL_DECISIONS if kind == "manual" else _STEP_DECISIONS):
             pass                                   # 操作员在弹窗里的选择
         elif cancelled or task.get("cancel_requested"):
             decision = "cancel"                    # 等待期间被取消
@@ -1591,11 +1643,13 @@ def _wait_operator(task: dict, *, kind: str, title: str, markdown: str, resource
 
 
 def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: Path | None,
-                  log_path: Path) -> tuple[str, str]:
-    """执行一条人工操作条目：把弹窗内容写进任务快照 -> 阻塞等待操作员选择 -> 返回 (决定, 说明)
+                  log_path: Path) -> tuple[str, str, dict]:
+    """执行一条人工操作条目：把弹窗内容写进任务快照 -> 阻塞等待操作员判定 -> 返回 (判定, 说明, 记录)
 
-    决定取值：`next`（继续下一步）/ `abort`（中止本轮）/ `cancel`（取消本轮，含等待期间取消）
+    判定取值：`pass`（判定通过，旧值 next 等价）/ `fail`（判定失败，带操作员备注）
+             / `abort`（中止本轮）/ `cancel`（取消本轮，含等待期间取消）
              / `timeout`（无人应答，按中止处理）
+    记录含 decision / note / operator，一并写入该步结果，报告可据此还原操作员判定。
     """
     info = step.get("manual") or {}
     resource = str(info.get("resource") or "")
@@ -1613,8 +1667,18 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
         task, kind="manual", title=title, markdown=markdown, resource=resource, source=source,
         timeout_s=timeout_s, log_label="人工操作", log_path=log_path, hold_id=str(info.get("id") or ""),
     )
-    if decision == "next":
-        detail = f"操作员确认继续（{title}）"
+    with TPS_TASKS_LOCK:
+        snap = dict(task.get("manual") or {})
+    note = str(snap.get("note") or "").strip()
+    operator = str(snap.get("operator") or "").strip()
+    record = {"decision": decision, "note": note, "operator": operator}
+    who = f"，操作员 {operator}" if operator else ""
+    if decision == "pass":
+        detail = f"操作员判定通过（{title}{who}）"
+    elif decision == "fail":
+        detail = f"操作员判定失败（{title}{who}）" + (f"：{note}" if note else "")
+        # 失败判定单独落一条 WARNING，便于日志筛选与事后追溯
+        _tps_log(task, log_path, f"人工判定失败：{note or '（操作员未填写备注）'}", level="warning")
     elif decision == "abort":
         detail = f"操作员选择中止（{title}）"
     elif decision == "cancel":
@@ -1622,14 +1686,14 @@ def _await_manual(task: dict, step: dict, stage_info: dict | None, source_dir: P
     else:
         detail = f"等待操作员确认超时（{timeout_s:.0f}s，按中止处理）：{title}"
     _tps_log(task, log_path, f"[{now_str()}] 人工操作 [{title}] -> {decision}（{detail}）")
-    return decision, detail
+    return decision, detail, record
 
 
 def _await_step_hold(task: dict, step: dict, log_path: Path, remaining: int) -> tuple[str, str]:
     """单步执行暂停点：本条用例已跑完，等操作员点「下一步 next」再继续
 
     `step: true` 的条目执行完毕后进入这里；提示内容由 Runner 自己生成（不需要 resource/）。
-    返回值与 `_await_manual` 一致：`next` / `abort` / `timeout`。
+    返回 `next` / `abort` / `cancel` / `timeout`：本条用例已经跑完，这里只放行或中止，不改判通过/失败。
     """
     info = step.get("hold") or {}
     title = step.get("name") or "单步暂停"
@@ -1758,11 +1822,14 @@ def _run_tps_task(task_id: str) -> None:
             _tps_log(task, log_path, f"[{now_str()}] Step {i}/{total} [{step.get('name', '?')}] -> SKIP（{stop_label}）", level="warning")
             continue
         t0 = _time.time()
+        manual_record = None
         if step.get("manual"):
-            # 人工操作环节：Runner 弹窗提示操作员，等 next / abort
-            decision, detail = _await_manual(task, step, stage, tps_dir, log_path)
-            if decision == "next":
-                ok, step_status, mark = True, "passed", "CONFIRM"
+            # 人工操作环节：Runner 弹窗提示操作员，等 判定通过 / 判定失败 / 中止 / 取消
+            decision, detail, manual_record = _await_manual(task, step, stage, tps_dir, log_path)
+            if decision == "pass":
+                ok, step_status, mark = True, "passed", "PASS"
+            elif decision == "fail":
+                ok, step_status, mark = False, "failed", "FAIL"
             elif decision == "cancel":
                 aborted, ok, step_status, mark = True, False, "aborted", "CANCEL"
                 stop_label = "操作员取消本轮测试"
@@ -1779,6 +1846,8 @@ def _run_tps_task(task_id: str) -> None:
             task["steps"][i - 1]["status"] = step_status
             task["steps"][i - 1]["detail"] = detail
             task["steps"][i - 1]["duration"] = dt
+            if manual_record is not None:
+                task["steps"][i - 1]["manual"] = manual_record
             task["progress"] = int(i / total * 100)
         # 单步执行（cmd_suit 条目 step=true）：本条已跑完，停在这里等操作员点「下一步」
         if ok and not aborted and step.get("hold"):
@@ -2033,25 +2102,34 @@ def tps_task_logs(task_id: str, levels: str = "", errors_only: bool = False, lim
 
 
 class ManualDecisionRequest(BaseModel):
-    decision: str = ""            # next（继续下一步）| abort（中止本轮测试）| cancel（取消本轮测试）
+    decision: str = ""            # pass/fail/abort/cancel；旧值 next 等价 pass
+    note: str = ""                # 判定备注（fail 时写入该步结果与日志）
+    operator: str = ""            # 操作员（可选）
 
 
 @app.post("/api/tps-tasks/{task_id}/manual")
 def tps_task_manual(task_id: str, req: ManualDecisionRequest):
     """等待操作员确认的暂停点：人工操作环节（type=manual）与单步暂停（step=true）
 
-    操作员选择「继续 next」「中止 abort」或「取消 cancel」；三者共用这一个接口与
-    task["manual"] 快照。中止与取消的收尾路径一致，区别在语义与记录。
+    人工操作环节：`pass`（判定通过，旧值 next 等价）/ `fail`（判定失败，可带 note）
+    / `abort`（中止本轮）/ `cancel`（取消本轮）。
+    单步暂停点：该步用例已执行完毕，只接受 next / pass（放行）、abort、cancel。
+    两类暂停点共用这一个接口与 task["manual"] 快照；中止与取消的收尾路径一致。
     """
     raw = (req.decision or "").strip().lower()
-    if raw not in ("next", "abort", "continue", "stop", "cancel"):
-        return {"success": False, "message": "decision 只支持 next（继续）/ abort（中止）/ cancel（取消本轮）"}
-    if raw in ("abort", "stop"):
+    if raw in ("pass", "next", "continue"):
+        decision = "pass"
+    elif raw == "fail":
+        decision = "fail"
+    elif raw in ("abort", "stop"):
         decision = "abort"
     elif raw == "cancel":
         decision = "cancel"
     else:
-        decision = "next"
+        return {"success": False,
+                "message": "decision 只支持 pass（判定通过）/ fail（判定失败）/ abort（中止）/ cancel（取消本轮），旧值 next 等价 pass"}
+    note = (req.note or "").strip()[:500]
+    operator = (req.operator or "").strip()[:64]
     kind = "manual"
     with TPS_TASKS_LOCK:
         task = TPS_TASKS.get(task_id)
@@ -2061,17 +2139,26 @@ def tps_task_manual(task_id: str, req: ManualDecisionRequest):
         if manual.get("status") != "waiting":
             return {"success": False, "message": "当前没有等待操作员确认的暂停点"}
         kind = str(manual.get("kind") or "manual")
-        task["manual"] = {**manual, "decision": decision}
+        if kind == "step" and decision == "pass":
+            decision = "next"                  # 单步暂停点沿用旧值
+        if kind != "manual" and decision == "fail":
+            # 单步暂停点的用例已经跑完，不能再改判失败
+            return {"success": False, "message": "单步暂停点只支持 next（继续）/ abort（中止）/ cancel（取消本轮）"}
+        task["manual"] = {**manual, "decision": decision, "note": note, "operator": operator}
+        task_status = task.get("status")
     event = MANUAL_WAITS.get(task_id)
     if event:
         event.set()
-    if decision == "next":
-        msg = "已提交：执行下一条" if kind == "step" else "已提交操作员选择：继续下一步"
+    if decision == "fail":
+        msg = "已提交：判定失败" + (f"（{note}）" if note else "")
+    elif decision in ("pass", "next"):
+        msg = "已提交：执行下一条" if kind == "step" else "已提交：判定通过"
     elif decision == "cancel":
         msg = "已提交：取消本轮测试（剩余测试条目跳过，收尾动作照常执行）"
     else:
         msg = "已提交：中止本轮测试"
-    return {"success": True, "decision": decision, "message": msg}
+    return {"success": True, "decision": decision, "message": msg,
+            "note": note, "operator": operator, "status": task_status}
 
 
 @app.post("/api/tps-tasks/{task_id}/cancel")

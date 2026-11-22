@@ -166,7 +166,7 @@ onMounted(load)
         </div>
       </div>
       <div class="hd-right">
-        <span class="src-chip" :class="info.source || 'unknown'">
+        <span class="src-chip" :class="info.source || 'unknown'" data-testid="shelf-source-chip">
           {{ sourceLabel }}
           <template v-if="info.channel"> · {{ info.channel }}</template>
         </span>
@@ -196,7 +196,7 @@ onMounted(load)
     <div v-else-if="!shown.length" class="tip">没有匹配的助手。</div>
 
     <section v-else class="grid">
-      <article v-for="it in shown" :key="it.id" class="card" :class="{ own: it.installed }">
+      <article v-for="it in shown" :key="it.id" class="card" :class="{ own: it.installed }" data-testid="assistant-card">
         <div class="card-top">
           <img class="ico" :src="it.icon_url" :alt="it.name" loading="lazy" />
           <div class="id-box">

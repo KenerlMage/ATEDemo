@@ -68,9 +68,10 @@ export const api = {
     const q = qs.toString()
     return request(`/api/tps-tasks/${taskId}/logs${q ? '?' + q : ''}`)
   },
-  // 人工操作环节（cmd_suit 里 type=manual）：提交操作员选择 next（继续）/ abort（中止）
-  decideTpsManual: (taskId, decision) =>
-    request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision }) }),
+  // 人工确认（cmd_suit 里 type=manual）：pass（判定通过）/ fail（判定失败，可带备注）
+  // / abort（中止）/ cancel（取消本轮）；旧值 next 等价 pass
+  decideTpsManual: (taskId, decision, note = '') =>
+    request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision, note }) }),
   // 取消本轮测试：运行中与等待操作员确认期间均可发起（剩余测试条目跳过、收尾段照常执行）
   cancelTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}/cancel`, { method: 'POST' }),
   // ---- 云端数据库（演示）：生产模式的测试结果上报 ----
