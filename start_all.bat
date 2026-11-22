@@ -16,14 +16,31 @@ rem ---------- 1/5 python ----------
 echo [1/5] Checking Python...
 set "PY=python"
 set "PYABS=python"
-if exist "backend\.venv\Scripts\python.exe" (
+if defined ATE_PYTHON if exist "%ATE_PYTHON%" (
+  set "PY=%ATE_PYTHON%"
+  set "PYABS=%ATE_PYTHON%"
+  echo [1/5] Using ATE_PYTHON
+)
+if not defined ATE_PYTHON if exist "backend\.venv\Scripts\python.exe" (
   set "PY=backend\.venv\Scripts\python.exe"
   set "PYABS=%~dp0backend\.venv\Scripts\python.exe"
   echo [1/5] Using venv: backend\.venv
 )
+if not defined ATE_PYTHON if not exist "backend\.venv\Scripts\python.exe" (
+  python --version >nul 2>&1
+  if not errorlevel 1 (
+    echo [1/5] Creating backend\.venv for a clean, portable install...
+    python -m venv backend\.venv >nul 2>&1
+    if exist "backend\.venv\Scripts\python.exe" (
+      set "PY=backend\.venv\Scripts\python.exe"
+      set "PYABS=%~dp0backend\.venv\Scripts\python.exe"
+      echo [1/5] Using venv: backend\.venv ^(created^)
+    )
+  )
+)
 %PY% --version >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] Python not found in PATH. Please install Python 3 first.
+  echo [ERROR] Python 3.10+ not found. Install it and add to PATH, or set ATE_PYTHON.
   pause
   exit /b 1
 )
@@ -33,7 +50,11 @@ echo [2/5] Checking backend dependencies...
 %PY% -c "import fastapi, uvicorn" >nul 2>&1
 if errorlevel 1 (
   echo [2/5] Installing backend dependencies...
-  %PY% -m pip install -r backend\requirements.txt -q
+  if exist wheels (
+    %PY% -m pip install --no-index --find-links wheels -r backend\requirements.txt -q
+  ) else (
+    %PY% -m pip install -r backend\requirements.txt -q
+  )
   %PY% -c "import fastapi, uvicorn" >nul 2>&1
   if errorlevel 1 (
     echo [ERROR] Backend dependency install failed. Check network and retry.
