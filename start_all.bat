@@ -42,7 +42,21 @@ if errorlevel 1 (
   )
 )
 
-rem ---------- 3/5 frontend deps and build output ----------
+rem ---------- 3/5 frontend build output ----------
+rem frontend/dist is committed: target PC does not need Node.js;
+rem only try npm when dist is missing (requires Node.js).
+if exist frontend\dist\index.html (
+  echo [3/5] frontend/dist found - skip Node/npm.
+  goto :frontend_ready
+)
+echo [3/5] frontend/dist missing - Node.js is required to build it.
+where npm >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] Node.js/npm not found and frontend\dist is missing.
+  echo         Either copy a built frontend\dist here, or install Node.js 18+ and retry.
+  pause
+  exit /b 1
+)
 if not exist frontend\node_modules (
   echo [3/5] Installing frontend dependencies...
   call npm install --prefix frontend
@@ -51,18 +65,15 @@ if not exist frontend\node_modules (
     pause
     exit /b 1
   )
-) else (
-  echo [3/5] Frontend dependencies already installed.
 )
-if not exist frontend\dist\index.html (
-  echo [3/5] Building frontend for first run...
-  call npm run build --prefix frontend
-  if errorlevel 1 (
-    echo [ERROR] Frontend build failed.
-    pause
-    exit /b 1
-  )
+echo [3/5] Building frontend...
+call npm run build --prefix frontend
+if errorlevel 1 (
+  echo [ERROR] Frontend build failed.
+  pause
+  exit /b 1
 )
+:frontend_ready
 
 rem ---------- 4/5 port check ----------
 netstat -ano | findstr ":%BACKEND_PORT% " | findstr LISTENING >nul 2>&1

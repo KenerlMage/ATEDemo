@@ -1,4 +1,4 @@
-# ---- dependencies / virtualenv ----
+ï»¿# ---- dependencies / virtualenv ----
 **/.venv/
 **/venv/
 **/env/
@@ -10,7 +10,9 @@
 # ---- build output ----
 **/dist/
 **/build/
-frontend/dist/
+# frontend/dist is committed on purpose: target PCs may not have Node.js.
+!frontend/dist/
+!frontend/dist/**
 
 # ---- secrets / licenses (DO NOT COMMIT) ----
 backend/tools/private_key.pem
@@ -105,15 +107,15 @@ backend/metadata_cache/
 # ---- åŠ©æ‰‹è´§æ¶ç¼“å­˜ï¼ˆæ¸…å•æ¥æºä¸º MockControllerï¼Œç¼“å­˜ä¸å…¥åº“ï¼‰----
 **/assistant_shelf/cache/
 
-# ---- Controller Îï»¯ÏÂÀ´µÄ TPS ÔËĞĞ¸±±¾£¨ÔËĞĞÊ±Éú³É£©----
+# ---- Controller ï¿½ï»¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ TPS ï¿½ï¿½ï¿½Ğ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½É£ï¿½----
 backend/testresource/*-tps*/
 
 
-# ---- pytest ÁÙÊ±Ä¿Â¼ ----
+# ---- pytest ï¿½ï¿½Ê±Ä¿Â¼ ----
 **/.pytest_tmp/
 
 
-# ---- TPS µ¼Èë²úÉúµÄ±¾µØÔËĞĞ¸±±¾£¨ÔËĞĞÊ±Êı¾İ£©----
+# ---- TPS ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½İ£ï¿½----
 backend/testresource/*/
 !backend/testresource/spm_rh_dyn/
 !backend/testresource/mc_demo_tps/
