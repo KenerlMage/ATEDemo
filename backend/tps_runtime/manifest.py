@@ -357,8 +357,20 @@ def case_entries(tps: dict) -> dict:
                 # 单步执行：跑完这条暂停等操作员点「下一步」（对人工条目无意义，人工条目本身就是暂停点）
                 "step": is_step_hold(case) and not manual,
                 "hold_timeout_s": case.get("timeout_s") if (is_step_hold(case) and not manual) else None,
+                # 单用例人工确认门禁（SR02-AR04）：true 或 {role, fields}；与 manual 互不影响
+                "manual_check": case.get("manual_check") if case.get("manual_check") not in (None, False) else None,
+                # 标定类步骤（SR02-AR05）：显式 type=calib 或 calibration=true
+                "calib": is_calib_case(case),
             })
     return out
+
+
+def is_calib_case(case: dict) -> bool:
+    """标定类用例：type/kind/case_type 为 calib|标定，或 calibration=true。"""
+    for key in ("type", "kind", "case_type", "tps_type"):
+        if str(case.get(key) or "").strip().lower() in ("calib", "calibration", "标定"):
+            return True
+    return case.get("calibration") is True
 
 
 def steps_of(tps: dict) -> list[dict]:
@@ -388,6 +400,15 @@ def steps_of(tps: dict) -> list[dict]:
                     "step": bool(case.get("step")),
                 },
             }
+            # manual_check 与标定标识原样带到步骤快照，执行页与 manual_check 模块都读这里
+            if case.get("manual_check"):
+                step["manual_check"] = case["manual_check"]
+                step["v2"]["manual_check"] = case["manual_check"]
+            if case.get("calib"):
+                step["calibration"] = True
+                step["type"] = "calib"
+                step["v2"]["calib"] = True
+                step["v2"]["kind"] = "calib"
             if manual:
                 step["manual"] = {
                     "id": case["id"],

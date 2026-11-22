@@ -364,6 +364,18 @@ def list_tasks():
     return {"success": True, "tasks": items[:50]}
 
 
+# ---- 机器常数执行侧（需求 SR02）：解析/写入/校验、人工确认、标定 ----
+for _mod_name in ("const_runtime", "manual_check", "calib"):
+    try:
+        _mod = __import__(_mod_name)
+        _register = getattr(_mod, "register_routes", None)
+        if _register:
+            _register(app, BASE_DIR, DB_PATH)
+        print(f"[ok] {_mod_name} 已挂载")
+    except Exception as _exc:  # noqa: BLE001
+        print(f"[warn] {_mod_name} 未挂载: {_exc}")
+
+
 @app.get("/api/health")
 def health():
     return {"success": True, "service": "ATE-Backend", "status": "running", "time": now_str(),

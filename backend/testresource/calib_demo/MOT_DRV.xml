@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MachineConstants schema="ate.constants.v2" module="MOT_DRV" pn="MOT-DRV-02"
+                  version="2026.11.02" calibrated="false" sn="" generatedAt="2026-11-20T09:00:00+08:00">
+  <Meta product="1000-A" subsystem="MOT" name="马达驱动板机常数" />
+  <Fields>
+    <Field key="drive_gain" label="驱动增益" type="float" unit=""
+           default="1.0" min="0.8" max="1.2" value="" />
+    <Field key="pole_pairs" label="极对数" type="int" unit="对"
+           default="8" min="1" max="16" value="" />
+    <Field key="direction" label="旋转方向" type="enum" unit=""
+           default="CW" values="CW,CCW" value="" />
+  </Fields>
+</MachineConstants>

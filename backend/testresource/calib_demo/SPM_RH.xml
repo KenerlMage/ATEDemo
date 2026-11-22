@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MachineConstants schema="ate.constants.v2" module="SPM_RH" pn="SPM-RH-01"
+                  version="2026.11.01" calibrated="false" sn="" generatedAt="2026-11-20T09:00:00+08:00">
+  <Meta product="1000-A" subsystem="SPM" name="SPM 读头机常数" />
+  <Fields>
+    <Field key="gain_offset" label="增益偏移" type="float" unit="mV"
+           default="0.0" min="-50.0" max="50.0" value="" />
+    <Field key="bias_voltage" label="偏置电压" type="float" unit="V"
+           default="1.85" min="1.5" max="2.2" value="" />
+    <Field key="head_grade" label="读头等级" type="enum" unit=""
+           default="B" values="A,B,C" value="" />
+  </Fields>
+</MachineConstants>

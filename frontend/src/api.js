@@ -74,6 +74,15 @@ export const api = {
     request(`/api/tps-tasks/${taskId}/manual`, { method: 'POST', body: JSON.stringify({ decision, note }) }),
   // 取消本轮测试：运行中与等待操作员确认期间均可发起（剩余测试条目跳过、收尾段照常执行）
   cancelTpsTask: (taskId) => request(`/api/tps-tasks/${taskId}/cancel`, { method: 'POST' }),
+  // 单用例 manual check：人工确认后才回传 MES（SR02-AR04）
+  manualChecks: (taskId) => request(`/api/runner/manual-check/${taskId}`),
+  decideManualCheck: (taskId, stepIndex, decision, note = '', operator = '') =>
+    request(`/api/runner/manual-check/${taskId}/${stepIndex}`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, note, operator })
+    }),
+  // 标定分区与标识（SR02-AR05）
+  taskCalib: (taskId) => request(`/api/runner/tasks/${taskId}/calib`),
   // ---- 云端数据库（演示）：生产模式的测试结果上报 ----
   // 云端连接状态 + 工单维度入库统计
   getCloudStatus: () => request('/api/cloud/status'),

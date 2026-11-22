@@ -279,6 +279,67 @@ function renderMarkdown(md, tpsId) {
   return html
 }
 
+// ---- 单用例 manual check：人工确认后才回传机器常数与测角结果（SR02-AR04）----
+const checkState = ref({})       // { stepIndex: { decision, note, at } }
+const checkSubmitting = ref(0)   // 正在提交的步骤序号，0 表示空闲
+const checkError = ref('')
+
+function stepNeedsCheck(st) {
+  return st?.manual_check === true || (st?.manual_check && typeof st.manual_check === 'object')
+}
+
+async function loadChecks() {
+  const id = currentTask.value?.id
+  if (!id) return
+  try {
+    const res = await api.manualChecks(id)
+    if (res && res.success) {
+      // 待确认接口只回未决项：保留本地已确认/已驳回的记录，避免状态回退
+      const map = { ...checkState.value }
+      for (const item of res.items || []) map[item.step_index] = item
+      checkState.value = map
+    }
+  } catch (e) {
+    // 未挂载时静默：不阻断执行主链路
+  }
+}
+
+async function submitCheck(stepIndex, decision) {
+  const id = currentTask.value?.id
+  if (!id || checkSubmitting.value) return
+  let note = ''
+  if (decision === 'reject') {
+    note = window.prompt('驳回原因（必填，将写入记录）', '') || ''
+    if (!note.trim()) return
+  }
+  checkSubmitting.value = stepIndex
+  checkError.value = ''
+  try {
+    const res = await api.decideManualCheck(id, stepIndex, decision, note)
+    if (!res.success) checkError.value = res.message || '提交失败'
+    else {
+      // 就地记录决策：任务结束后轮询已停，不能只依赖下一次 loadChecks
+      checkState.value = {
+        ...checkState.value,
+        [stepIndex]: { step_index: stepIndex, decision, note, pushed: res.pushed !== false }
+      }
+      await loadChecks()
+    }
+  } catch (e) {
+    checkError.value = '提交失败：' + e.message
+  } finally {
+    checkSubmitting.value = 0
+  }
+}
+
+// 标定类步骤：Controller 侧标定 TPS 或步骤声明 type=calib（SR02-AR05）
+const calibSteps = computed(() =>
+  steps.value
+    .map((st, i) => ({ st, index: i + 1 }))
+    .filter(({ st }) => st?.type === 'calib' || st?.calibration === true || st?.v2?.calib === true)
+)
+const hasCalib = computed(() => calibSteps.value.length > 0)
+
 async function answerManual(decision, note = '') {
   const id = currentTask.value?.id
   if (!id || manualBusy.value) return
@@ -710,6 +771,8 @@ async function pollTask() {
     if (!res.success) return
     currentTask.value = { ...currentTask.value, ...res }
     if (res.cloud) cloud.value = res.cloud
+    // 步骤有新结果时同步 manual check 待确认项（接口未挂载时静默）
+    await loadChecks()
     await nextTick()
     // 日志面板自动滚到底部（用户上翻查看历史时不打扰）
     if (logEl.value) {
@@ -1095,6 +1158,13 @@ onUnmounted(() => {
         </div>
         <div v-if="stepHoldOpen && manualError" class="tip err">{{ manualError }}</div>
 
+        <!-- 标定模式条：本次执行含标定步骤时置顶提示（SR02-AR05） -->
+        <div v-if="hasCalib" class="calib-bar" data-testid="calib-bar">
+          <span class="calib-tag">标定</span>
+          <span class="calib-text">本次执行含 {{ calibSteps.length }} 个标定步骤，结果为标定常数，不参与合格判定</span>
+        </div>
+        <div v-if="checkError" class="tip err">{{ checkError }}</div>
+
         <div v-if="loadingDetail && !steps.length" class="panel-tip">正在加载步骤…</div>
         <div v-else-if="!steps.length" class="panel-tip">该 TPS 没有定义步骤</div>
         <ol v-else class="step-list">
@@ -1109,11 +1179,46 @@ onUnmounted(() => {
               <div class="step-meta">
                 <span class="step-type" :class="{ 'step-type-manual': st.manual }">{{ st.manual ? '人工操作' : ({ init: '环境初始化', test: '测试用例', teardown: '环境终止' }[st.type] || st.type) }}</span>
                 <span v-if="st.v2?.step" class="step-type step-type-step">单步暂停点</span>
+                <span
+                  v-if="st.type === 'calib' || st.calibration === true || st.v2?.calib === true"
+                  class="step-type step-type-calib"
+                  data-testid="step-calib-badge"
+                >标定</span>
                 <span v-if="stepState[i + 1]?.duration != null" class="step-dur">
                   耗时 {{ stepState[i + 1].duration.toFixed(2) }}s
                 </span>
               </div>
               <pre v-if="stepState[i + 1]?.detail" class="step-detail">{{ stepState[i + 1].detail }}</pre>
+              <!-- manual check：该步执行完后由人工确认，确认后机器常数与测角结果才回传 MES -->
+              <div
+                v-if="stepNeedsCheck(st) && stepState[i + 1] && stepState[i + 1].status !== 'running'"
+                class="check-row"
+                data-testid="manual-check-row"
+              >
+                <template v-if="checkState[i + 1]?.decision === 'confirm'">
+                  <span class="check-done">✓ 已人工确认并回传</span>
+                </template>
+                <template v-else-if="checkState[i + 1]?.decision === 'reject'">
+                  <span class="check-rejected">✗ 已驳回：{{ checkState[i + 1].note }}</span>
+                  <button class="btn ghost small" :disabled="checkSubmitting === i + 1" @click="submitCheck(i + 1, 'confirm')">
+                    改为确认回传
+                  </button>
+                </template>
+                <template v-else>
+                  <span class="check-hint">本步结果待人工确认，确认后才回传 MES</span>
+                  <button
+                    class="btn primary small"
+                    data-testid="manual-check-confirm"
+                    :disabled="checkSubmitting === i + 1"
+                    @click="submitCheck(i + 1, 'confirm')"
+                  >确认回传</button>
+                  <button
+                    class="btn ghost small"
+                    :disabled="checkSubmitting === i + 1"
+                    @click="submitCheck(i + 1, 'reject')"
+                  >驳回</button>
+                </template>
+              </div>
               <div v-if="stepHoldOpen && manual.id && st.v2?.id === manual.id" class="step-hold-row">
                 <span class="step-hold-hint">本条已执行完毕，等待放行</span>
                 <button class="btn primary step-next" :disabled="manualSubmitting" @click="answerManual('next')">
@@ -1773,6 +1878,63 @@ onUnmounted(() => {
 
 /* ---- 单步执行（cmd_suit 条目 step=true）---- */
 .step-type-step { color: var(--accent); font-weight: 600; }
+.calib-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(109, 40, 217, 0.35);
+  border-radius: 8px;
+  background: rgba(109, 40, 217, 0.07);
+  font-size: 12.5px;
+  color: var(--accent);
+}
+
+.calib-tag {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.step-type-calib {
+  background: rgba(109, 40, 217, 0.12);
+  color: var(--accent);
+  border-color: rgba(109, 40, 217, 0.35);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed rgba(109, 40, 217, 0.4);
+  border-radius: 7px;
+  background: rgba(109, 40, 217, 0.04);
+  font-size: 12px;
+}
+
+.check-hint {
+  color: var(--muted);
+}
+
+.check-done {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.check-rejected {
+  color: var(--err);
+  font-weight: 600;
+}
+
 .step-hold-banner {
   display: flex;
   align-items: center;

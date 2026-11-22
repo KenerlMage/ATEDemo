@@ -115,10 +115,14 @@ backend/testresource/*-tps*/
 
 # ---- TPS 导入产生的本地运行副本（运行时数据）----
 backend/testresource/*/
-!backend/testresource/spm_rh_dyn/\n!backend/testresource/mc_demo_tps/\n
+!backend/testresource/spm_rh_dyn/
+!backend/testresource/mc_demo_tps/
 
 # ---- runtime workspace (娴嬭瘯杩愯鍓湰) ----
 workspace/
 backend/testresource/*/
 !backend/testresource/spm_rh_dyn/
-
+!backend/testresource/calib_demo/
+**/.pytest_tmp*/
+backend/manual_check.json
+backend/remote_targets.json

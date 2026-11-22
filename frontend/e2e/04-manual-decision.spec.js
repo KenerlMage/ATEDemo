@@ -113,16 +113,18 @@ test.describe('人工确认弹窗', () => {
     await seedLogin(page)
     await page.goto('/execute')
 
-    // 2) 展开树（默认折叠），选中刚导入的 TPS
+    // 2) 选中刚导入的 TPS：按可见性决定是否展开，不假设初始折叠状态
     const tree = page.getByTestId('equipment-tree')
     await expect(tree).toBeVisible()
-    const projectRow = tree.locator('.tree-row', { hasText: '未分组项目' }).first()
-    if (await projectRow.count()) {
-      await projectRow.click()
-      const dutRow = tree.locator('.tree-row', { hasText: '未分组 DUT' }).first()
-      if (await dutRow.count()) await dutRow.click()
-    }
     const tpsNode = tree.locator('.tree-node.tps', { hasText: 'E2E 人工判定 TPS' }).first()
+    const isOpen = async () => tpsNode.isVisible().catch(() => false)
+
+    if (!(await isOpen())) {
+      await tree.locator('.tree-row', { hasText: '未分组项目' }).first().click()
+    }
+    if (!(await isOpen())) {
+      await tree.locator('.tree-row', { hasText: '未分组 DUT' }).first().click()
+    }
     await expect(tpsNode).toBeVisible({ timeout: 15_000 })
     await tpsNode.click()
 
