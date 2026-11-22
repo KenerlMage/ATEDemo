@@ -33,4 +33,25 @@ test.describe('测试执行页', () => {
     await expect(report).toBeVisible()
     await expect(report.getByText('测试报告', { exact: true })).toBeVisible()
   })
+
+  test('部署清单可隐藏，偏好跨刷新保持', async ({ page }) => {
+    const toggle = page.getByTestId('deploy-list-toggle')
+    await expect(toggle).toBeVisible()
+    await expect(toggle).toHaveText('隐藏清单')
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+    await toggle.click()
+    await expect(toggle).toHaveText(/^显示清单/)
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('deploy-pending-panel')).toHaveCount(0)
+    expect(await page.evaluate(() => localStorage.getItem('ate_deploy_list_hidden'))).toBe('1')
+
+    // 刷新后仍是隐藏态
+    await page.reload()
+    await expect(page.getByTestId('deploy-list-toggle')).toHaveText(/^显示清单/)
+
+    await page.getByTestId('deploy-list-toggle').click()
+    await expect(page.getByTestId('deploy-list-toggle')).toHaveText('隐藏清单')
+    expect(await page.evaluate(() => localStorage.getItem('ate_deploy_list_hidden'))).toBe('0')
+  })
 })

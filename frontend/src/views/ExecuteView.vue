@@ -48,6 +48,14 @@ const deployMsg = ref('')
 const deployError = ref('')
 let deployTimer = null
 const deployInstalled = ref([])
+// 部署清单是否隐藏：操作员可收起列表，只看按钮；偏好持久化在本机
+const DEPLOY_LIST_KEY = 'ate_deploy_list_hidden'
+const deployListHidden = ref(localStorage.getItem(DEPLOY_LIST_KEY) === '1')
+const deployListCount = computed(() => deployItems.value.length + deployInstalled.value.length)
+const toggleDeployList = () => {
+  deployListHidden.value = !deployListHidden.value
+  localStorage.setItem(DEPLOY_LIST_KEY, deployListHidden.value ? '1' : '0')
+}
 const cloudReuploading = ref(false)
 const cloudStatus = ref(null)      // 云端（演示）连接状态与入库统计
 const cloudRecords = ref([])       // 云端库已入库记录
@@ -1093,11 +1101,20 @@ onUnmounted(() => {
             {{ deploying ? '部署中…' : '📦 部署软件' }}
           </button>
           <button class="btn ghost small" :disabled="!deployBatch" @click="refreshDeploy">部署状态</button>
+          <button
+            class="btn ghost small"
+            data-testid="deploy-list-toggle"
+            :aria-pressed="deployListHidden"
+            :title="deployListHidden ? '展开待部署与已部署软件列表' : '收起部署清单，仅保留部署按钮'"
+            @click="toggleDeployList"
+          >
+            {{ deployListHidden ? `显示清单${deployListCount ? `（${deployListCount}）` : ''}` : '隐藏清单' }}
+          </button>
           <span v-if="deployMsg" class="tip ok">{{ deployMsg }}</span>
           <span v-if="deployError" class="tip err">{{ deployError }}</span>
           <span v-if="deployBusy" class="tip">同一时间只执行一个部署批次</span>
         </div>
-        <div v-if="deployItems.length" class="deploy-panel">
+        <div v-if="!deployListHidden && deployItems.length" class="deploy-panel" data-testid="deploy-pending-panel">
           <div class="deploy-head">待部署软件（{{ deployItems.length }}）</div>
           <div v-for="it in deployItems" :key="it.seq" class="deploy-item">
             <span class="deploy-name">{{ it.name || it.object }}<span v-if="it.version" class="deploy-ver"> · {{ it.version }}</span></span>
@@ -1106,7 +1123,7 @@ onUnmounted(() => {
             <span v-if="it.installed_version" class="deploy-badge ok">已装 {{ it.installed_version }}</span>
           </div>
         </div>
-        <div v-if="deployInstalled.length" class="deploy-panel">
+        <div v-if="!deployListHidden && deployInstalled.length" class="deploy-panel" data-testid="deploy-installed-panel">
           <div class="deploy-head">已部署软件（{{ deployInstalled.length }}）</div>
           <div v-for="r in deployInstalled" :key="r.target_id + r.object" class="deploy-item">
             <span class="deploy-name">{{ r.object }}<span class="deploy-ver"> · v{{ r.version }}</span></span>
