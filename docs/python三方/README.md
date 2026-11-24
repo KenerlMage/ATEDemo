@@ -2,7 +2,7 @@
 
 > 适用：MockController + MockRunner 部署在**无外网**的测试台小网环境。
 > 对应需求：`docs/需求设计/controller/软件部署功能.md` 的 SR03（Controller 供给）与 SR04（Runner 执行）。
-> 版本：v1.1　2026-11-08（锁文件改为 Controller 扫描用例自动生成）
+> 版本：v1.2　2026-11-24（锁文件升级为 v2：Python 3.9.11、备案目录、单 whl）
 
 ## 1. 结论
 
@@ -72,43 +72,59 @@ envs/
 
 ```json
 {
-  "schema": "ate.python.lock/v1",
-  "python": "3.13",
-  "platform": "win_amd64",
-  "base": "1000-A/SPM/cp313-win_amd64",
-  "sdk": { "name": "ate-sdk", "range": ">=2.3,<3.0" },
+  "schema": "ate.python.lock/v2",
+  "tps_id": "spm_rh_dyn",
+  "tps_version": "3.1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "python": "3.9.11",
+    "abi": "cp39",
+    "platform": "win_amd64"
+  },
+  "catalog": {
+    "rev": 42,
+    "source": "manufacturing-version-server"
+  },
+  "sdk": {
+    "name": "atefr",
+    "version": "1.0.0",
+    "range": ">=1.0,<2.0"
+  },
   "packages": [
     {
       "name": "numpy",
-      "version": "2.1.3",
+      "version": "1.26.4",
+      "filename": "numpy-1.26.4-cp39-cp39-win_amd64.whl",
       "sha256": "9f2c...",
-      "wheel": "numpy/2.1.3/cp313-win_amd64/numpy-2.1.3-cp313-cp313-win_amd64.whl",
-      "source": "mcs-registry"
-    },
-    {
-      "name": "opencv-python",
-      "version": "4.10.0.84",
-      "sha256": "1a7b...",
-      "wheel": "opencv-python/4.10.0.84/cp313-win_amd64/opencv_python-4.10.0.84-cp313-cp313-win_amd64.whl",
-      "source": "mcs-registry"
+      "size": 15873221,
+      "tags": ["cp39", "cp39", "win_amd64"],
+      "top_level": ["numpy"],
+      "implicit": false,
+      "reason": "default"
     }
   ],
-  "notes": "视觉检测 TPS 专用；numpy 固定在 2.x"
+  "generated_at": "2026-11-24T10:15:30+08:00",
+  "generated_by": "controller",
+  "generator_version": "1.0.0"
 }
 ```
+
+可直接复制的空白模板见 [python.lock.template.json](python.lock.template.json)。模板只用于阅读和联调，TPS 内的锁仍由 Controller 生成。
 
 字段规则：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `schema` | 是 | 固定 `ate.python.lock/v1`，后续不兼容变更升 v2 |
-| `python` | 是 | 只写 `major.minor`；小版本由 Runner 解释器决定 |
-| `platform` | 是 | `win_amd64` / `linux_x86_64`；与 wheel 标签一致 |
-| `base` | 是 | 使用的子系统基础环境键；没有基础环境时填 `none` |
-| `sdk` | 是 | Runner SDK 兼容范围，启动时校验 |
+| `schema` | 是 | 固定 `ate.python.lock/v2` |
+| `runtime.python` | 是 | 精确到补丁版本，当前基线 `3.9.11` |
+| `runtime.abi` / `platform` | 是 | `cp39` 与 `win_amd64` / `linux_x86_64`，必须与 wheel 标签一致 |
+| `catalog.rev` | 是 | 生成锁时依据的备案目录版本，用于审计 |
+| `sdk` | 是 | 平台公共代码名称、版本与兼容范围，启动时校验 |
 | `packages[]` | 是 | 允许为空数组（纯标准库 TPS） |
-| `packages[].sha256` | 是 | 与 Controller 仓内文件一致，安装前逐个校验 |
-| `packages[].wheel` | 是 | 相对 `wheels/` 的路径，避免同名文件歧义 |
+| `packages[].sha256` | 是 | 单个 whl 的内容哈希，下载与安装前逐个校验 |
+| `packages[].filename` | 是 | 仅文件名；Controller 按 sha256 定位 blob |
+| `packages[].tags` | 是 | `[python_tag, abi_tag, platform_tag]` |
+| `packages[].implicit` | 是 | `true` 表示由平台 SDK 带入的隐式依赖 |
 
 ### 4.1 生成流程
 
@@ -116,9 +132,9 @@ envs/
 上传 TPS zip
   → 解包，定位包内全部 .py
   → AST 解析 import / from ... import
-  → 分类：标准库 / Runner SDK / 包内模块 / 三方模块
-  → 三方模块反查发行包（离线仓 top_level.txt、RECORD）
-  → 选版（基础环境优先，仓内最新兼容版次之）
+  → 分类：标准库（3.9）/ Runner SDK / 包内模块 / 三方模块
+  → 三方模块反查发行包（备案目录 top_level.txt、RECORD）
+  → 选版（备案目录 default 优先；已有锁版本仍有效则保留）
   → 传递闭包（wheel METADATA 的 Requires-Dist，过滤环境标记）
   → 冲突、缺包、平台不符则发布失败
   → 写 python.lock 并封存进 TPS
@@ -140,9 +156,9 @@ import 名与发行包名经常不一致（`cv2` → `opencv-python`、`yaml` �
 
 | 优先级 | 规则 |
 | --- | --- |
-| 1 | 子系统基础环境已含该包 → 用基础环境版本，不重复装 |
-| 2 | 否则取离线仓内满足 Python/平台标签的最新版 |
-| 3 | 传递依赖按上述同样规则逐个选版，已选定的版本不再被后续依赖改写 |
+| 1 | 已有锁中的版本仍为 `approved` → 保留，不因目录新增版本而升级 |
+| 2 | 新出现的包 → 取备案目录中 `is_default=1` 的版本 |
+| 3 | 传递依赖按同样规则逐个选版，已选定的版本不再被后续依赖改写 |
 | 4 | 两个直接依赖对同一包提出互斥范围 → 发布失败，列出两条依赖链 |
 
 不做"自动升降级兜底"：解不出来就失败，把问题留在发布阶段。
@@ -168,7 +184,7 @@ Controller 把它并入扫描结果后照常选版；**仍然不接受版本号*
   "scanned_files": 14,
   "imports": ["numpy", "cv2", "serial"],
   "resolved": [
-    { "module": "cv2", "package": "opencv-python", "version": "4.10.0.84", "reason": "repo-latest" },
+    { "module": "cv2", "package": "opencv-python", "version": "4.10.0.84", "reason": "catalog-default" },
     { "module": "numpy", "package": "numpy", "version": "2.1.3", "reason": "base-env" }
   ],
   "warnings": ["dynamic import in testcase/impl.py:42"],
@@ -177,6 +193,19 @@ Controller 把它并入扫描结果后照常选版；**仍然不接受版本号*
 ```
 
 用于回答"为什么装了这个版本"，也用于对比两次发布的环境差异。
+
+### 4.6 模板文件
+
+本目录的 [python.lock.template.json](python.lock.template.json) 是 v2 空白模板，字段与本节一致。
+
+使用方式：
+
+```powershell
+# 仅用于本地阅读、联调或 Mock；正式 TPS 的锁由 Controller 发布时生成
+Copy-Item docs\python三方\python.lock.template.json <TPS目录>\python.lock
+```
+
+模板中的 `REPLACE_*`、`0`、`REPLACE_ISO8601` 必须替换为真实值；`packages` 至少保留一项，纯标准库 TPS 改为空数组。
 
 ## 5. Controller 侧职责
 

@@ -1,0 +1,43 @@
+{
+  "schema": "ate.python.lock/v2",
+  "tps_id": "REPLACE_TPS_ID",
+  "tps_version": "REPLACE_TPS_VERSION",
+  "runtime": {
+    "implementation": "cpython",
+    "python": "3.9.11",
+    "abi": "cp39",
+    "platform": "win_amd64"
+  },
+  "catalog": {
+    "rev": 0,
+    "source": "manufacturing-version-server",
+    "signed_at": "REPLACE_ISO8601"
+  },
+  "sdk": {
+    "name": "atefr",
+    "version": "1.0.0",
+    "range": ">=1.0,<2.0"
+  },
+  "packages": [
+    {
+      "name": "REPLACE_DISTRIBUTION",
+      "version": "REPLACE_VERSION",
+      "filename": "REPLACE_WHEEL_FILENAME.whl",
+      "sha256": "REPLACE_WITH_64_HEX",
+      "size": 0,
+      "tags": [
+        "cp39",
+        "cp39",
+        "win_amd64"
+      ],
+      "top_level": [
+        "REPLACE_IMPORT_NAME"
+      ],
+      "implicit": false,
+      "reason": "default"
+    }
+  ],
+  "generated_at": "REPLACE_ISO8601",
+  "generated_by": "controller",
+  "generator_version": "1.0.0"
+}
