@@ -12,8 +12,8 @@ docs/需求设计/
 
 | 目录 | 内容 | 说明 |
 | --- | --- | --- |
-| `controller/` | 机器常数功能模块、机器常数实现契约、机器常数实现说明、软件部署功能（含 Python 三方依赖供给 SR03/SR04） | 需求规范**原件**，同时备份在 `D:\ATE\MockController\docs\需求设计\` |
-| `runner/` | 机器常数-Runner侧需求（SR02）、软件部署-Runner侧需求（SR02） | 从 controller 文档抽取的 Runner 章节，附 Runner 实现落点与未覆盖项 |
+| `controller/` | 机器常数功能模块、机器常数实现契约、机器常数实现说明、软件部署功能（含 Python 三方依赖供给 SR03/SR04）、Python三方依赖管理（Controller） | 需求规范**原件**，同时备份在 `D:\ATE\MockController\docs\需求设计\` |
+| `runner/` | 机器常数-Runner侧需求（SR02）、软件部署-Runner侧需求（SR02）、Python三方依赖管理（Runner） | 从 controller 文档抽取的 Runner 章节，附 Runner 实现落点与未覆盖项；Python 三方依赖为独立 Runner 文档 |
 
 ## 为什么这样分
 
@@ -27,6 +27,9 @@ docs/需求设计/
 | --- | --- | --- |
 | 机器常数 | [机器常数功能模块](controller/机器常数功能模块.md)、[实现契约](controller/机器常数实现契约.md)、[实现说明](controller/机器常数实现说明.md) | [机器常数-Runner侧需求](runner/机器常数-Runner侧需求.md) |
 | 软件部署 | [软件部署功能](controller/软件部署功能.md)（含 3.7 Python 依赖形态方案对比与锁文件自动生成） | [软件部署-Runner侧需求](runner/软件部署-Runner侧需求.md) |
+| Python 三方依赖 | [Python三方依赖管理（Controller）](controller/Python三方依赖管理（Controller）.md) | [Python三方依赖管理（Runner）](runner/Python三方依赖管理（Runner）.md) |
+
+方案 PPT：[Python三方依赖治理方案](Python三方依赖治理方案.pptx)
 
 ## 格式
 
