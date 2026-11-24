@@ -1,0 +1,17 @@
+{
+  "object": "REPLACE_OBJECT",
+  "name": "REPLACE_NAME",
+  "version": "REPLACE_VERSION",
+  "entry": "deploy/install.sh",
+  "platform": "linux",
+  "sha256": "REPLACE_WITH_64_HEX",
+  "size": 0,
+  "uploaded_at": "REPLACE_ISO8601",
+  "deploy": {
+    "probe": {
+      "script": "deploy/probe.sh",
+      "timeout_s": 10,
+      "expect_exit_code": 0
+    }
+  }
+}
